@@ -156,6 +156,22 @@
   .btn-add-role { background:transparent; border:1px dashed rgba(83,74,183,.35); border-radius:6px; color:#a89ef0; font-size:.8rem; font-family:'Cinzel',serif; letter-spacing:.08em; padding:.5rem 1rem; cursor:pointer; transition:all .2s; width:100%; margin-top:.4rem; }
   .btn-add-role:hover { border-color:#a89ef0; background:rgba(83,74,183,.08); }
 
+
+  /* ── FIRE METER ── */
+  .fire-meter { background:rgba(46,26,0,.7); border:1px solid var(--amber-mid); border-radius:8px; padding:1.4rem 1.6rem; margin-bottom:1.5rem; text-align:center; backdrop-filter:blur(4px); }
+  .fire-visual { font-size:2.6rem; line-height:1; margin-bottom:.5rem; filter:drop-shadow(0 0 14px rgba(232,74,10,.5)); transition:all .4s; }
+  .fire-tier-label { font-family:'Cinzel',serif; font-size:1.1rem; letter-spacing:.08em; margin-bottom:.2rem; }
+  .fire-tier-petit { color:#9dcf7a; }
+  .fire-tier-grand { color:var(--amber-bright); }
+  .fire-tier-legendaire { color:#f5b832; text-shadow:0 0 20px rgba(245,184,50,.6); }
+  .fire-count { font-size:.9rem; color:var(--amber-warm); font-style:italic; }
+  .fire-progress { height:8px; background:rgba(26,13,0,.6); border-radius:4px; margin:.9rem 0 .5rem; overflow:hidden; border:1px solid rgba(122,61,0,.4); }
+  .fire-progress-bar { height:100%; background:linear-gradient(to right,var(--ember),var(--amber-bright)); border-radius:4px; transition:width .5s ease; }
+  .fire-thresholds { display:flex; justify-content:space-between; font-size:.7rem; color:var(--amber-mid); font-family:'Cinzel',serif; letter-spacing:.05em; }
+  .fire-config-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem; }
+  .fire-mini-input { width:100%; background:rgba(26,13,0,.6); border:1px solid var(--amber-mid); border-radius:4px; padding:.5rem .8rem; font-family:'Cinzel',serif; font-size:.95rem; color:var(--amber-bright); outline:none; text-align:center; }
+  .fire-mini-input:focus { border-color:var(--amber-glow); }
+
   /* ── BADGES ── */
   .type-badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:.7rem; font-family:'Cinzel',serif; letter-spacing:.08em; text-transform:uppercase; }
   .type-objet { background:rgba(196,106,0,.2); color:var(--amber-glow); border:1px solid rgba(196,106,0,.3); }
@@ -189,9 +205,6 @@ const firebaseConfig = {
   messagingSenderId: "527854879287",
   appId: "1:527854879287:web:ffdd2337cacb6c585e35b2"
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
 
   // Détection : config non remplie -> mode local (démo hors-ligne)
   const isConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey !== "TON_API_KEY";
@@ -240,6 +253,15 @@ const app = initializeApp(firebaseConfig);
   <!-- ══ VIEWER PAGE ══ -->
   <div id="page-viewer" class="page active">
     <div class="viewer-container">
+
+      <!-- Fire meter (shown when a game with thresholds is active) -->
+      <div class="fire-meter" id="viewer-fire-meter" style="display:none">
+        <div class="fire-visual" id="fire-visual">🔥</div>
+        <div class="fire-tier-label" id="fire-tier-label">Petit feu</div>
+        <div class="fire-count" id="fire-count">0 ressource réunie</div>
+        <div class="fire-progress"><div class="fire-progress-bar" id="fire-progress-bar" style="width:0%"></div></div>
+        <div class="fire-thresholds" id="fire-thresholds"></div>
+      </div>
 
       <!-- Active game card -->
       <div class="game-card" id="viewer-game-card" style="display:none">
@@ -333,6 +355,25 @@ const app = initializeApp(firebaseConfig);
         <div style="margin-bottom:1rem">
           <label>Règles &amp; objectifs</label>
           <textarea id="game-rules" style="min-height:120px" placeholder="🎯 Objectif : Rassemblez 10 fagots avant que la lune se lève…"></textarea>
+        </div>
+
+        <!-- Fire thresholds -->
+        <div style="margin-bottom:1rem">
+          <label>🔥 Seuils du feu de camp <span style="color:var(--amber-mid);font-size:.8rem">(total des objets 🪵 réunis par tous les villageois)</span></label>
+          <div class="fire-config-row">
+            <div>
+              <div style="font-size:.75rem;color:var(--amber-bright);text-align:center;margin-bottom:.3rem;font-family:'Cinzel',serif">🔥 Grand feu dès</div>
+              <input type="number" min="1" id="fire-threshold-grand" class="fire-mini-input" placeholder="10" value="10">
+            </div>
+            <div>
+              <div style="font-size:.75rem;color:#f5b832;text-align:center;margin-bottom:.3rem;font-family:'Cinzel',serif">✨ Légendaire dès</div>
+              <input type="number" min="1" id="fire-threshold-legendaire" class="fire-mini-input" placeholder="25" value="25">
+            </div>
+          </div>
+          <div style="margin-top:.6rem">
+            <label style="font-size:.85rem">Filtrer par mot-clé <span style="color:var(--amber-mid);font-size:.8rem">(optionnel — ne compter que les objets contenant ce mot, ex: « fagot »). Vide = tous les objets.</span></label>
+            <input type="text" id="fire-filter" placeholder="ex: fagot (laisser vide pour tout compter)" style="margin-top:.3rem">
+          </div>
         </div>
 
         <!-- Craft roles section -->
@@ -460,6 +501,7 @@ function attachListeners(){
     assignments = Object.values(obj);
     renderViewerList();
     updateStats();
+    renderFireMeter();
     if (selectedViewer) renderPanel();
     if (currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
   });
@@ -468,6 +510,7 @@ function attachListeners(){
     activeGame = snap.val() || null;
     updateGameUI();
     updateViewerGameCard();
+    renderFireMeter();
     if (currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
   });
 }
@@ -518,13 +561,13 @@ function fbSetGame(game){
     set(ref(db, 'activeGame'), game);
   } else {
     activeGame = game;
-    updateGameUI(); updateViewerGameCard();
+    updateGameUI(); updateViewerGameCard(); renderFireMeter();
     if(currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
   }
 }
 
 function localAfterAssignmentChange(){
-  renderViewerList(); updateStats();
+  renderViewerList(); updateStats(); renderFireMeter();
   if(selectedViewer) renderPanel();
   if(currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
 }
@@ -717,9 +760,9 @@ function renderPanel(){
     const qty = a.qty??1;
     const stepper = isObjet ? `
       <div style="display:flex;align-items:center;gap:0;margin-top:6px">
-        <button onclick="changeQty(${a.id},-1)" style="width:26px;height:26px;background:rgba(26,13,0,.6);border:1px solid var(--amber-mid);border-radius:4px 0 0 4px;color:var(--amber-warm);font-size:1rem;cursor:pointer;line-height:1;transition:all .15s" onmouseover="this.style.background='rgba(122,61,0,.3)'" onmouseout="this.style.background='rgba(26,13,0,.6)'">−</button>
+        <button onclick="changeQty('${escAttr(a.id)}',-1)" style="width:26px;height:26px;background:rgba(26,13,0,.6);border:1px solid var(--amber-mid);border-radius:4px 0 0 4px;color:var(--amber-warm);font-size:1rem;cursor:pointer;line-height:1;transition:all .15s" onmouseover="this.style.background='rgba(122,61,0,.3)'" onmouseout="this.style.background='rgba(26,13,0,.6)'">−</button>
         <div style="min-width:36px;height:26px;background:rgba(26,13,0,.4);border-top:1px solid var(--amber-mid);border-bottom:1px solid var(--amber-mid);display:flex;align-items:center;justify-content:center;font-family:'Cinzel',serif;font-size:.85rem;color:var(--amber-bright);font-weight:600">×${qty}</div>
-        <button onclick="changeQty(${a.id},+1)" style="width:26px;height:26px;background:rgba(26,13,0,.6);border:1px solid var(--amber-mid);border-radius:0 4px 4px 0;color:var(--amber-warm);font-size:1rem;cursor:pointer;line-height:1;transition:all .15s" onmouseover="this.style.background='rgba(122,61,0,.3)'" onmouseout="this.style.background='rgba(26,13,0,.6)'">+</button>
+        <button onclick="changeQty('${escAttr(a.id)}',+1)" style="width:26px;height:26px;background:rgba(26,13,0,.6);border:1px solid var(--amber-mid);border-radius:0 4px 4px 0;color:var(--amber-warm);font-size:1rem;cursor:pointer;line-height:1;transition:all .15s" onmouseover="this.style.background='rgba(122,61,0,.3)'" onmouseout="this.style.background='rgba(26,13,0,.6)'">+</button>
       </div>` : '';
     return `<div style="display:flex;align-items:flex-start;gap:.7rem;padding:.65rem .4rem;border-bottom:1px solid rgba(122,61,0,.2)">
       <span style="font-size:1.2rem;flex-shrink:0;margin-top:2px">${typeIcon[a.type]||'📦'}</span>
@@ -728,7 +771,7 @@ function renderPanel(){
         <div style="font-size:.97rem;color:var(--amber-pale);line-height:1.45">${escHtml(a.content)}</div>
         ${stepper}
       </div>
-      <button class="btn-delete" onclick="deleteAssignment(${a.id})" title="Retirer">✕</button>
+      <button class="btn-delete" onclick="deleteAssignment('${escAttr(a.id)}')" title="Retirer">✕</button>
     </div>`;
   }).join('');
 }
@@ -757,7 +800,7 @@ function deleteAssignment(id){
 }
 
 function changeQty(id, delta){
-  const a = assignments.find(a=>a.id===id);
+  const a = assignments.find(a=>String(a.id)===String(id));
   if(!a) return;
   const newQty = (a.qty??1)+delta;
   if(newQty<=0){ if(!confirm('Retirer cet objet complètement ?')) return; deleteAssignment(id); return; }
@@ -779,7 +822,12 @@ function activateGame(){
       }))
     }))
     .filter(r=>r.name && r.recipes.length);
-  fbSetGame({ title, rules, craftRoles });
+  const fire = {
+    grand: Math.max(1, parseInt(document.getElementById('fire-threshold-grand').value)||10),
+    legendaire: Math.max(1, parseInt(document.getElementById('fire-threshold-legendaire').value)||25),
+    filter: document.getElementById('fire-filter').value.trim()
+  };
+  fbSetGame({ title, rules, craftRoles, fire });
   toast('🏕️ Épreuve lancée !');
 }
 
@@ -793,6 +841,15 @@ function updateGameUI(){
   const label = document.getElementById('game-status-label');
   const btnA  = document.getElementById('btn-activate-game');
   const btnS  = document.getElementById('btn-stop-game');
+  // Keep the admin form in sync with the active game (fire thresholds, etc.)
+  if(activeGame && activeGame.fire){
+    const g=document.getElementById('fire-threshold-grand');
+    const l=document.getElementById('fire-threshold-legendaire');
+    const f=document.getElementById('fire-filter');
+    if(g && document.activeElement!==g) g.value = activeGame.fire.grand;
+    if(l && document.activeElement!==l) l.value = activeGame.fire.legendaire;
+    if(f && document.activeElement!==f) f.value = activeGame.fire.filter||'';
+  }
   if(activeGame){
     bar.className='game-status-bar active';
     label.textContent='⚡ En cours : '+activeGame.title;
@@ -890,12 +947,65 @@ function renderCraftRoles(){
     </div>`).join('');
 }
 
+
+// ── FIRE METER ──────────────────────────────────────────────────────────────
+function computeFireTotal(){
+  if(!activeGame || !activeGame.fire) return 0;
+  const filter = (activeGame.fire.filter||'').toLowerCase();
+  return assignments
+    .filter(a => a.type==='objet')
+    .filter(a => !filter || a.content.toLowerCase().includes(filter))
+    .reduce((sum,a) => sum + (a.qty??1), 0);
+}
+
+function fireTier(total){
+  if(!activeGame || !activeGame.fire) return 'petit';
+  if(total >= activeGame.fire.legendaire) return 'legendaire';
+  if(total >= activeGame.fire.grand) return 'grand';
+  return 'petit';
+}
+
+function renderFireMeter(){
+  const el = document.getElementById('viewer-fire-meter');
+  if(!el) return;
+  if(!activeGame || !activeGame.fire){ el.style.display='none'; return; }
+  el.style.display = 'block';
+
+  const total = computeFireTotal();
+  const tier  = fireTier(total);
+  const cfg   = activeGame.fire;
+
+  const visuals = { petit:'🔥', grand:'🔥🔥', legendaire:'🔥🔥🔥' };
+  const labels  = { petit:'Petit feu', grand:'Grand feu', legendaire:'Feu Légendaire ✨' };
+
+  document.getElementById('fire-visual').textContent = visuals[tier];
+  const lab = document.getElementById('fire-tier-label');
+  lab.textContent = labels[tier];
+  lab.className = 'fire-tier-label fire-tier-' + tier;
+
+  const filterNote = cfg.filter ? ' (« '+cfg.filter+' »)' : '';
+  document.getElementById('fire-count').textContent =
+    total + (total>1?' ressources réunies':' ressource réunie') + filterNote;
+
+  // progress toward legendaire
+  const pct = Math.min(100, Math.round(total / cfg.legendaire * 100));
+  document.getElementById('fire-progress-bar').style.width = pct + '%';
+  document.getElementById('fire-thresholds').innerHTML =
+    '<span>0</span><span>🔥 '+cfg.grand+'</span><span>✨ '+cfg.legendaire+'</span>';
+}
+
 // ── STATS ─────────────────────────────────────────────────────────────────
 function updateStats(){
   document.getElementById('stat-viewers').textContent  = Object.keys(viewers).length;
   document.getElementById('stat-assigns').textContent  = assignments.length;
-  const n=Object.keys(viewers).length;
-  document.getElementById('stat-fire').textContent = n===0?'—':n<5?'Petit 🌱':n<12?'Grand 🔥':'Légendaire ✨';
+  if(activeGame && activeGame.fire){
+    const total = computeFireTotal();
+    const tier  = fireTier(total);
+    const lbl   = { petit:'Petit', grand:'Grand 🔥', legendaire:'Légendaire ✨' }[tier];
+    document.getElementById('stat-fire').textContent = lbl + ' ('+total+')';
+  } else {
+    document.getElementById('stat-fire').textContent = '—';
+  }
 }
 
 updateStats();
