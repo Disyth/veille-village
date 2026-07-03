@@ -195,7 +195,7 @@
   // ╔══════════════════════════════════════════════════════════════════╗
   // ║  COLLE TA CONFIG FIREBASE ICI (voir le guide en haut de la page)  ║
   // ╚══════════════════════════════════════════════════════════════════╝
- // Your web app's Firebase configuration
+// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBD8G35KMNAc6W-HTPqjGpi8fgQuBuh48w",
   authDomain: "veillee-village.firebaseapp.com",
@@ -254,11 +254,11 @@ const firebaseConfig = {
   <div id="page-viewer" class="page active">
     <div class="viewer-container">
 
-      <!-- Fire meter (shown when a game with thresholds is active) -->
-      <div class="fire-meter" id="viewer-fire-meter" style="display:none">
+      <!-- Fire meter — global & permanent (always visible) -->
+      <div class="fire-meter" id="viewer-fire-meter">
         <div class="fire-visual" id="fire-visual">🔥</div>
         <div class="fire-tier-label" id="fire-tier-label">Petit feu</div>
-        <div class="fire-count" id="fire-count">0 ressource réunie</div>
+        <div class="fire-count" id="fire-count">0 point</div>
         <div class="fire-progress"><div class="fire-progress-bar" id="fire-progress-bar" style="width:0%"></div></div>
         <div class="fire-thresholds" id="fire-thresholds"></div>
       </div>
@@ -336,47 +336,85 @@ const firebaseConfig = {
         </div>
       </div>
 
-      <!-- Game module -->
+      <!-- ══ FIRE CONFIG (global, permanent) ══ -->
       <div class="card admin-full">
-        <div class="section-title">Créer une épreuve</div>
-        <div class="game-status-bar inactive" id="game-status-bar">
-          <div class="status-dot"></div>
-          <span id="game-status-label">Aucune épreuve active</span>
+        <div class="section-title">🔥 Feu de camp de la veillée</div>
+        <div style="display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap;margin-bottom:1rem">
+          <div style="text-align:center">
+            <div id="admin-fire-visual" style="font-size:2rem;line-height:1">🔥</div>
+            <div id="admin-fire-tier" style="font-family:'Cinzel',serif;font-size:.85rem;color:var(--amber-bright)">Petit feu</div>
+          </div>
+          <div style="flex:1;min-width:200px">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.4rem">
+              <span style="font-size:.85rem;color:var(--amber-warm)">Points :</span>
+              <strong id="admin-fire-points" style="font-family:'Cinzel',serif;font-size:1.3rem;color:var(--amber-bright)">0</strong>
+              <div style="display:flex;gap:.3rem;margin-left:auto">
+                <button class="btn-icon" onclick="adjustFirePoints(-5)" title="-5">−5</button>
+                <button class="btn-icon" onclick="adjustFirePoints(-1)" title="-1">−</button>
+                <button class="btn-icon" onclick="adjustFirePoints(1)" title="+1">+</button>
+                <button class="btn-icon" onclick="adjustFirePoints(5)" title="+5">+5</button>
+              </div>
+            </div>
+            <div class="fire-progress"><div class="fire-progress-bar" id="admin-fire-bar" style="width:0%"></div></div>
+          </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+        <div class="fire-config-row">
           <div>
-            <label>Titre de l'épreuve</label>
-            <input type="text" id="game-title" placeholder="Ex : La Forêt des Murmures" maxlength="60">
+            <div style="font-size:.75rem;color:var(--amber-bright);text-align:center;margin-bottom:.3rem;font-family:'Cinzel',serif">🔥 Grand feu dès</div>
+            <input type="number" min="1" id="fire-threshold-grand" class="fire-mini-input" value="50" onchange="saveFireConfig()">
           </div>
-          <div style="display:flex;flex-direction:column;justify-content:flex-end">
-            <div style="font-size:.8rem;color:var(--amber-mid);font-style:italic;padding-bottom:.5rem">Visible par tous les viewers quand activée</div>
+          <div>
+            <div style="font-size:.75rem;color:#f5b832;text-align:center;margin-bottom:.3rem;font-family:'Cinzel',serif">✨ Légendaire dès</div>
+            <input type="number" min="1" id="fire-threshold-legendaire" class="fire-mini-input" value="120" onchange="saveFireConfig()">
           </div>
+        </div>
+        <div style="font-size:.78rem;color:var(--amber-mid);font-style:italic;margin-top:.6rem;text-align:center">Le feu est permanent : il gagne des points quand une épreuve réussit et ne redescend jamais tout seul.</div>
+      </div>
+
+      <!-- ══ ÉPREUVE EN COURS (bandeau) ══ -->
+      <div class="card admin-full" id="active-epreuve-card" style="display:none;border-color:rgba(97,174,27,.4)">
+        <div class="section-title" style="color:#9dcf7a">⚡ Épreuve en cours</div>
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div id="active-epreuve-title" style="font-family:'Cinzel',serif;font-size:1.1rem;color:var(--amber-bright)"></div>
+            <div id="active-epreuve-reward" style="font-size:.85rem;color:#9dcf7a;font-style:italic"></div>
+          </div>
+          <button class="btn-small" onclick="editActiveEpreuve()" style="border-color:rgba(168,158,240,.4);color:#a89ef0">✎ Modifier</button>
+        </div>
+        <div style="display:flex;gap:.8rem;margin-top:1rem">
+          <button class="btn-activate" onclick="finishEpreuveSuccess()" style="flex:2">✅ Épreuve réussie <span id="reward-hint"></span></button>
+          <button class="btn-deactivate" onclick="finishEpreuve()" style="flex:1;margin-top:0">✕ Terminer</button>
+        </div>
+      </div>
+
+      <!-- ══ BIBLIOTHÈQUE D'ÉPREUVES ══ -->
+      <div class="card admin-full">
+        <div class="section-title">📚 Bibliothèque d'épreuves</div>
+        <input class="search-input" type="text" id="search-epreuves" placeholder="Rechercher une épreuve…" oninput="renderLibrary()">
+        <div id="library-list" style="max-height:260px;overflow-y:auto;margin-bottom:1rem">
+          <div class="empty-state">Aucune épreuve enregistrée</div>
+        </div>
+        <button class="btn-add-role" onclick="openEpreuveEditor()" style="border-color:rgba(97,174,27,.4);color:#9dcf7a">+ Créer une nouvelle épreuve</button>
+      </div>
+
+      <!-- ══ ÉDITEUR D'ÉPREUVE (création / modification) ══ -->
+      <div class="card admin-full" id="epreuve-editor" style="display:none;border-color:rgba(168,158,240,.3)">
+        <div class="section-title" id="editor-title" style="color:#a89ef0">✎ Nouvelle épreuve</div>
+        <input type="hidden" id="editor-id">
+        <div style="margin-bottom:1rem">
+          <label>Titre de l'épreuve</label>
+          <input type="text" id="game-title" placeholder="Ex : La Forêt des Murmures" maxlength="60">
         </div>
         <div style="margin-bottom:1rem">
           <label>Règles &amp; objectifs</label>
           <textarea id="game-rules" style="min-height:120px" placeholder="🎯 Objectif : Rassemblez 10 fagots avant que la lune se lève…"></textarea>
         </div>
-
-        <!-- Fire thresholds -->
         <div style="margin-bottom:1rem">
-          <label>🔥 Seuils du feu de camp <span style="color:var(--amber-mid);font-size:.8rem">(total des objets 🪵 réunis par tous les villageois)</span></label>
-          <div class="fire-config-row">
-            <div>
-              <div style="font-size:.75rem;color:var(--amber-bright);text-align:center;margin-bottom:.3rem;font-family:'Cinzel',serif">🔥 Grand feu dès</div>
-              <input type="number" min="1" id="fire-threshold-grand" class="fire-mini-input" placeholder="10" value="10">
-            </div>
-            <div>
-              <div style="font-size:.75rem;color:#f5b832;text-align:center;margin-bottom:.3rem;font-family:'Cinzel',serif">✨ Légendaire dès</div>
-              <input type="number" min="1" id="fire-threshold-legendaire" class="fire-mini-input" placeholder="25" value="25">
-            </div>
-          </div>
-          <div style="margin-top:.6rem">
-            <label style="font-size:.85rem">Filtrer par mot-clé <span style="color:var(--amber-mid);font-size:.8rem">(optionnel — ne compter que les objets contenant ce mot, ex: « fagot »). Vide = tous les objets.</span></label>
-            <input type="text" id="fire-filter" placeholder="ex: fagot (laisser vide pour tout compter)" style="margin-top:.3rem">
-          </div>
+          <label>🔥 Récompense en points <span style="color:var(--amber-mid);font-size:.8rem">(points ajoutés au feu si l'épreuve réussit)</span></label>
+          <input type="number" min="0" id="game-reward" class="fire-mini-input" value="20" style="max-width:140px">
         </div>
 
-        <!-- Craft roles section -->
+        <!-- Craft roles -->
         <div class="craft-section-toggle">
           <span class="craft-toggle-label">⚗️ Rôles artisans <span style="color:rgba(168,158,240,.5);font-size:.65rem">(optionnel)</span></span>
           <button class="craft-toggle-btn" id="craft-toggle-btn" onclick="toggleCraftSection()">+ Ajouter des rôles</button>
@@ -387,8 +425,9 @@ const firebaseConfig = {
         </div>
 
         <div style="display:flex;gap:.8rem">
-          <button class="btn-activate" id="btn-activate-game" onclick="activateGame()" style="flex:2">🏕️ Lancer l'épreuve</button>
-          <button class="btn-deactivate" id="btn-stop-game" onclick="stopGame()" style="flex:1;display:none">✕ Terminer l'épreuve</button>
+          <button class="btn-activate" id="btn-save-epreuve" onclick="saveEpreuve()" style="flex:2">💾 Enregistrer</button>
+          <button class="btn-activate" id="btn-save-launch" onclick="saveAndLaunch()" style="flex:2;background:rgba(196,106,0,.2);border-color:var(--amber-warm);color:var(--amber-bright)">💾 Enregistrer + Lancer</button>
+          <button class="btn-deactivate" onclick="closeEpreuveEditor()" style="flex:1;margin-top:0">Annuler</button>
         </div>
       </div>
 
@@ -462,9 +501,11 @@ const TEMPLATES = {
 };
 
 // ── STATE ──────────────────────────────────────────────────────────────────
-let viewers     = {};   // { pseudo: {joined} }   (mirror of Firebase)
-let assignments = [];    // [ {id,viewer,type,content,qty} ]  (mirror)
-let activeGame  = null;  // { title, rules, craftRoles:[...] } (mirror)
+let viewers     = {};   // { key: {pseudo,joined} }
+let assignments = [];    // [ {id,viewer,type,content,qty} ]
+let activeGame  = null;  // { id,title,rules,craftRoles,reward } — épreuve en cours
+let library     = {};    // { id: {id,title,rules,craftRoles,reward} } — bibliothèque
+let fire        = { points:0, grand:50, legendaire:120 };  // feu global permanent
 let selectedViewer   = null;
 let currentViewerPseudo = null;
 let craftRolesDraft  = [];
@@ -501,7 +542,6 @@ function attachListeners(){
     assignments = Object.values(obj);
     renderViewerList();
     updateStats();
-    renderFireMeter();
     if (selectedViewer) renderPanel();
     if (currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
   });
@@ -510,8 +550,18 @@ function attachListeners(){
     activeGame = snap.val() || null;
     updateGameUI();
     updateViewerGameCard();
-    renderFireMeter();
     if (currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
+  });
+
+  onValue(ref(db, 'library'), (snap) => {
+    library = snap.val() || {};
+    renderLibrary();
+  });
+
+  onValue(ref(db, 'fire'), (snap) => {
+    fire = snap.val() || { points:0, grand:50, legendaire:120 };
+    renderFireMeter();
+    renderAdminFire();
   });
 }
 
@@ -561,13 +611,43 @@ function fbSetGame(game){
     set(ref(db, 'activeGame'), game);
   } else {
     activeGame = game;
-    updateGameUI(); updateViewerGameCard(); renderFireMeter();
+    updateGameUI(); updateViewerGameCard();
     if(currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
   }
 }
 
+function fbSaveEpreuve(ep){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'library/' + ep.id), ep);
+  } else {
+    library[ep.id] = ep;
+    renderLibrary();
+  }
+}
+
+function fbDeleteEpreuve(id){
+  if (ONLINE){
+    const { db, ref, remove } = window.FB;
+    remove(ref(db, 'library/' + id));
+  } else {
+    delete library[id];
+    renderLibrary();
+  }
+}
+
+function fbSetFire(f){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'fire'), f);
+  } else {
+    fire = f;
+    renderFireMeter(); renderAdminFire();
+  }
+}
+
 function localAfterAssignmentChange(){
-  renderViewerList(); updateStats(); renderFireMeter();
+  renderViewerList(); updateStats();
   if(selectedViewer) renderPanel();
   if(currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
 }
@@ -826,59 +906,139 @@ function changeQty(id, delta){
   fbUpdateAssignment(a);
 }
 
-// ── GAME ──────────────────────────────────────────────────────────────────
-function activateGame(){
-  const title = document.getElementById('game-title').value.trim();
-  const rules = document.getElementById('game-rules').value.trim();
-  if(!title){ toast('Donne un titre à l\'épreuve !'); return; }
-  if(!rules){ toast('Ajoute les règles et objectifs !'); return; }
-  const craftRoles = craftRolesDraft
-    .map(r=>({ id:r.id, name:r.name.trim(),
+// ── ÉPREUVE EDITOR (create / edit in library) ──────────────────────────────
+function harvestCraftRoles(){
+  return craftRolesDraft
+    .map(r=>({ id:String(r.id), name:r.name.trim(),
       recipes: r.recipes.filter(rc=>rc.output.trim()).map(rc=>({
-        id:rc.id, output:rc.output.trim(),
+        id:String(rc.id), output:rc.output.trim(),
         cost: rc.cost.filter(c=>c.name.trim()).map(c=>({name:c.name.trim(),qty:Math.max(1,parseInt(c.qty)||1)}))
       }))
     }))
     .filter(r=>r.name && r.recipes.length);
-  const fire = {
-    grand: Math.max(1, parseInt(document.getElementById('fire-threshold-grand').value)||10),
-    legendaire: Math.max(1, parseInt(document.getElementById('fire-threshold-legendaire').value)||25),
-    filter: document.getElementById('fire-filter').value.trim()
-  };
-  fbSetGame({ title, rules, craftRoles, fire });
+}
+
+function openEpreuveEditor(ep){
+  document.getElementById('epreuve-editor').style.display = 'block';
+  document.getElementById('editor-title').textContent = ep ? '✎ Modifier l\'épreuve' : '✎ Nouvelle épreuve';
+  document.getElementById('editor-id').value    = ep ? ep.id : '';
+  document.getElementById('game-title').value   = ep ? ep.title : '';
+  document.getElementById('game-rules').value   = ep ? ep.rules : '';
+  document.getElementById('game-reward').value  = ep ? (ep.reward??20) : 20;
+  // load craft roles into draft
+  craftRolesDraft = ep && ep.craftRoles ? JSON.parse(JSON.stringify(ep.craftRoles)) : [];
+  craftSectionOpen = craftRolesDraft.length>0;
+  document.getElementById('craft-section').style.display = craftSectionOpen?'block':'none';
+  document.getElementById('craft-toggle-btn').textContent = craftSectionOpen?'− Masquer':'+ Ajouter des rôles';
+  renderCraftRoles();
+  document.getElementById('epreuve-editor').scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function closeEpreuveEditor(){
+  document.getElementById('epreuve-editor').style.display = 'none';
+  craftRolesDraft = [];
+}
+
+function buildEpreuveFromForm(){
+  const title = document.getElementById('game-title').value.trim();
+  const rules = document.getElementById('game-rules').value.trim();
+  if(!title){ toast('Donne un titre à l\'épreuve !'); return null; }
+  if(!rules){ toast('Ajoute les règles et objectifs !'); return null; }
+  const id = document.getElementById('editor-id').value || (String(Date.now())+Math.floor(Math.random()*1000));
+  const reward = Math.max(0, parseInt(document.getElementById('game-reward').value)||0);
+  return { id, title, rules, reward, craftRoles: harvestCraftRoles() };
+}
+
+function saveEpreuve(){
+  const ep = buildEpreuveFromForm();
+  if(!ep) return;
+  fbSaveEpreuve(ep);
+  closeEpreuveEditor();
+  toast('💾 Épreuve enregistrée !');
+}
+
+function saveAndLaunch(){
+  const ep = buildEpreuveFromForm();
+  if(!ep) return;
+  fbSaveEpreuve(ep);
+  fbSetGame(ep);
+  closeEpreuveEditor();
   toast('🏕️ Épreuve lancée !');
 }
 
-function stopGame(){
+// ── LIBRARY ─────────────────────────────────────────────────────────────────
+function renderLibrary(){
+  const el = document.getElementById('library-list');
+  if(!el) return;
+  const q = (document.getElementById('search-epreuves')?.value||'').toLowerCase();
+  const list = Object.values(library).filter(ep => ep && ep.title && ep.title.toLowerCase().includes(q));
+  if(!list.length){
+    el.innerHTML = '<div class="empty-state">'+(q?'Aucune épreuve trouvée':'Aucune épreuve enregistrée')+'</div>';
+    return;
+  }
+  el.innerHTML = list.map(ep => {
+    const roleCount = (ep.craftRoles||[]).length;
+    const isActive = activeGame && String(activeGame.id)===String(ep.id);
+    return `<div style="display:flex;align-items:center;gap:.7rem;padding:.7rem .6rem;border-bottom:1px solid rgba(122,61,0,.2)">
+      <div style="flex:1;min-width:0">
+        <div style="font-family:'Cinzel',serif;font-size:.95rem;color:var(--amber-bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(ep.title)}${isActive?' <span style=\'color:#9dcf7a;font-size:.7rem\'>● en cours</span>':''}</div>
+        <div style="font-size:.78rem;color:var(--amber-warm)">🔥 +${ep.reward??0} pts${roleCount?' · ⚗️ '+roleCount+' rôle'+(roleCount>1?'s':''):''}</div>
+      </div>
+      <button class="btn-small" onclick="launchFromLibrary('${escAttr(String(ep.id))}')" style="border-color:rgba(97,174,27,.4);color:#9dcf7a">▶ Lancer</button>
+      <button class="btn-small" onclick="editFromLibrary('${escAttr(String(ep.id))}')" style="border-color:rgba(168,158,240,.4);color:#a89ef0">✎</button>
+      <button class="btn-delete" onclick="deleteFromLibrary('${escAttr(String(ep.id))}')" title="Supprimer">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function launchFromLibrary(id){
+  const ep = library[id] || Object.values(library).find(e=>String(e.id)===String(id));
+  if(!ep){ toast('Épreuve introuvable'); return; }
+  fbSetGame(JSON.parse(JSON.stringify(ep)));
+  toast('🏕️ « '+ep.title+' » lancée !');
+}
+
+function editFromLibrary(id){
+  const ep = library[id] || Object.values(library).find(e=>String(e.id)===String(id));
+  if(ep) openEpreuveEditor(ep);
+}
+
+function deleteFromLibrary(id){
+  if(!confirm('Supprimer cette épreuve de la bibliothèque ?')) return;
+  fbDeleteEpreuve(id);
+  toast('Épreuve supprimée.');
+}
+
+// ── ÉPREUVE EN COURS ────────────────────────────────────────────────────────
+function editActiveEpreuve(){
+  if(activeGame) openEpreuveEditor(activeGame);
+}
+
+function finishEpreuveSuccess(){
+  const reward = activeGame ? (activeGame.reward||0) : 0;
+  const newFire = Object.assign({}, fire, { points: (fire.points||0) + reward });
+  fbSetFire(newFire);
   fbSetGame(null);
-  toast('Épreuve terminée.');
+  toast('✅ Épreuve réussie ! +'+reward+' pts au feu');
+}
+
+function finishEpreuve(){
+  fbSetGame(null);
+  toast('Épreuve terminée (objets et feu conservés).');
 }
 
 function updateGameUI(){
-  const bar   = document.getElementById('game-status-bar');
-  const label = document.getElementById('game-status-label');
-  const btnA  = document.getElementById('btn-activate-game');
-  const btnS  = document.getElementById('btn-stop-game');
-  // Keep the admin form in sync with the active game (fire thresholds, etc.)
-  if(activeGame && activeGame.fire){
-    const g=document.getElementById('fire-threshold-grand');
-    const l=document.getElementById('fire-threshold-legendaire');
-    const f=document.getElementById('fire-filter');
-    if(g && document.activeElement!==g) g.value = activeGame.fire.grand;
-    if(l && document.activeElement!==l) l.value = activeGame.fire.legendaire;
-    if(f && document.activeElement!==f) f.value = activeGame.fire.filter||'';
-  }
+  const card = document.getElementById('active-epreuve-card');
+  if(!card) return;
   if(activeGame){
-    bar.className='game-status-bar active';
-    label.textContent='⚡ En cours : '+activeGame.title;
-    btnA.textContent='🔄 Mettre à jour l\'épreuve';
-    btnS.style.display='block';
+    card.style.display = 'block';
+    document.getElementById('active-epreuve-title').textContent = activeGame.title;
+    document.getElementById('active-epreuve-reward').textContent = '🔥 Récompense : +'+(activeGame.reward||0)+' points si réussie';
+    document.getElementById('reward-hint').textContent = '(+'+(activeGame.reward||0)+' pts)';
   } else {
-    bar.className='game-status-bar inactive';
-    label.textContent='Aucune épreuve active';
-    btnA.textContent='🏕️ Lancer l\'épreuve';
-    btnS.style.display='none';
+    card.style.display = 'none';
   }
+  renderLibrary();
 }
 
 // ── CRAFT BUILDER ─────────────────────────────────────────────────────────
@@ -966,67 +1126,72 @@ function renderCraftRoles(){
 }
 
 
-// ── FIRE METER ──────────────────────────────────────────────────────────────
-function computeFireTotal(){
-  if(!activeGame || !activeGame.fire) return 0;
-  const filter = (activeGame.fire.filter||'').toLowerCase();
-  return assignments
-    .filter(a => a.type==='objet')
-    .filter(a => !filter || a.content.toLowerCase().includes(filter))
-    .reduce((sum,a) => sum + (a.qty??1), 0);
-}
-
-function fireTier(total){
-  if(!activeGame || !activeGame.fire) return 'petit';
-  if(total >= activeGame.fire.legendaire) return 'legendaire';
-  if(total >= activeGame.fire.grand) return 'grand';
+// ── FIRE (global, permanent, points-based) ──────────────────────────────────
+function fireTier(points){
+  if(points >= (fire.legendaire||120)) return 'legendaire';
+  if(points >= (fire.grand||50)) return 'grand';
   return 'petit';
 }
 
 function renderFireMeter(){
   const el = document.getElementById('viewer-fire-meter');
   if(!el) return;
-  if(!activeGame || !activeGame.fire){ el.style.display='none'; return; }
-  el.style.display = 'block';
-
-  const total = computeFireTotal();
-  const tier  = fireTier(total);
-  const cfg   = activeGame.fire;
-
+  const points = fire.points||0;
+  const tier = fireTier(points);
   const visuals = { petit:'🔥', grand:'🔥🔥', legendaire:'🔥🔥🔥' };
   const labels  = { petit:'Petit feu', grand:'Grand feu', legendaire:'Feu Légendaire ✨' };
-
   document.getElementById('fire-visual').textContent = visuals[tier];
   const lab = document.getElementById('fire-tier-label');
   lab.textContent = labels[tier];
   lab.className = 'fire-tier-label fire-tier-' + tier;
-
-  const filterNote = cfg.filter ? ' (« '+cfg.filter+' »)' : '';
-  document.getElementById('fire-count').textContent =
-    total + (total>1?' ressources réunies':' ressource réunie') + filterNote;
-
-  // progress toward legendaire
-  const pct = Math.min(100, Math.round(total / cfg.legendaire * 100));
+  document.getElementById('fire-count').textContent = points + (points>1?' points':' point');
+  const pct = Math.min(100, Math.round(points / (fire.legendaire||120) * 100));
   document.getElementById('fire-progress-bar').style.width = pct + '%';
   document.getElementById('fire-thresholds').innerHTML =
-    '<span>0</span><span>🔥 '+cfg.grand+'</span><span>✨ '+cfg.legendaire+'</span>';
+    '<span>0</span><span>🔥 '+(fire.grand||50)+'</span><span>✨ '+(fire.legendaire||120)+'</span>';
+}
+
+function renderAdminFire(){
+  const pts = fire.points||0;
+  const tier = fireTier(pts);
+  const visuals = { petit:'🔥', grand:'🔥🔥', legendaire:'🔥🔥🔥' };
+  const labels  = { petit:'Petit feu', grand:'Grand feu', legendaire:'Légendaire ✨' };
+  const v=document.getElementById('admin-fire-visual'); if(v) v.textContent=visuals[tier];
+  const t=document.getElementById('admin-fire-tier'); if(t){ t.textContent=labels[tier]; t.className=''; t.style.color = tier==='legendaire'?'#f5b832':tier==='grand'?'var(--amber-bright)':'#9dcf7a'; }
+  const p=document.getElementById('admin-fire-points'); if(p) p.textContent=pts;
+  const bar=document.getElementById('admin-fire-bar'); if(bar) bar.style.width = Math.min(100, Math.round(pts/(fire.legendaire||120)*100))+'%';
+  // sync threshold inputs if not focused
+  const g=document.getElementById('fire-threshold-grand');
+  const l=document.getElementById('fire-threshold-legendaire');
+  if(g && document.activeElement!==g) g.value = fire.grand||50;
+  if(l && document.activeElement!==l) l.value = fire.legendaire||120;
+}
+
+function adjustFirePoints(delta){
+  const newFire = Object.assign({}, fire, { points: Math.max(0, (fire.points||0)+delta) });
+  fbSetFire(newFire);
+}
+
+function saveFireConfig(){
+  const grand = Math.max(1, parseInt(document.getElementById('fire-threshold-grand').value)||50);
+  const legendaire = Math.max(grand+1, parseInt(document.getElementById('fire-threshold-legendaire').value)||120);
+  fbSetFire(Object.assign({}, fire, { grand, legendaire }));
 }
 
 // ── STATS ─────────────────────────────────────────────────────────────────
 function updateStats(){
   document.getElementById('stat-viewers').textContent  = Object.keys(viewers).length;
   document.getElementById('stat-assigns').textContent  = assignments.length;
-  if(activeGame && activeGame.fire){
-    const total = computeFireTotal();
-    const tier  = fireTier(total);
-    const lbl   = { petit:'Petit', grand:'Grand 🔥', legendaire:'Légendaire ✨' }[tier];
-    document.getElementById('stat-fire').textContent = lbl + ' ('+total+')';
-  } else {
-    document.getElementById('stat-fire').textContent = '—';
-  }
+  const pts = fire.points||0;
+  const tier = fireTier(pts);
+  const lbl  = { petit:'Petit', grand:'Grand 🔥', legendaire:'Légendaire ✨' }[tier];
+  document.getElementById('stat-fire').textContent = lbl + ' ('+pts+' pts)';
 }
 
 updateStats();
+renderFireMeter();
+renderAdminFire();
+renderLibrary();
 // Handle case where fb-ready fired before this script parsed
 if (window.FB) initSync();
 </script>
