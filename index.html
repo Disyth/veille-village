@@ -195,7 +195,7 @@
   // ╔══════════════════════════════════════════════════════════════════╗
   // ║  COLLE TA CONFIG FIREBASE ICI (voir le guide en haut de la page)  ║
   // ╚══════════════════════════════════════════════════════════════════╝
-// Your web app's Firebase configuration
+ // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBD8G35KMNAc6W-HTPqjGpi8fgQuBuh48w",
   authDomain: "veillee-village.firebaseapp.com",
@@ -700,8 +700,15 @@ function craftItem(pseudo, roleId, recipeId){
       else { found.qty = left; fbUpdateAssignment(found); }
     }
   });
-  // Add crafted object
-  fbPushAssignment({ id:String(Date.now())+Math.floor(Math.random()*1000), viewer:pseudo, type:'objet', content:rc.output, qty:1 });
+  // Add crafted object — stack onto an existing identical objet if the viewer has one
+  const existing = assignments.find(a => a.viewer===pseudo && a.type==='objet'
+    && a.content.toLowerCase() === rc.output.toLowerCase());
+  if(existing){
+    existing.qty = (existing.qty??1) + 1;
+    fbUpdateAssignment(existing);
+  } else {
+    fbPushAssignment({ id:String(Date.now())+Math.floor(Math.random()*1000), viewer:pseudo, type:'objet', content:rc.output, qty:1 });
+  }
   toast('⚗️ ' + rc.output + ' fabriqué !');
 }
 
