@@ -666,19 +666,30 @@ function renderCraftSection(pseudo){
     const costHtml = costChecks.map(c =>
       `<span class="${c.ok?'ok':'missing'}">${escHtml(c.name)} ×${c.qty} (tu en as : ${c.have})</span>`
     ).join('<br>');
-    const rcData = escAttr(JSON.stringify(rc));
     return `<div class="recipe-card ${canCraft?'craftable':''}">
       <div class="recipe-output">⚗️ ${escHtml(rc.output)}</div>
       <div class="recipe-cost">${costHtml}</div>
-      <button class="btn-craft" ${canCraft?'':'disabled'} onclick="craftItem('${escAttr(pseudo)}','${rcData}')">
+      <button class="btn-craft" ${canCraft?'':'disabled'} onclick="craftItem('${escAttr(pseudo)}','${escAttr(String(matchedRole.id))}','${escAttr(String(rc.id))}')">
         ${canCraft?'✦ Fabriquer':'✕ Ressources manquantes'}
       </button>
     </div>`;
   }).join('');
 }
 
-function craftItem(pseudo, rcJson){
-  const rc = JSON.parse(rcJson);
+function craftItem(pseudo, roleId, recipeId){
+  if(!activeGame || !activeGame.craftRoles){ return; }
+  const role = activeGame.craftRoles.find(r => String(r.id)===String(roleId));
+  const rc   = role && role.recipes.find(r => String(r.id)===String(recipeId));
+  if(!rc){ toast('Recette introuvable'); return; }
+
+  // Re-check the viewer really has the resources (safety against stale UI)
+  const myObjets = assignments.filter(a => a.viewer===pseudo && a.type==='objet');
+  const enough = rc.cost.every(c => {
+    const found = myObjets.find(o => o.content.toLowerCase().includes(c.name.toLowerCase()));
+    return found && (found.qty??1) >= c.qty;
+  });
+  if(!enough){ toast('Ressources insuffisantes'); renderCraftSection(pseudo); return; }
+
   // Consume resources
   rc.cost.forEach(c => {
     const found = assignments.find(a => a.viewer===pseudo && a.type==='objet'
