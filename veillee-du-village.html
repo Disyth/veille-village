@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La Grande Veillée du Village</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --amber-deep: #1a0d00; --amber-dark: #2e1a00; --amber-mid: #7a3d00;
+    --amber-warm: #c46a00; --amber-glow: #e8920a; --amber-bright: #f5b832;
+    --amber-light: #ffd97a; --amber-pale: #fff3cc; --ember: #e84a0a;
+    --ember-dim: #8b2800; --parchment: #fdf5e0; --ink: #2a1a00;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Crimson Text',Georgia,serif; background:var(--amber-deep); color:var(--amber-pale); min-height:100vh; overflow-x:hidden; position:relative; }
+  body::before { content:''; position:fixed; inset:0; background: radial-gradient(ellipse 60% 40% at 50% 100%,rgba(232,74,10,.15) 0%,transparent 70%), radial-gradient(ellipse 40% 60% at 20% 80%,rgba(196,106,0,.08) 0%,transparent 60%), radial-gradient(ellipse 40% 60% at 80% 80%,rgba(196,106,0,.08) 0%,transparent 60%); pointer-events:none; z-index:0; }
+  #app { position:relative; z-index:1; min-height:100vh; }
+
+  nav { display:flex; justify-content:center; padding:1.5rem 2rem 0; position:relative; z-index:10; }
+  nav button { font-family:'Cinzel',serif; font-size:.75rem; letter-spacing:.15em; text-transform:uppercase; padding:.6rem 1.6rem; background:transparent; border:1px solid var(--amber-mid); color:var(--amber-warm); cursor:pointer; transition:all .3s; }
+  nav button:first-child { border-radius:4px 0 0 4px; }
+  nav button:last-child { border-radius:0 4px 4px 0; border-left:none; }
+  nav button.active { background:var(--amber-mid); color:var(--amber-bright); border-color:var(--amber-warm); }
+  nav button:not(.active):hover { background:rgba(122,61,0,.2); color:var(--amber-light); }
+
+  header { text-align:center; padding:2.5rem 2rem 1.5rem; }
+  .fire-icon { font-size:2.8rem; display:block; margin-bottom:.5rem; animation:flicker 2.5s ease-in-out infinite; filter:drop-shadow(0 0 12px rgba(232,74,10,.6)); }
+  @keyframes flicker { 0%,100%{transform:scaleY(1) scaleX(1);opacity:1} 20%{transform:scaleY(1.04) scaleX(.98);opacity:.95} 50%{transform:scaleY(.97) scaleX(1.01);opacity:1} 75%{transform:scaleY(1.02) scaleX(.99);opacity:.97} }
+  h1 { font-family:'Cinzel',serif; font-size:clamp(1.4rem,4vw,2.2rem); font-weight:700; color:var(--amber-bright); letter-spacing:.05em; text-shadow:0 0 30px rgba(245,184,50,.4); line-height:1.2; }
+  .subtitle { font-family:'Crimson Text',serif; font-style:italic; color:var(--amber-warm); font-size:1.05rem; margin-top:.3rem; letter-spacing:.03em; }
+
+  .divider { display:flex; align-items:center; gap:1rem; margin:.5rem auto 1.5rem; max-width:700px; padding:0 2rem; }
+  .divider::before,.divider::after { content:''; flex:1; height:1px; background:linear-gradient(to right,transparent,var(--amber-mid),transparent); }
+  .divider-gem { width:6px; height:6px; background:var(--amber-warm); transform:rotate(45deg); flex-shrink:0; }
+
+  .page { display:none; animation:fadeIn .4s ease; }
+  .page.active { display:block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ── VIEWER ── */
+  .viewer-container { max-width:480px; margin:0 auto; padding:0 1.5rem 3rem; }
+  .card { background:rgba(46,26,0,.7); border:1px solid var(--amber-mid); border-radius:8px; padding:1.8rem; margin-bottom:1.5rem; backdrop-filter:blur(4px); }
+  .card-title { font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.2em; text-transform:uppercase; color:var(--amber-warm); margin-bottom:1rem; }
+  .input-group { margin-bottom:1.2rem; }
+  label { display:block; font-size:.9rem; color:var(--amber-light); margin-bottom:.4rem; font-style:italic; }
+  input[type="text"],input[type="password"] { width:100%; background:rgba(26,13,0,.6); border:1px solid var(--amber-mid); border-radius:4px; padding:.7rem 1rem; font-family:'Crimson Text',serif; font-size:1.1rem; color:var(--amber-pale); outline:none; transition:border-color .2s; }
+  input[type="text"]::placeholder,input[type="password"]::placeholder { color:var(--amber-mid); opacity:.8; }
+  input[type="text"]:focus,input[type="password"]:focus { border-color:var(--amber-glow); }
+  .btn-primary { width:100%; padding:.85rem; background:var(--amber-mid); border:1px solid var(--amber-warm); border-radius:4px; font-family:'Cinzel',serif; font-size:.85rem; letter-spacing:.1em; color:var(--amber-bright); cursor:pointer; transition:all .25s; text-transform:uppercase; }
+  .btn-primary:hover { background:var(--amber-warm); color:var(--amber-pale); }
+  .btn-primary:active { transform:scale(.98); }
+  .viewer-info { display:none; }
+  .viewer-info.visible { display:block; animation:fadeIn .4s ease; }
+  .info-greeting { font-family:'Cinzel',serif; font-size:1rem; color:var(--amber-bright); margin-bottom:.4rem; }
+  .info-empty { text-align:center; padding:2rem; color:var(--amber-mid); font-style:italic; }
+  .info-item { background:rgba(26,13,0,.5); border:1px solid var(--amber-mid); border-radius:6px; padding:1rem 1.2rem; margin-bottom:.8rem; }
+  .info-type { font-family:'Cinzel',serif; font-size:.65rem; letter-spacing:.18em; text-transform:uppercase; color:var(--amber-warm); margin-bottom:.3rem; }
+  .info-content { font-size:1.1rem; color:var(--amber-pale); line-height:1.5; }
+  .item-icon { font-size:1.6rem; margin-bottom:.4rem; display:block; }
+
+  /* ── GAME card viewer ── */
+  .game-card { background:rgba(61,109,17,.1); border:1px solid rgba(97,174,27,.35); border-radius:8px; padding:1.5rem 1.8rem; margin-bottom:1.5rem; animation:fadeIn .5s ease; }
+  .game-card-header { display:flex; align-items:center; gap:.8rem; margin-bottom:1rem; }
+  .game-card-icon { font-size:1.6rem; }
+  .game-card-title { font-family:'Cinzel',serif; font-size:1rem; color:#c5f09a; letter-spacing:.05em; }
+  .game-card-subtitle { font-size:.8rem; color:rgba(157,207,122,.6); font-style:italic; }
+  .game-card-divider { height:1px; background:rgba(97,174,27,.2); margin:.8rem 0; }
+  .game-rules { font-size:1rem; color:var(--amber-pale); line-height:1.7; white-space:pre-wrap; }
+  .live-badge { display:inline-flex; align-items:center; gap:.4rem; background:rgba(61,109,17,.25); border:1px solid rgba(97,174,27,.4); border-radius:12px; padding:.2rem .7rem; font-family:'Cinzel',serif; font-size:.6rem; letter-spacing:.12em; color:#9dcf7a; margin-left:auto; flex-shrink:0; }
+
+  /* ── CRAFT viewer ── */
+  .craft-viewer-card { background:rgba(83,74,183,.08); border:1px solid rgba(83,74,183,.3); border-radius:8px; padding:1.2rem 1.5rem; margin-bottom:1.2rem; }
+  .craft-viewer-title { font-family:'Cinzel',serif; font-size:.85rem; letter-spacing:.12em; color:#a89ef0; text-transform:uppercase; margin-bottom:.8rem; display:flex; align-items:center; gap:.5rem; }
+  .recipe-card { background:rgba(26,13,0,.4); border:1px solid rgba(122,61,0,.3); border-radius:6px; padding:.8rem 1rem; margin-bottom:.6rem; }
+  .recipe-card.craftable { border-color:rgba(83,74,183,.4); background:rgba(83,74,183,.07); }
+  .recipe-output { font-size:1rem; color:var(--amber-pale); margin-bottom:.4rem; font-weight:600; }
+  .recipe-cost { font-size:.85rem; color:var(--amber-warm); font-style:italic; margin-bottom:.6rem; line-height:1.7; }
+  .recipe-cost .ok { color:#9dcf7a; }
+  .recipe-cost .missing { color:var(--ember); }
+  .btn-craft { padding:.45rem 1rem; background:rgba(83,74,183,.25); border:1px solid rgba(83,74,183,.5); border-radius:4px; font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.1em; color:#c5bff8; cursor:pointer; transition:all .2s; text-transform:uppercase; }
+  .btn-craft:hover:not(:disabled) { background:rgba(83,74,183,.4); color:#e0dcff; }
+  .btn-craft:disabled { opacity:.35; cursor:not-allowed; }
+
+  /* ── ADMIN ── */
+  .admin-container { max-width:900px; margin:0 auto; padding:0 1.5rem 3rem; display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
+  @media(max-width:680px){ .admin-container{ grid-template-columns:1fr; } }
+  .admin-full { grid-column:1 / -1; }
+  .section-title { font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.2em; text-transform:uppercase; color:var(--amber-warm); margin-bottom:1rem; display:flex; align-items:center; gap:.6rem; }
+  .section-title::after { content:''; flex:1; height:1px; background:var(--amber-mid); opacity:.5; }
+  .viewer-list { max-height:320px; overflow-y:auto; }
+  .viewer-list::-webkit-scrollbar { width:4px; }
+  .viewer-list::-webkit-scrollbar-thumb { background:var(--amber-mid); border-radius:2px; }
+  .viewer-row { display:flex; align-items:center; gap:.8rem; padding:.6rem .8rem; border-radius:4px; cursor:pointer; transition:background .2s; border:1px solid transparent; margin-bottom:.3rem; }
+  .viewer-row:hover { background:rgba(122,61,0,.2); }
+  .viewer-row.selected { background:rgba(122,61,0,.35); border-color:var(--amber-mid); }
+  .viewer-avatar { width:32px; height:32px; background:var(--amber-mid); border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Cinzel',serif; font-size:.75rem; color:var(--amber-bright); flex-shrink:0; }
+  .viewer-name-row { flex:1; font-size:1rem; color:var(--amber-pale); }
+  .viewer-badge-count { font-size:.75rem; color:var(--amber-warm); background:rgba(122,61,0,.3); padding:2px 7px; border-radius:10px; }
+  .assign-form { display:flex; flex-direction:column; gap:.9rem; }
+  select { width:100%; background:rgba(26,13,0,.6); border:1px solid var(--amber-mid); border-radius:4px; padding:.7rem 1rem; font-family:'Crimson Text',serif; font-size:1rem; color:var(--amber-pale); outline:none; cursor:pointer; }
+  select option { background:#2e1a00; }
+  textarea { width:100%; background:rgba(26,13,0,.6); border:1px solid var(--amber-mid); border-radius:4px; padding:.7rem 1rem; font-family:'Crimson Text',serif; font-size:1rem; color:var(--amber-pale); resize:vertical; min-height:90px; outline:none; transition:border-color .2s; }
+  textarea::placeholder { color:var(--amber-mid); opacity:.8; }
+  textarea:focus { border-color:var(--amber-glow); }
+  .empty-state { text-align:center; padding:2rem; color:var(--amber-mid); font-style:italic; font-size:.95rem; }
+  .no-selection { text-align:center; color:var(--amber-mid); font-style:italic; padding:1rem; font-size:.95rem; }
+  .btn-delete { background:transparent; border:1px solid rgba(232,74,10,.3); color:rgba(232,74,10,.5); border-radius:3px; width:24px; height:24px; cursor:pointer; font-size:.75rem; flex-shrink:0; transition:all .2s; display:flex; align-items:center; justify-content:center; }
+  .btn-delete:hover { border-color:var(--ember); color:var(--ember); background:rgba(232,74,10,.1); }
+  .btn-small { padding:.5rem 1rem; background:transparent; border:1px solid var(--amber-mid); border-radius:4px; font-family:'Cinzel',serif; font-size:.65rem; letter-spacing:.1em; color:var(--amber-warm); cursor:pointer; transition:all .2s; text-transform:uppercase; }
+  .btn-small:hover { background:rgba(122,61,0,.2); border-color:var(--amber-warm); color:var(--amber-light); }
+  .stats-bar { display:flex; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+  .stat-pill { background:rgba(122,61,0,.2); border:1px solid var(--amber-mid); border-radius:20px; padding:.3rem .9rem; font-size:.85rem; color:var(--amber-warm); display:flex; align-items:center; gap:.4rem; }
+  .stat-pill strong { color:var(--amber-bright); font-family:'Cinzel',serif; }
+  .search-input { width:100%; background:rgba(26,13,0,.4); border:1px solid rgba(122,61,0,.4); border-radius:4px; padding:.5rem .8rem; font-family:'Crimson Text',serif; font-size:.95rem; color:var(--amber-pale); outline:none; margin-bottom:.8rem; }
+  .search-input::placeholder { color:var(--amber-mid); opacity:.7; }
+  .search-input:focus { border-color:var(--amber-warm); }
+  .templates { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.3rem; }
+  .tpl-btn { background:rgba(26,13,0,.5); border:1px solid rgba(122,61,0,.5); border-radius:12px; padding:.25rem .7rem; font-size:.8rem; color:var(--amber-warm); cursor:pointer; transition:all .2s; font-family:'Crimson Text',serif; font-style:italic; }
+  .tpl-btn:hover { background:rgba(122,61,0,.2); color:var(--amber-light); }
+
+  /* ── GAME admin ── */
+  .game-status-bar { display:flex; align-items:center; gap:.8rem; padding:.7rem 1rem; border-radius:6px; margin-bottom:1rem; border:1px solid; font-family:'Cinzel',serif; font-size:.75rem; letter-spacing:.1em; }
+  .game-status-bar.inactive { background:rgba(26,13,0,.4); border-color:rgba(122,61,0,.3); color:var(--amber-mid); }
+  .game-status-bar.active { background:rgba(61,109,17,.15); border-color:rgba(97,174,27,.4); color:#9dcf7a; }
+  .status-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .inactive .status-dot { background:var(--amber-mid); }
+  .active .status-dot { background:#9dcf7a; animation:pulse-dot 1.8s ease-in-out infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.7)} }
+  .btn-activate { width:100%; padding:1rem; background:rgba(61,109,17,.2); border:1px solid rgba(97,174,27,.5); border-radius:6px; font-family:'Cinzel',serif; font-size:.85rem; letter-spacing:.1em; color:#9dcf7a; cursor:pointer; transition:all .25s; text-transform:uppercase; margin-top:.5rem; }
+  .btn-activate:hover { background:rgba(61,109,17,.35); color:#c5f09a; }
+  .btn-deactivate { width:100%; padding:.7rem; background:transparent; border:1px solid rgba(232,74,10,.3); border-radius:6px; font-family:'Cinzel',serif; font-size:.72rem; letter-spacing:.1em; color:rgba(232,74,10,.6); cursor:pointer; transition:all .25s; text-transform:uppercase; margin-top:.5rem; }
+  .btn-deactivate:hover { background:rgba(232,74,10,.08); color:var(--ember); border-color:var(--ember); }
+
+  /* ── CRAFT admin builder ── */
+  .craft-section-toggle { display:flex; align-items:center; justify-content:space-between; margin-bottom:.7rem; }
+  .craft-toggle-label { font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.15em; text-transform:uppercase; color:#a89ef0; }
+  .craft-toggle-btn { background:transparent; border:1px solid rgba(83,74,183,.3); border-radius:4px; color:#a89ef0; font-size:.7rem; font-family:'Cinzel',serif; letter-spacing:.1em; padding:.3rem .8rem; cursor:pointer; transition:all .2s; text-transform:uppercase; }
+  .craft-toggle-btn:hover { background:rgba(83,74,183,.1); }
+  .craft-role-builder { background:rgba(26,13,0,.5); border:1px solid rgba(83,74,183,.25); border-radius:6px; padding:1rem 1.1rem; margin-bottom:.8rem; }
+  .craft-role-header { display:flex; align-items:center; gap:.7rem; margin-bottom:.8rem; }
+  .craft-role-name-input { flex:1; background:rgba(26,13,0,.6); border:1px solid rgba(83,74,183,.35); border-radius:4px; padding:.45rem .8rem; font-family:'Crimson Text',serif; font-size:1rem; color:var(--amber-pale); outline:none; }
+  .craft-role-name-input:focus { border-color:#a89ef0; }
+  .craft-recipe-block { background:rgba(0,0,0,.2); border-radius:4px; padding:.6rem .7rem; margin-bottom:.5rem; }
+  .craft-recipe-row { display:grid; grid-template-columns:1fr 52px auto; gap:.4rem; align-items:center; margin-bottom:.3rem; }
+  .craft-input { background:rgba(26,13,0,.5); border:1px solid rgba(122,61,0,.4); border-radius:4px; padding:.35rem .6rem; font-family:'Crimson Text',serif; font-size:.9rem; color:var(--amber-pale); outline:none; width:100%; }
+  .craft-input:focus { border-color:var(--amber-warm); }
+  .craft-qty-input { width:52px; text-align:center; background:rgba(26,13,0,.5); border:1px solid rgba(122,61,0,.4); border-radius:4px; padding:.35rem .4rem; font-family:'Cinzel',serif; font-size:.85rem; color:var(--amber-bright); outline:none; }
+  .btn-icon { background:transparent; border:1px solid rgba(122,61,0,.4); border-radius:4px; color:var(--amber-mid); width:26px; height:26px; cursor:pointer; font-size:.8rem; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all .15s; }
+  .btn-icon:hover:not(:disabled) { border-color:var(--ember); color:var(--ember); }
+  .btn-icon:disabled { opacity:.3; cursor:not-allowed; }
+  .craft-output-row { display:flex; align-items:center; gap:.5rem; margin-top:.4rem; }
+  .craft-arrow { color:var(--amber-mid); font-size:.9rem; flex-shrink:0; }
+  .btn-add-recipe { background:transparent; border:1px dashed rgba(122,61,0,.4); border-radius:4px; color:var(--amber-mid); font-size:.75rem; font-family:'Cinzel',serif; letter-spacing:.08em; padding:.3rem .8rem; cursor:pointer; transition:all .2s; margin-top:.4rem; }
+  .btn-add-recipe:hover { border-color:var(--amber-warm); color:var(--amber-warm); }
+  .btn-add-role { background:transparent; border:1px dashed rgba(83,74,183,.35); border-radius:6px; color:#a89ef0; font-size:.8rem; font-family:'Cinzel',serif; letter-spacing:.08em; padding:.5rem 1rem; cursor:pointer; transition:all .2s; width:100%; margin-top:.4rem; }
+  .btn-add-role:hover { border-color:#a89ef0; background:rgba(83,74,183,.08); }
+
+  /* ── BADGES ── */
+  .type-badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:.7rem; font-family:'Cinzel',serif; letter-spacing:.08em; text-transform:uppercase; }
+  .type-objet { background:rgba(196,106,0,.2); color:var(--amber-glow); border:1px solid rgba(196,106,0,.3); }
+  .type-role  { background:rgba(139,40,0,.2); color:#f08060; border:1px solid rgba(139,40,0,.3); }
+  .type-info  { background:rgba(27,46,13,.4); color:#9dcf7a; border:1px solid rgba(61,109,17,.3); }
+  .type-secret{ background:rgba(83,74,183,.2); color:#a89ef0; border:1px solid rgba(83,74,183,.3); }
+
+  .admin-pass-hint { font-size:.8rem; color:var(--amber-mid); font-style:italic; text-align:center; margin-top:.5rem; }
+  .lock-overlay { text-align:center; padding:3rem 1.5rem; }
+  .lock-overlay h2 { font-family:'Cinzel',serif; color:var(--amber-bright); font-size:1.2rem; margin-bottom:1rem; letter-spacing:.1em; }
+
+  .toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(80px); background:var(--amber-mid); border:1px solid var(--amber-warm); border-radius:6px; padding:.6rem 1.4rem; font-family:'Cinzel',serif; font-size:.75rem; letter-spacing:.1em; color:var(--amber-bright); transition:transform .3s ease; z-index:100; }
+  .toast.show { transform:translateX(-50%) translateY(0); }
+</style>
+<!-- Firebase SDK (module) -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getDatabase, ref, onValue, set, update, remove, get, child, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  COLLE TA CONFIG FIREBASE ICI (voir le guide en haut de la page)  ║
+  // ╚══════════════════════════════════════════════════════════════════╝
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyBD8G35KMNAc6W-HTPqjGpi8fgQuBuh48w",
+  authDomain: "veillee-village.firebaseapp.com",
+  databaseURL: "https://veillee-village-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "veillee-village",
+  storageBucket: "veillee-village.firebasestorage.app",
+  messagingSenderId: "527854879287",
+  appId: "1:527854879287:web:ffdd2337cacb6c585e35b2"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+  // Détection : config non remplie -> mode local (démo hors-ligne)
+  const isConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey !== "TON_API_KEY";
+
+  if (isConfigured) {
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
+    // Expose une API minimale au reste du script (non-module)
+    window.FB = {
+      ready: true,
+      db, ref, onValue, set, update, remove, get, child, serverTimestamp
+    };
+    window.dispatchEvent(new Event('fb-ready'));
+  } else {
+    window.FB = { ready: false };
+    window.dispatchEvent(new Event('fb-ready'));
+  }
+</script>
+</head>
+<body>
+<div id="app">
+
+  <!-- Bandeau de configuration (visible tant que Firebase n'est pas configuré) -->
+  <div id="setup-banner" style="display:none;max-width:760px;margin:1rem auto 0;padding:1rem 1.4rem;background:rgba(139,40,0,.15);border:1px solid rgba(232,74,10,.4);border-radius:8px;font-size:.9rem;line-height:1.6;color:var(--amber-light)">
+    <strong style="color:var(--amber-bright);font-family:'Cinzel',serif;letter-spacing:.05em">⚙️ Mode local (hors-ligne)</strong><br>
+    La synchronisation temps réel entre appareils n'est pas encore active. Pour l'activer, ouvre ce fichier dans un éditeur, colle ta config Firebase dans le bloc <code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:3px">firebaseConfig</code> en haut, puis héberge le fichier (voir le guide fourni).
+  </div>
+
+  <!-- Indicateur de connexion (visible quand Firebase est actif) -->
+  <div id="conn-indicator" style="display:none;position:fixed;top:10px;right:12px;z-index:50;font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;padding:.25rem .7rem;border-radius:12px;background:rgba(61,109,17,.2);border:1px solid rgba(97,174,27,.4);color:#9dcf7a">
+    <span style="width:6px;height:6px;border-radius:50%;background:#9dcf7a;display:inline-block;margin-right:4px;animation:pulse-dot 1.8s ease-in-out infinite"></span>En ligne
+  </div>
+
+  <nav>
+    <button id="btn-viewer" class="active" onclick="showPage('viewer')">🌿 Je rejoins la veillée</button>
+    <button id="btn-admin" onclick="showPage('admin-gate')">🔥 Meneur de jeu</button>
+  </nav>
+
+  <header>
+    <span class="fire-icon">🔥</span>
+    <h1>La Grande Veillée du Village</h1>
+    <p class="subtitle">Rassemblez les ressources, préparez le grand feu…</p>
+  </header>
+  <div class="divider"><div class="divider-gem"></div></div>
+
+  <!-- ══ VIEWER PAGE ══ -->
+  <div id="page-viewer" class="page active">
+    <div class="viewer-container">
+
+      <!-- Active game card -->
+      <div class="game-card" id="viewer-game-card" style="display:none">
+        <div class="game-card-header">
+          <span class="game-card-icon">🏕️</span>
+          <div>
+            <div class="game-card-title" id="viewer-game-title"></div>
+            <div class="game-card-subtitle">Consignes du meneur</div>
+          </div>
+          <div class="live-badge"><span style="width:6px;height:6px;border-radius:50%;background:#9dcf7a;display:inline-block;animation:pulse-dot 1.8s ease-in-out infinite"></span>&nbsp;EN JEU</div>
+        </div>
+        <div class="game-card-divider"></div>
+        <div class="game-rules" id="viewer-game-rules"></div>
+      </div>
+
+      <!-- Login -->
+      <div class="card" id="login-card">
+        <div class="card-title">✦ Rejoindre la veillée</div>
+        <div class="input-group">
+          <label>Ton pseudo Twitch</label>
+          <input type="text" id="viewer-pseudo" placeholder="ex: DruideDuChat" maxlength="30" autocomplete="off" onkeydown="if(event.key==='Enter')viewerConnect()">
+        </div>
+        <button class="btn-primary" onclick="viewerConnect()">🪵 Entrer dans le cercle</button>
+      </div>
+
+      <!-- Info + craft -->
+      <div class="viewer-info" id="viewer-info">
+        <div class="card">
+          <div class="card-title">✦ Ton rôle dans la veillée</div>
+          <div class="info-greeting" id="greeting-name"></div>
+          <div style="font-size:.9rem;color:var(--amber-warm);font-style:italic;margin-bottom:1.2rem" id="greeting-status"></div>
+          <div id="info-items-list"></div>
+        </div>
+        <!-- Craft section -->
+        <div id="viewer-craft-section" style="display:none">
+          <div class="craft-viewer-card">
+            <div class="craft-viewer-title">⚗️ <span id="viewer-craft-role-name"></span></div>
+            <div id="viewer-recipes-list"></div>
+          </div>
+        </div>
+        <button class="btn-small" onclick="viewerDisconnect()" style="width:100%;margin-top:.5rem">↩ Changer de pseudo</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ ADMIN GATE ══ -->
+  <div id="page-admin-gate" class="page">
+    <div class="viewer-container">
+      <div class="card lock-overlay">
+        <h2>⚔ Accès Meneur de Jeu</h2>
+        <div class="input-group">
+          <label>Mot de passe</label>
+          <input type="password" id="admin-pass-input" placeholder="••••••••" onkeydown="if(event.key==='Enter')adminLogin()">
+        </div>
+        <button class="btn-primary" onclick="adminLogin()">Entrer dans la salle du conseil</button>
+        <p class="admin-pass-hint">Défaut : <strong style="color:var(--amber-warm)">veillée</strong></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ADMIN ══ -->
+  <div id="page-admin" class="page">
+    <div class="admin-container">
+
+      <!-- Stats -->
+      <div class="admin-full">
+        <div class="stats-bar">
+          <div class="stat-pill">Villageois <strong id="stat-viewers">0</strong></div>
+          <div class="stat-pill">Objets attribués <strong id="stat-assigns">0</strong></div>
+          <div class="stat-pill">🔥 Feu <strong id="stat-fire">—</strong></div>
+        </div>
+      </div>
+
+      <!-- Game module -->
+      <div class="card admin-full">
+        <div class="section-title">Créer une épreuve</div>
+        <div class="game-status-bar inactive" id="game-status-bar">
+          <div class="status-dot"></div>
+          <span id="game-status-label">Aucune épreuve active</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+          <div>
+            <label>Titre de l'épreuve</label>
+            <input type="text" id="game-title" placeholder="Ex : La Forêt des Murmures" maxlength="60">
+          </div>
+          <div style="display:flex;flex-direction:column;justify-content:flex-end">
+            <div style="font-size:.8rem;color:var(--amber-mid);font-style:italic;padding-bottom:.5rem">Visible par tous les viewers quand activée</div>
+          </div>
+        </div>
+        <div style="margin-bottom:1rem">
+          <label>Règles &amp; objectifs</label>
+          <textarea id="game-rules" style="min-height:120px" placeholder="🎯 Objectif : Rassemblez 10 fagots avant que la lune se lève…"></textarea>
+        </div>
+
+        <!-- Craft roles section -->
+        <div class="craft-section-toggle">
+          <span class="craft-toggle-label">⚗️ Rôles artisans <span style="color:rgba(168,158,240,.5);font-size:.65rem">(optionnel)</span></span>
+          <button class="craft-toggle-btn" id="craft-toggle-btn" onclick="toggleCraftSection()">+ Ajouter des rôles</button>
+        </div>
+        <div id="craft-section" style="display:none;margin-bottom:1rem">
+          <div id="craft-roles-list"></div>
+          <button class="btn-add-role" onclick="addCraftRole()">+ Nouveau rôle artisan</button>
+        </div>
+
+        <div style="display:flex;gap:.8rem">
+          <button class="btn-activate" id="btn-activate-game" onclick="activateGame()" style="flex:2">🏕️ Lancer l'épreuve</button>
+          <button class="btn-deactivate" id="btn-stop-game" onclick="stopGame()" style="flex:1;display:none">✕ Terminer l'épreuve</button>
+        </div>
+      </div>
+
+      <!-- Viewer list -->
+      <div class="card">
+        <div class="section-title">Villageois connectés</div>
+        <input class="search-input" type="text" id="search-viewers" placeholder="Rechercher…" oninput="renderViewerList()">
+        <div class="viewer-list" id="viewer-list-el">
+          <div class="empty-state">Aucun villageois connecté</div>
+        </div>
+      </div>
+
+      <!-- Unified viewer panel -->
+      <div class="card admin-full" id="viewer-panel">
+        <div id="panel-empty" style="text-align:center;padding:2rem 1rem">
+          <div style="font-size:2rem;margin-bottom:.6rem;opacity:.3">👆</div>
+          <div style="color:var(--amber-mid);font-style:italic;font-size:.95rem">Sélectionne un villageois pour gérer ses attributions</div>
+        </div>
+        <div id="panel-content" style="display:none">
+          <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.4rem">
+            <div id="panel-avatar" style="width:44px;height:44px;background:var(--amber-mid);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Cinzel',serif;font-size:1rem;color:var(--amber-bright);flex-shrink:0"></div>
+            <div>
+              <div id="panel-name" style="font-family:'Cinzel',serif;font-size:1.1rem;color:var(--amber-bright);letter-spacing:.05em"></div>
+              <div id="panel-count" style="font-size:.85rem;color:var(--amber-warm);font-style:italic"></div>
+            </div>
+            <button onclick="clearSelection()" style="margin-left:auto;background:transparent;border:1px solid rgba(122,61,0,.4);border-radius:4px;color:var(--amber-mid);font-size:.7rem;font-family:'Cinzel',serif;letter-spacing:.08em;padding:.3rem .7rem;cursor:pointer;text-transform:uppercase">✕ Fermer</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+            <div>
+              <div class="section-title">Ce que possède ce villageois</div>
+              <div id="panel-items-list" style="min-height:80px"></div>
+            </div>
+            <div>
+              <div class="section-title">Attribuer</div>
+              <div class="assign-form">
+                <div>
+                  <label>Type</label>
+                  <select id="assign-type" onchange="updateTemplates()">
+                    <option value="objet">🪵 Objet</option>
+                    <option value="role">🎭 Rôle</option>
+                    <option value="info">📜 Information secrète</option>
+                    <option value="secret">🔮 Secret</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Contenu</label>
+                  <textarea id="assign-content" placeholder="Ex : Tu possèdes une torche enchantée…"></textarea>
+                  <div class="templates" id="templates-list"></div>
+                </div>
+                <button class="btn-primary" onclick="assignToViewer()">⚡ Attribuer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const ADMIN_PASSWORD = 'veillée';
+
+const TEMPLATES = {
+  objet: ['Une torche enchantée (éclaire le chemin)','Un fagot de bois sacré (+2 flammes)','Une outre d\'eau de source','Une braise magique (relance une épreuve)','Un sac de graines mystérieuses'],
+  role:  ['L\'Ancien du Village (peut donner un indice)','Le Forgeron (double la valeur du prochain bois)','La Sorcière des Bois (peut voler un objet)','Le Barde (booste le moral +1)','L\'Éclaireur (voit la prochaine épreuve)'],
+  info:  ['Le deuxième sentier mène à la forêt cachée.','La fontaine se tarira au 3e round.','L\'Ancien cache un trésor sous le grand chêne.','Le loup rôde côté Est cette nuit.'],
+  secret:['Tu es en réalité l\'esprit du feu. Ne le dis à personne.','Tu sais que la carte du trésor est fausse.','Tu peux sacrifier ton objet pour sauver un autre joueur.'],
+};
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+let viewers     = {};   // { pseudo: {joined} }   (mirror of Firebase)
+let assignments = [];    // [ {id,viewer,type,content,qty} ]  (mirror)
+let activeGame  = null;  // { title, rules, craftRoles:[...] } (mirror)
+let selectedViewer   = null;
+let currentViewerPseudo = null;
+let craftRolesDraft  = [];
+let craftSectionOpen = false;
+
+// ── FIREBASE SYNC LAYER ─────────────────────────────────────────────────────
+let ONLINE = false;   // true once Firebase is configured & listeners attached
+
+function initSync(){
+  if (window.FB && window.FB.ready) {
+    ONLINE = true;
+    document.getElementById('conn-indicator').style.display = 'block';
+    document.getElementById('setup-banner').style.display   = 'none';
+    attachListeners();
+  } else {
+    ONLINE = false;
+    document.getElementById('setup-banner').style.display   = 'block';
+    document.getElementById('conn-indicator').style.display = 'none';
+  }
+}
+window.addEventListener('fb-ready', initSync);
+
+function attachListeners(){
+  const { db, ref, onValue } = window.FB;
+
+  onValue(ref(db, 'viewers'), (snap) => {
+    viewers = snap.val() || {};
+    renderViewerList();
+    updateStats();
+  });
+
+  onValue(ref(db, 'assignments'), (snap) => {
+    const obj = snap.val() || {};
+    assignments = Object.values(obj);
+    renderViewerList();
+    updateStats();
+    if (selectedViewer) renderPanel();
+    if (currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
+  });
+
+  onValue(ref(db, 'activeGame'), (snap) => {
+    activeGame = snap.val() || null;
+    updateGameUI();
+    updateViewerGameCard();
+    if (currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
+  });
+}
+
+// Write helpers — write to Firebase if online, else mutate local mirror + re-render
+function fbSetViewer(pseudo){
+  if (ONLINE){
+    const { db, ref, set, serverTimestamp } = window.FB;
+    set(ref(db, 'viewers/' + fbKey(pseudo)), { pseudo, joined: serverTimestamp() });
+  } else {
+    if(!viewers[pseudo]) viewers[pseudo] = { pseudo, joined: Date.now() };
+    renderViewerList(); updateStats();
+  }
+}
+
+function fbPushAssignment(a){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'assignments/' + a.id), a);
+  } else {
+    assignments.push(a);
+    localAfterAssignmentChange();
+  }
+}
+
+function fbUpdateAssignment(a){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'assignments/' + a.id), a);
+  } else {
+    localAfterAssignmentChange();
+  }
+}
+
+function fbRemoveAssignment(id){
+  if (ONLINE){
+    const { db, ref, remove } = window.FB;
+    remove(ref(db, 'assignments/' + id));
+  } else {
+    assignments = assignments.filter(a=>a.id!==id);
+    localAfterAssignmentChange();
+  }
+}
+
+function fbSetGame(game){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'activeGame'), game);
+  } else {
+    activeGame = game;
+    updateGameUI(); updateViewerGameCard();
+    if(currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
+  }
+}
+
+function localAfterAssignmentChange(){
+  renderViewerList(); updateStats();
+  if(selectedViewer) renderPanel();
+  if(currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
+}
+
+// Firebase keys can't contain . # $ [ ] / — sanitize pseudo
+function fbKey(s){ return String(s).replace(/[.#$\[\]/]/g,'_'); }
+
+// ── UTILS ─────────────────────────────────────────────────────────────────
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s){ return String(s).replace(/'/g,"\\'"); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
+function showPage(name){ document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById('page-'+name).classList.add('active'); document.getElementById('btn-viewer').classList.toggle('active',name==='viewer'); document.getElementById('btn-admin').classList.toggle('active',name==='admin'||name==='admin-gate'); }
+
+// ── VIEWER ────────────────────────────────────────────────────────────────
+function viewerConnect(){
+  const pseudo = document.getElementById('viewer-pseudo').value.trim();
+  if(!pseudo){ toast('Entre ton pseudo !'); return; }
+  currentViewerPseudo = pseudo;
+  fbSetViewer(pseudo);
+  document.getElementById('login-card').style.display = 'none';
+  document.getElementById('viewer-info').classList.add('visible');
+  renderViewerInfo(pseudo);
+}
+
+function viewerDisconnect(){
+  currentViewerPseudo = null;
+  document.getElementById('login-card').style.display = 'block';
+  document.getElementById('viewer-info').classList.remove('visible');
+  document.getElementById('viewer-pseudo').value = '';
+}
+
+function renderViewerInfo(pseudo){
+  document.getElementById('greeting-name').textContent = '✦ Bienvenue, ' + pseudo;
+  const myItems = assignments.filter(a => a.viewer === pseudo);
+  document.getElementById('greeting-status').textContent =
+    myItems.length === 0 ? 'Tu attends ton rôle autour du feu…' :
+    myItems.length === 1 ? 'Le meneur t\'a confié quelque chose.' :
+    'Le meneur t\'a confié ' + myItems.length + ' choses.';
+
+  renderCraftSection(pseudo);
+
+  const list = document.getElementById('info-items-list');
+  if(myItems.length === 0){ list.innerHTML = '<div class="info-empty">🌑 Rien encore… Le meneur va bientôt agir.</div>'; return; }
+  const icons = {objet:'🪵',role:'🎭',info:'📜',secret:'🔮'};
+  const labels= {objet:'Objet',role:'Rôle',info:'Information',secret:'Secret'};
+  list.innerHTML = myItems.map(a => {
+    const qtyBadge = (a.type==='objet' && (a.qty??1)>1)
+      ? `<span style="margin-left:.5rem;font-family:'Cinzel',serif;font-size:.85rem;color:var(--amber-glow);font-weight:600">×${a.qty}</span>` : '';
+    return `<div class="info-item">
+      <span class="item-icon">${icons[a.type]||'📦'}</span>
+      <div class="info-type">${labels[a.type]||a.type}</div>
+      <div class="info-content">${escHtml(a.content)}${qtyBadge}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── VIEWER GAME CARD ──────────────────────────────────────────────────────
+function updateViewerGameCard(){
+  const card = document.getElementById('viewer-game-card');
+  if(!activeGame){ card.style.display='none'; return; }
+  card.style.display = 'block';
+  document.getElementById('viewer-game-title').textContent = activeGame.title;
+  document.getElementById('viewer-game-rules').textContent = activeGame.rules;
+}
+
+// ── CRAFT VIEWER ──────────────────────────────────────────────────────────
+function renderCraftSection(pseudo){
+  const sec = document.getElementById('viewer-craft-section');
+  if(!sec) return;
+  if(!activeGame || !activeGame.craftRoles || activeGame.craftRoles.length===0){ sec.style.display='none'; return; }
+
+  const myRoleAssignments = assignments.filter(a => a.viewer===pseudo && a.type==='role');
+  const matchedRole = activeGame.craftRoles.find(cr =>
+    myRoleAssignments.some(a => a.content.toLowerCase().includes(cr.name.toLowerCase()))
+  );
+  if(!matchedRole){ sec.style.display='none'; return; }
+
+  sec.style.display = 'block';
+  document.getElementById('viewer-craft-role-name').textContent = matchedRole.name;
+
+  const myObjets = assignments.filter(a => a.viewer===pseudo && a.type==='objet');
+  const recipesEl = document.getElementById('viewer-recipes-list');
+
+  if(matchedRole.recipes.length===0){
+    recipesEl.innerHTML='<div style="color:var(--amber-mid);font-style:italic;font-size:.9rem">Aucune recette pour ce rôle.</div>';
+    return;
+  }
+
+  recipesEl.innerHTML = matchedRole.recipes.map((rc,ri) => {
+    const costChecks = rc.cost.map(c => {
+      const found = myObjets.find(o => o.content.toLowerCase().includes(c.name.toLowerCase()));
+      const have  = found ? (found.qty??1) : 0;
+      return {...c, have, ok: have>=c.qty};
+    });
+    const canCraft = costChecks.every(c=>c.ok);
+    const costHtml = costChecks.map(c =>
+      `<span class="${c.ok?'ok':'missing'}">${escHtml(c.name)} ×${c.qty} (tu en as : ${c.have})</span>`
+    ).join('<br>');
+    const rcData = escAttr(JSON.stringify(rc));
+    return `<div class="recipe-card ${canCraft?'craftable':''}">
+      <div class="recipe-output">⚗️ ${escHtml(rc.output)}</div>
+      <div class="recipe-cost">${costHtml}</div>
+      <button class="btn-craft" ${canCraft?'':'disabled'} onclick="craftItem('${escAttr(pseudo)}','${rcData}')">
+        ${canCraft?'✦ Fabriquer':'✕ Ressources manquantes'}
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function craftItem(pseudo, rcJson){
+  const rc = JSON.parse(rcJson);
+  // Consume resources
+  rc.cost.forEach(c => {
+    const found = assignments.find(a => a.viewer===pseudo && a.type==='objet'
+      && a.content.toLowerCase().includes(c.name.toLowerCase()));
+    if(found){
+      const left = (found.qty??1) - c.qty;
+      if(left<=0) fbRemoveAssignment(found.id);
+      else { found.qty = left; fbUpdateAssignment(found); }
+    }
+  });
+  // Add crafted object
+  fbPushAssignment({ id:String(Date.now())+Math.floor(Math.random()*1000), viewer:pseudo, type:'objet', content:rc.output, qty:1 });
+  toast('⚗️ ' + rc.output + ' fabriqué !');
+}
+
+// ── ADMIN LOGIN ───────────────────────────────────────────────────────────
+function adminLogin(){
+  if(document.getElementById('admin-pass-input').value === ADMIN_PASSWORD){
+    document.getElementById('admin-pass-input').value='';
+    showPage('admin');
+    renderViewerList();
+    updateStats();
+  } else { toast('⛔ Mot de passe incorrect'); }
+}
+
+// ── VIEWER LIST ───────────────────────────────────────────────────────────
+function renderViewerList(){
+  const q   = (document.getElementById('search-viewers')?.value||'').toLowerCase();
+  const el  = document.getElementById('viewer-list-el');
+  // Use the stored pseudo (real display name) rather than the sanitized key
+  const names = Object.values(viewers)
+    .map(v => (v && v.pseudo) ? v.pseudo : v)
+    .filter(n => typeof n === 'string' && n.toLowerCase().includes(q));
+  if(!names.length){ el.innerHTML='<div class="empty-state">Aucun villageois</div>'; return; }
+  el.innerHTML = names.map(name => {
+    const count = assignments.filter(a=>a.viewer===name).length;
+    return `<div class="viewer-row${selectedViewer===name?' selected':''}" onclick="selectViewer('${escAttr(name)}')">
+      <div class="viewer-avatar">${name.slice(0,2).toUpperCase()}</div>
+      <div class="viewer-name-row">${escHtml(name)}</div>
+      ${count>0?`<span class="viewer-badge-count">${count}</span>`:''}
+    </div>`;
+  }).join('');
+}
+
+function selectViewer(name){
+  selectedViewer = name;
+  renderViewerList();
+  renderPanel();
+  updateTemplates();
+}
+
+function clearSelection(){
+  selectedViewer = null;
+  renderViewerList();
+  document.getElementById('panel-empty').style.display='block';
+  document.getElementById('panel-content').style.display='none';
+}
+
+// ── PANEL ─────────────────────────────────────────────────────────────────
+function renderPanel(){
+  if(!selectedViewer) return;
+  document.getElementById('panel-empty').style.display='none';
+  document.getElementById('panel-content').style.display='block';
+  document.getElementById('panel-avatar').textContent = selectedViewer.slice(0,2).toUpperCase();
+  document.getElementById('panel-name').textContent   = selectedViewer;
+  const myItems = assignments.filter(a=>a.viewer===selectedViewer);
+  document.getElementById('panel-count').textContent  =
+    myItems.length===0 ? 'Aucun objet attribué' :
+    myItems.length===1 ? '1 objet attribué' : myItems.length+' objets attribués';
+
+  const typeLabel={objet:'Objet',role:'Rôle',info:'Information',secret:'Secret'};
+  const typeClass={objet:'type-objet',role:'type-role',info:'type-info',secret:'type-secret'};
+  const typeIcon ={objet:'🪵',role:'🎭',info:'📜',secret:'🔮'};
+  const listEl=document.getElementById('panel-items-list');
+  if(!myItems.length){ listEl.innerHTML='<div class="empty-state" style="padding:1rem 0;font-size:.9rem">Rien attribué pour l\'instant</div>'; return; }
+
+  listEl.innerHTML = myItems.map(a => {
+    const isObjet = a.type==='objet';
+    const qty = a.qty??1;
+    const stepper = isObjet ? `
+      <div style="display:flex;align-items:center;gap:0;margin-top:6px">
+        <button onclick="changeQty(${a.id},-1)" style="width:26px;height:26px;background:rgba(26,13,0,.6);border:1px solid var(--amber-mid);border-radius:4px 0 0 4px;color:var(--amber-warm);font-size:1rem;cursor:pointer;line-height:1;transition:all .15s" onmouseover="this.style.background='rgba(122,61,0,.3)'" onmouseout="this.style.background='rgba(26,13,0,.6)'">−</button>
+        <div style="min-width:36px;height:26px;background:rgba(26,13,0,.4);border-top:1px solid var(--amber-mid);border-bottom:1px solid var(--amber-mid);display:flex;align-items:center;justify-content:center;font-family:'Cinzel',serif;font-size:.85rem;color:var(--amber-bright);font-weight:600">×${qty}</div>
+        <button onclick="changeQty(${a.id},+1)" style="width:26px;height:26px;background:rgba(26,13,0,.6);border:1px solid var(--amber-mid);border-radius:0 4px 4px 0;color:var(--amber-warm);font-size:1rem;cursor:pointer;line-height:1;transition:all .15s" onmouseover="this.style.background='rgba(122,61,0,.3)'" onmouseout="this.style.background='rgba(26,13,0,.6)'">+</button>
+      </div>` : '';
+    return `<div style="display:flex;align-items:flex-start;gap:.7rem;padding:.65rem .4rem;border-bottom:1px solid rgba(122,61,0,.2)">
+      <span style="font-size:1.2rem;flex-shrink:0;margin-top:2px">${typeIcon[a.type]||'📦'}</span>
+      <div style="flex:1">
+        <div style="margin-bottom:3px"><span class="type-badge ${typeClass[a.type]||''}">${typeLabel[a.type]||a.type}</span></div>
+        <div style="font-size:.97rem;color:var(--amber-pale);line-height:1.45">${escHtml(a.content)}</div>
+        ${stepper}
+      </div>
+      <button class="btn-delete" onclick="deleteAssignment(${a.id})" title="Retirer">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ── ASSIGN ────────────────────────────────────────────────────────────────
+function updateTemplates(){
+  const type = document.getElementById('assign-type')?.value;
+  const tpls = TEMPLATES[type]||[];
+  document.getElementById('templates-list').innerHTML = tpls.map(t=>`<button class="tpl-btn" onclick="useTpl(this)">${t}</button>`).join('');
+}
+function useTpl(btn){ document.getElementById('assign-content').value=btn.textContent; }
+
+function assignToViewer(){
+  if(!selectedViewer){ toast('Sélectionne un villageois !'); return; }
+  const type    = document.getElementById('assign-type').value;
+  const content = document.getElementById('assign-content').value.trim();
+  if(!content){ toast('Entre un contenu !'); return; }
+  const qty = type==='objet' ? 1 : null;
+  fbPushAssignment({ id:String(Date.now())+Math.floor(Math.random()*1000), viewer:selectedViewer, type, content, qty });
+  document.getElementById('assign-content').value='';
+  toast('✓ Attribué à '+selectedViewer+' !');
+}
+
+function deleteAssignment(id){
+  fbRemoveAssignment(id);
+}
+
+function changeQty(id, delta){
+  const a = assignments.find(a=>a.id===id);
+  if(!a) return;
+  const newQty = (a.qty??1)+delta;
+  if(newQty<=0){ if(!confirm('Retirer cet objet complètement ?')) return; deleteAssignment(id); return; }
+  a.qty = newQty;
+  fbUpdateAssignment(a);
+}
+
+// ── GAME ──────────────────────────────────────────────────────────────────
+function activateGame(){
+  const title = document.getElementById('game-title').value.trim();
+  const rules = document.getElementById('game-rules').value.trim();
+  if(!title){ toast('Donne un titre à l\'épreuve !'); return; }
+  if(!rules){ toast('Ajoute les règles et objectifs !'); return; }
+  const craftRoles = craftRolesDraft
+    .map(r=>({ id:r.id, name:r.name.trim(),
+      recipes: r.recipes.filter(rc=>rc.output.trim()).map(rc=>({
+        id:rc.id, output:rc.output.trim(),
+        cost: rc.cost.filter(c=>c.name.trim()).map(c=>({name:c.name.trim(),qty:Math.max(1,parseInt(c.qty)||1)}))
+      }))
+    }))
+    .filter(r=>r.name && r.recipes.length);
+  fbSetGame({ title, rules, craftRoles });
+  toast('🏕️ Épreuve lancée !');
+}
+
+function stopGame(){
+  fbSetGame(null);
+  toast('Épreuve terminée.');
+}
+
+function updateGameUI(){
+  const bar   = document.getElementById('game-status-bar');
+  const label = document.getElementById('game-status-label');
+  const btnA  = document.getElementById('btn-activate-game');
+  const btnS  = document.getElementById('btn-stop-game');
+  if(activeGame){
+    bar.className='game-status-bar active';
+    label.textContent='⚡ En cours : '+activeGame.title;
+    btnA.textContent='🔄 Mettre à jour l\'épreuve';
+    btnS.style.display='block';
+  } else {
+    bar.className='game-status-bar inactive';
+    label.textContent='Aucune épreuve active';
+    btnA.textContent='🏕️ Lancer l\'épreuve';
+    btnS.style.display='none';
+  }
+}
+
+// ── CRAFT BUILDER ─────────────────────────────────────────────────────────
+function toggleCraftSection(){
+  craftSectionOpen = !craftSectionOpen;
+  document.getElementById('craft-section').style.display = craftSectionOpen?'block':'none';
+  document.getElementById('craft-toggle-btn').textContent = craftSectionOpen?'− Masquer':'+ Ajouter des rôles';
+  if(craftSectionOpen && craftRolesDraft.length===0) addCraftRole();
+}
+
+function addCraftRole(){
+  const id = Date.now();
+  craftRolesDraft.push({ id, name:'', recipes:[] });
+  addCraftRecipe(id);
+  renderCraftRoles();
+}
+
+function removeCraftRole(roleId){
+  craftRolesDraft = craftRolesDraft.filter(r=>r.id!==roleId);
+  renderCraftRoles();
+}
+
+function addCraftRecipe(roleId){
+  const role = craftRolesDraft.find(r=>r.id===roleId);
+  if(!role) return;
+  role.recipes.push({ id:Date.now()+Math.random(), output:'', cost:[{name:'',qty:1}] });
+  renderCraftRoles();
+}
+
+function removeCraftRecipe(roleId,recipeId){
+  const role = craftRolesDraft.find(r=>r.id===roleId);
+  if(role) role.recipes = role.recipes.filter(r=>r.id!==recipeId);
+  renderCraftRoles();
+}
+
+function addCraftCost(roleId,recipeId){
+  const role   = craftRolesDraft.find(r=>r.id===roleId);
+  const recipe = role && role.recipes.find(r=>r.id===recipeId);
+  if(recipe){ recipe.cost.push({name:'',qty:1}); renderCraftRoles(); }
+}
+
+function removeCraftCost(roleId,recipeId,ci){
+  const role   = craftRolesDraft.find(r=>r.id===roleId);
+  const recipe = role && role.recipes.find(r=>r.id===recipeId);
+  if(recipe){ recipe.cost.splice(ci,1); renderCraftRoles(); }
+}
+
+function syncCraftField(roleId,field,value){ const r=craftRolesDraft.find(r=>r.id===roleId); if(r) r[field]=value; }
+function syncRecipeField(roleId,recipeId,field,value){ const role=craftRolesDraft.find(r=>r.id===roleId); const rc=role&&role.recipes.find(r=>r.id===recipeId); if(rc) rc[field]=value; }
+function syncCostField(roleId,recipeId,ci,field,value){
+  const role=craftRolesDraft.find(r=>r.id===roleId);
+  const rc=role&&role.recipes.find(r=>r.id===recipeId);
+  if(rc&&rc.cost[ci]) rc.cost[ci][field]=field==='qty'?Math.max(1,parseInt(value)||1):value;
+}
+
+function renderCraftRoles(){
+  const el=document.getElementById('craft-roles-list');
+  if(!el) return;
+  el.innerHTML = craftRolesDraft.map(role=>`
+    <div class="craft-role-builder">
+      <div class="craft-role-header">
+        <span style="font-size:1.1rem">🎭</span>
+        <input class="craft-role-name-input" placeholder="Nom du rôle (ex: Forgeron)" value="${escHtml(role.name)}" oninput="syncCraftField(${role.id},'name',this.value)">
+        <button class="btn-icon" onclick="removeCraftRole(${role.id})">✕</button>
+      </div>
+      <div style="font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.12em;color:rgba(168,158,240,.6);text-transform:uppercase;margin-bottom:.5rem">Recettes — Ressources consommées → Objet fabriqué</div>
+      ${role.recipes.map(rc=>`
+        <div class="craft-recipe-block">
+          <div style="font-size:.75rem;color:var(--amber-mid);font-style:italic;margin-bottom:.4rem">Coûts :</div>
+          ${rc.cost.map((c,ci)=>`
+            <div class="craft-recipe-row">
+              <input class="craft-input" placeholder="Ressource (ex: Bois)" value="${escHtml(c.name)}" oninput="syncCostField(${role.id},${rc.id},${ci},'name',this.value)">
+              <input class="craft-qty-input" type="number" min="1" value="${c.qty}" oninput="syncCostField(${role.id},${rc.id},${ci},'qty',this.value)">
+              <button class="btn-icon" onclick="removeCraftCost(${role.id},${rc.id},${ci})" ${rc.cost.length<=1?'disabled':''}>−</button>
+            </div>`).join('')}
+          <button class="btn-add-recipe" onclick="addCraftCost(${role.id},${rc.id})">+ ajouter une ressource</button>
+          <div class="craft-output-row" style="margin-top:.6rem">
+            <span class="craft-arrow">→ Fabrique :</span>
+            <input class="craft-input" style="flex:1" placeholder="Nom de l'objet fabriqué" value="${escHtml(rc.output)}" oninput="syncRecipeField(${role.id},${rc.id},'output',this.value)">
+            <button class="btn-icon" onclick="removeCraftRecipe(${role.id},${rc.id})">✕</button>
+          </div>
+        </div>`).join('')}
+      <button class="btn-add-recipe" onclick="addCraftRecipe(${role.id})">+ Ajouter une recette</button>
+    </div>`).join('');
+}
+
+// ── STATS ─────────────────────────────────────────────────────────────────
+function updateStats(){
+  document.getElementById('stat-viewers').textContent  = Object.keys(viewers).length;
+  document.getElementById('stat-assigns').textContent  = assignments.length;
+  const n=Object.keys(viewers).length;
+  document.getElementById('stat-fire').textContent = n===0?'—':n<5?'Petit 🌱':n<12?'Grand 🔥':'Légendaire ✨';
+}
+
+updateStats();
+// Handle case where fb-ready fired before this script parsed
+if (window.FB) initSync();
+</script>
+</body>
+</html>
