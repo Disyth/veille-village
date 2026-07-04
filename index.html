@@ -172,6 +172,44 @@
   .fire-mini-input { width:100%; background:rgba(26,13,0,.6); border:1px solid var(--amber-mid); border-radius:4px; padding:.5rem .8rem; font-family:'Cinzel',serif; font-size:.95rem; color:var(--amber-bright); outline:none; text-align:center; }
   .fire-mini-input:focus { border-color:var(--amber-glow); }
 
+
+  /* ── DIAMANT ── */
+  .diamant-board { background:rgba(26,13,0,.5); border:1px solid rgba(196,106,0,.4); border-radius:8px; padding:1rem; margin-bottom:1rem; overflow-x:auto; }
+  .diamant-path { display:flex; gap:.5rem; align-items:center; min-height:76px; }
+  .dcard { flex-shrink:0; width:52px; height:70px; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:'Cinzel',serif; border:1px solid; animation:fadeIn .3s ease; }
+  .dcard-treasure { background:linear-gradient(160deg,rgba(196,106,0,.3),rgba(139,40,0,.2)); border-color:var(--amber-warm); color:var(--amber-bright); }
+  .dcard-treasure .dval { font-size:1.4rem; font-weight:700; }
+  .dcard-treasure .dico { font-size:1rem; }
+  .dcard-hazard { background:rgba(139,40,0,.25); border-color:var(--ember); color:#f08060; }
+  .dcard-hazard .dico { font-size:1.7rem; }
+  .dcard-empty { color:var(--amber-mid); font-style:italic; font-family:'Crimson Text',serif; font-size:.85rem; padding:0 1rem; }
+  .diamant-status { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:.8rem; }
+  .dpill { background:rgba(122,61,0,.2); border:1px solid var(--amber-mid); border-radius:14px; padding:.25rem .8rem; font-size:.8rem; color:var(--amber-warm); }
+  .dpill strong { color:var(--amber-bright); font-family:'Cinzel',serif; }
+  .diamant-event { font-style:italic; color:var(--amber-light); font-size:.95rem; line-height:1.5; padding:.7rem 1rem; background:rgba(0,0,0,.2); border-radius:6px; border-left:3px solid var(--amber-warm); margin-bottom:1rem; }
+  .diamant-players { display:flex; flex-direction:column; gap:.4rem; }
+  .dplayer-row { display:flex; align-items:center; gap:.6rem; padding:.4rem .7rem; border-radius:5px; background:rgba(26,13,0,.4); font-size:.9rem; }
+  .dplayer-row.out { opacity:.5; }
+  .dplayer-status { font-size:.7rem; font-family:'Cinzel',serif; letter-spacing:.05em; padding:1px 7px; border-radius:8px; }
+  .dstatus-in { background:rgba(61,109,17,.25); color:#9dcf7a; }
+  .dstatus-out { background:rgba(122,61,0,.25); color:var(--amber-warm); }
+  .dvote-badge { margin-left:auto; font-size:.75rem; }
+  .dvote-done { color:#9dcf7a; }
+  .dvote-wait { color:var(--amber-mid); }
+  .diamant-vote-btns { display:flex; gap:.8rem; margin-top:1rem; }
+  .btn-continue { flex:1; padding:1rem; background:rgba(61,109,17,.2); border:1px solid rgba(97,174,27,.5); border-radius:6px; font-family:'Cinzel',serif; font-size:.9rem; letter-spacing:.08em; color:#9dcf7a; cursor:pointer; transition:all .2s; text-transform:uppercase; }
+  .btn-continue:hover { background:rgba(61,109,17,.35); }
+  .btn-leave { flex:1; padding:1rem; background:rgba(196,106,0,.2); border:1px solid var(--amber-warm); border-radius:6px; font-family:'Cinzel',serif; font-size:.9rem; letter-spacing:.08em; color:var(--amber-bright); cursor:pointer; transition:all .2s; text-transform:uppercase; }
+  .btn-leave:hover { background:rgba(196,106,0,.35); }
+  .diamant-voted { text-align:center; padding:1rem; font-style:italic; color:var(--amber-warm); }
+  .dbank { display:flex; gap:1.2rem; justify-content:center; margin:.5rem 0; }
+  .dbank-item { text-align:center; }
+  .dbank-val { font-family:'Cinzel',serif; font-size:1.5rem; color:var(--amber-bright); }
+  .dbank-lbl { font-size:.7rem; color:var(--amber-warm); text-transform:uppercase; letter-spacing:.1em; }
+  .btn-draw { width:100%; padding:1rem; background:rgba(196,106,0,.25); border:1px solid var(--amber-warm); border-radius:6px; font-family:'Cinzel',serif; font-size:.9rem; letter-spacing:.1em; color:var(--amber-bright); cursor:pointer; transition:all .2s; text-transform:uppercase; }
+  .btn-draw:hover { background:rgba(196,106,0,.4); }
+  .btn-draw:disabled { opacity:.35; cursor:not-allowed; }
+
   /* ── BADGES ── */
   .type-badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:.7rem; font-family:'Cinzel',serif; letter-spacing:.08em; text-transform:uppercase; }
   .type-objet { background:rgba(196,106,0,.2); color:var(--amber-glow); border:1px solid rgba(196,106,0,.3); }
@@ -195,7 +233,7 @@
   // ╔══════════════════════════════════════════════════════════════════╗
   // ║  COLLE TA CONFIG FIREBASE ICI (voir le guide en haut de la page)  ║
   // ╚══════════════════════════════════════════════════════════════════╝
-// Your web app's Firebase configuration
+ // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBD8G35KMNAc6W-HTPqjGpi8fgQuBuh48w",
   authDomain: "veillee-village.firebaseapp.com",
@@ -205,6 +243,7 @@ const firebaseConfig = {
   messagingSenderId: "527854879287",
   appId: "1:527854879287:web:ffdd2337cacb6c585e35b2"
 };
+
 
   // Détection : config non remplie -> mode local (démo hors-ligne)
   const isConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey !== "TON_API_KEY";
@@ -261,6 +300,18 @@ const firebaseConfig = {
         <div class="fire-count" id="fire-count">0 point</div>
         <div class="fire-progress"><div class="fire-progress-bar" id="fire-progress-bar" style="width:0%"></div></div>
         <div class="fire-thresholds" id="fire-thresholds"></div>
+      </div>
+
+      <!-- Diamant board (shown when a Diamant game is active) -->
+      <div id="viewer-diamant" style="display:none">
+        <div class="card">
+          <div class="card-title">💎 Diamant — La Grotte aux Trésors</div>
+          <div class="diamant-status" id="dv-status"></div>
+          <div class="diamant-event" id="dv-event"></div>
+          <div class="diamant-board"><div class="diamant-path" id="dv-path"></div></div>
+          <div id="dv-myzone"></div>
+          <div class="diamant-players" id="dv-players"></div>
+        </div>
       </div>
 
       <!-- Active game card -->
@@ -333,6 +384,24 @@ const firebaseConfig = {
           <div class="stat-pill">Villageois <strong id="stat-viewers">0</strong></div>
           <div class="stat-pill">Objets attribués <strong id="stat-assigns">0</strong></div>
           <div class="stat-pill">🔥 Feu <strong id="stat-fire">—</strong></div>
+        </div>
+      </div>
+
+      <!-- ══ DIAMANT (module de jeu interactif) ══ -->
+      <div class="card admin-full" id="diamant-panel">
+        <div class="section-title">💎 Diamant — module de jeu</div>
+        <div id="diamant-admin-inactive">
+          <div style="font-size:.9rem;color:var(--amber-light);line-height:1.6;margin-bottom:1rem">
+            Une partie coopérative sur 5 manches. Les villageois connectés explorent la grotte, votent pour continuer ou rentrer, et sécurisent leur trésor. Le total alimente le feu à la fin.
+          </div>
+          <button class="btn-draw" onclick="startDiamant()">💎 Lancer une partie de Diamant</button>
+        </div>
+        <div id="diamant-admin-active" style="display:none">
+          <div class="diamant-status" id="da-status"></div>
+          <div class="diamant-event" id="da-event"></div>
+          <div class="diamant-board"><div class="diamant-path" id="da-path"></div></div>
+          <div class="diamant-players" id="da-players" style="margin-bottom:1rem"></div>
+          <div id="da-controls"></div>
         </div>
       </div>
 
@@ -506,6 +575,7 @@ let assignments = [];    // [ {id,viewer,type,content,qty} ]
 let activeGame  = null;  // { id,title,rules,craftRoles,reward } — épreuve en cours
 let library     = {};    // { id: {id,title,rules,craftRoles,reward} } — bibliothèque
 let fire        = { points:0, grand:50, legendaire:120 };  // feu global permanent
+let diamant     = null;  // partie de Diamant en cours (null si aucune)
 let selectedViewer   = null;
 let currentViewerPseudo = null;
 let craftRolesDraft  = [];
@@ -562,6 +632,12 @@ function attachListeners(){
     fire = snap.val() || { points:0, grand:50, legendaire:120 };
     renderFireMeter();
     renderAdminFire();
+  });
+
+  onValue(ref(db, 'diamant'), (snap) => {
+    diamant = snap.val() || null;
+    renderDiamantAdmin();
+    if (currentViewerPseudo) renderDiamantViewer(currentViewerPseudo);
   });
 }
 
@@ -646,6 +722,17 @@ function fbSetFire(f){
   }
 }
 
+function fbSetDiamant(d){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'diamant'), d);
+  } else {
+    diamant = d;
+    renderDiamantAdmin();
+    if(currentViewerPseudo) renderDiamantViewer(currentViewerPseudo);
+  }
+}
+
 function localAfterAssignmentChange(){
   renderViewerList(); updateStats();
   if(selectedViewer) renderPanel();
@@ -670,6 +757,7 @@ function viewerConnect(){
   document.getElementById('login-card').style.display = 'none';
   document.getElementById('viewer-info').classList.add('visible');
   renderViewerInfo(pseudo);
+  renderDiamantViewer(pseudo);
 }
 
 function viewerDisconnect(){
@@ -1178,6 +1266,253 @@ function saveFireConfig(){
   fbSetFire(Object.assign({}, fire, { grand, legendaire }));
 }
 
+// ── DIAMANT ENGINE + UI ──────────────────────────────────────────────────────
+const D_HAZARDS = ['serpent','araignee','eboulement'];
+const D_TREASURES = [1,2,3,4,5,5,7,7,9,11,11,13,14,15,17];
+const D_MAXROUNDS = 5;
+let __dseq = 0;
+function dCardId(){ return 'c'+Date.now()+'_'+(__dseq++); }
+function dShuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function dNewDeck(){
+  const cards=[];
+  D_TREASURES.forEach(v=>cards.push({id:dCardId(),type:'treasure',value:v}));
+  D_HAZARDS.forEach(t=>{ for(let i=0;i<3;i++) cards.push({id:dCardId(),type:'hazard',hazard:t}); });
+  return dShuffle(cards);
+}
+function dHazLabel(h){ return {serpent:'🐍 Serpent',araignee:'🕷️ Araignée',eboulement:'🪨 Éboulement'}[h]||h; }
+function dHazIcon(h){ return {serpent:'🐍',araignee:'🕷️',eboulement:'🪨'}[h]||'⚠️'; }
+function dInPlayers(st){ return Object.values(st.players).filter(p=>p.status==='in'); }
+function dTotalBanked(st){ return Object.values(st.players).reduce((s,p)=>s+p.banked,0); }
+
+// ── Control handlers (write to Firebase) ──
+function startDiamant(){
+  const pseudos = Object.values(viewers).map(v=>(v&&v.pseudo)?v.pseudo:v).filter(p=>typeof p==='string');
+  if(pseudos.length===0){ toast('Aucun villageois connecté pour jouer !'); return; }
+  if(!confirm('Lancer une partie de Diamant avec les '+pseudos.length+' villageois connectés ?')) return;
+  const players={};
+  pseudos.forEach(p=>{ players[p]={pseudo:p,status:'in',held:0,banked:0,vote:null}; });
+  fbSetDiamant({
+    active:true, round:1, maxRounds:D_MAXROUNDS, phase:'exploring',
+    deck:dNewDeck(), board:[], pathTreasure:0, hazardsSeen:{}, players,
+    lastEvent:'La partie commence ! Révèle la première carte.'
+  });
+  toast('💎 Partie de Diamant lancée !');
+}
+
+function diamantCancel(){
+  if(!confirm('Abandonner la partie de Diamant en cours ? (le trésor sécurisé ne sera pas ajouté au feu)')) return;
+  fbSetDiamant(null);
+  toast('Partie de Diamant annulée.');
+}
+
+function diamantDraw(){
+  if(!diamant || diamant.phase!=='exploring') return;
+  const st = JSON.parse(JSON.stringify(diamant));
+  if(!st.deck.length){ st.lastEvent='Deck vide, la manche se termine.'; dEndRound(st); fbSetDiamant(st); return; }
+  const card = st.deck.shift();
+  st.board.push(card);
+  if(card.type==='treasure'){
+    const ins = dInPlayers(st); const N=ins.length;
+    if(N>0){
+      const share=Math.floor(card.value/N), rem=card.value%N;
+      ins.forEach(p=>p.held+=share); st.pathTreasure+=rem;
+      st.lastEvent='💎 Trésor de '+card.value+' ! Chaque explorateur ('+N+') gagne '+share+(rem?(' — '+rem+' sur le chemin.'):'.');
+    }
+    Object.values(st.players).forEach(p=>{ if(p.status==='in') p.vote=null; });
+    st.phase='voting';
+  } else {
+    const seen = st.hazardsSeen[card.hazard]||0;
+    if(seen>=1){
+      const lost = dInPlayers(st).reduce((s,p)=>s+p.held,0)+st.pathTreasure;
+      dInPlayers(st).forEach(p=>p.held=0); st.pathTreasure=0; st.hazardsSeen[card.hazard]=seen+1;
+      st.lastEvent='💥 Double '+dHazLabel(card.hazard)+' ! Manche perdue. '+lost+' trésor'+(lost>1?'s':'')+' non sécurisé'+(lost>1?'s':'')+' perdu'+(lost>1?'s':'')+'.';
+      dEndRound(st); fbSetDiamant(st); return;
+    } else {
+      st.hazardsSeen[card.hazard]=1;
+      Object.values(st.players).forEach(p=>{ if(p.status==='in') p.vote=null; });
+      st.phase='voting';
+      st.lastEvent='⚠️ '+dHazLabel(card.hazard)+' ! Un deuxième serait fatal. Continuer ou rentrer ?';
+    }
+  }
+  fbSetDiamant(st);
+}
+
+function diamantVote(pseudo, vote){
+  if(!diamant || diamant.phase!=='voting') return;
+  const st = JSON.parse(JSON.stringify(diamant));
+  const p = st.players[pseudo];
+  if(!p || p.status!=='in') return;
+  p.vote = vote;
+  const ins = dInPlayers(st);
+  if(ins.every(pl=>pl.vote)) dResolveVotes(st);
+  fbSetDiamant(st);
+}
+
+function diamantForceResolve(){
+  if(!diamant || diamant.phase!=='voting') return;
+  const st = JSON.parse(JSON.stringify(diamant));
+  dInPlayers(st).forEach(p=>{ if(!p.vote) p.vote='continue'; });
+  dResolveVotes(st);
+  fbSetDiamant(st);
+}
+
+function dResolveVotes(st){
+  const ins = dInPlayers(st);
+  const leavers = ins.filter(p=>p.vote==='leave');
+  const M = leavers.length;
+  if(M>0){
+    const share=Math.floor(st.pathTreasure/M), rem=st.pathTreasure%M;
+    leavers.forEach(p=>{ p.banked+=p.held+share; p.held=0; p.status='out'; p.vote=null; });
+    st.pathTreasure=rem;
+    st.lastEvent=M+' explorateur'+(M>1?'s rentrent':' rentre')+' au camp avec leur butin.';
+  } else { st.lastEvent='Tout le monde continue l\'exploration !'; }
+  dInPlayers(st).forEach(p=>p.vote=null);
+  if(dInPlayers(st).length===0){ dEndRound(st); return; }
+  st.phase='exploring';
+}
+
+function dEndRound(st){
+  dInPlayers(st).forEach(p=>{ p.held=0; p.status='out'; p.vote=null; });
+  st.pathTreasure=0; st.phase='roundEnd';
+}
+
+function diamantNextRound(){
+  if(!diamant || diamant.phase!=='roundEnd') return;
+  const st = JSON.parse(JSON.stringify(diamant));
+  if(st.round>=st.maxRounds){
+    st.phase='gameEnd';
+    st.lastEvent='🏁 Partie terminée ! Trésor total sécurisé : '+dTotalBanked(st)+'.';
+    fbSetDiamant(st); return;
+  }
+  st.round+=1; st.deck=dNewDeck(); st.board=[]; st.pathTreasure=0; st.hazardsSeen={};
+  Object.values(st.players).forEach(p=>{ p.status='in'; p.held=0; p.vote=null; });
+  st.phase='exploring';
+  st.lastEvent='Manche '+st.round+' ! Tous repartent dans la grotte.';
+  fbSetDiamant(st);
+}
+
+function diamantEndToFire(){
+  if(!diamant) return;
+  const total = dTotalBanked(diamant);
+  if(!confirm('Ajouter '+total+' points au feu de camp et clôturer la partie ?')) return;
+  fbSetFire(Object.assign({}, fire, { points:(fire.points||0)+total }));
+  fbSetDiamant(null);
+  toast('🔥 +'+total+' points au feu ! Partie clôturée.');
+}
+
+// ── Rendering ──
+function dRenderPath(el, board){
+  if(!el) return;
+  if(!board || !board.length){ el.innerHTML='<div class="dcard-empty">La grotte est encore inexplorée…</div>'; return; }
+  el.innerHTML = board.map(c=>{
+    if(c.type==='treasure') return '<div class="dcard dcard-treasure"><span class="dico">💎</span><span class="dval">'+c.value+'</span></div>';
+    return '<div class="dcard dcard-hazard"><span class="dico">'+dHazIcon(c.hazard)+'</span></div>';
+  }).join('');
+  el.scrollLeft = el.scrollWidth;
+}
+
+function dStatusPills(st){
+  const ins = dInPlayers(st).length;
+  const total = dTotalBanked(st);
+  return '<div class="dpill">Manche <strong>'+st.round+'/'+st.maxRounds+'</strong></div>'+
+         '<div class="dpill">Dans la grotte <strong>'+ins+'</strong></div>'+
+         '<div class="dpill">Sur le chemin <strong>'+st.pathTreasure+'</strong></div>'+
+         '<div class="dpill">Trésor sécurisé <strong>'+total+'</strong></div>';
+}
+
+function dPlayersList(st, highlightPseudo){
+  return Object.values(st.players).map(p=>{
+    const isIn = p.status==='in';
+    const voteBadge = (st.phase==='voting' && isIn)
+      ? (p.vote ? '<span class="dvote-badge dvote-done">✓ a voté</span>' : '<span class="dvote-badge dvote-wait">…réfléchit</span>')
+      : '';
+    const hl = (p.pseudo===highlightPseudo) ? 'style="outline:1px solid var(--amber-warm)"' : '';
+    return '<div class="dplayer-row '+(isIn?'':'out')+'" '+hl+'>'+
+      '<span class="dplayer-status '+(isIn?'dstatus-in':'dstatus-out')+'">'+(isIn?'⛏️ explore':'🏕️ au camp')+'</span>'+
+      '<span>'+escHtml(p.pseudo)+'</span>'+
+      '<span style="color:var(--amber-warm);font-size:.8rem">'+(isIn?('+'+p.held+' en jeu'):('🔒 '+p.banked))+'</span>'+
+      voteBadge+'</div>';
+  }).join('');
+}
+
+function renderDiamantAdmin(){
+  const panel = document.getElementById('diamant-panel');
+  if(!panel) return;
+  const inactive = document.getElementById('diamant-admin-inactive');
+  const active   = document.getElementById('diamant-admin-active');
+  if(!diamant || !diamant.active){ inactive.style.display='block'; active.style.display='none'; return; }
+  inactive.style.display='none'; active.style.display='block';
+
+  document.getElementById('da-status').innerHTML = dStatusPills(diamant);
+  document.getElementById('da-event').textContent = diamant.lastEvent||'';
+  dRenderPath(document.getElementById('da-path'), diamant.board);
+  document.getElementById('da-players').innerHTML = dPlayersList(diamant);
+
+  const ctrl = document.getElementById('da-controls');
+  const ph = diamant.phase;
+  if(ph==='exploring'){
+    ctrl.innerHTML = '<button class="btn-draw" onclick="diamantDraw()">🎴 Révéler une carte ('+diamant.deck.length+' restantes)</button>'+
+      '<button class="btn-deactivate" onclick="diamantCancel()" style="margin-top:.6rem">✕ Abandonner la partie</button>';
+  } else if(ph==='voting'){
+    const ins = dInPlayers(diamant); const voted = ins.filter(p=>p.vote).length;
+    ctrl.innerHTML = '<div class="diamant-voted">🗳️ Vote en cours… '+voted+'/'+ins.length+' ont voté</div>'+
+      '<button class="btn-draw" onclick="diamantForceResolve()">⏭️ Forcer la résolution (absents = continuent)</button>'+
+      '<button class="btn-deactivate" onclick="diamantCancel()" style="margin-top:.6rem">✕ Abandonner la partie</button>';
+  } else if(ph==='roundEnd'){
+    const last = diamant.round>=diamant.maxRounds;
+    ctrl.innerHTML = '<button class="btn-draw" onclick="diamantNextRound()">'+(last?'🏁 Voir le résultat final':'▶ Manche suivante ('+(diamant.round+1)+'/'+diamant.maxRounds+')')+'</button>'+
+      '<button class="btn-deactivate" onclick="diamantCancel()" style="margin-top:.6rem">✕ Abandonner la partie</button>';
+  } else if(ph==='gameEnd'){
+    const total = dTotalBanked(diamant);
+    ctrl.innerHTML = '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+total+'</div><div class="dbank-lbl">Trésor total</div></div></div>'+
+      '<button class="btn-draw" onclick="diamantEndToFire()">🔥 Ajouter '+total+' pts au feu + clôturer</button>'+
+      '<button class="btn-deactivate" onclick="diamantCancel()" style="margin-top:.6rem">✕ Clôturer sans ajouter au feu</button>';
+  }
+}
+
+function renderDiamantViewer(pseudo){
+  const wrap = document.getElementById('viewer-diamant');
+  if(!wrap) return;
+  if(!diamant || !diamant.active){ wrap.style.display='none'; return; }
+  wrap.style.display='block';
+
+  document.getElementById('dv-status').innerHTML = dStatusPills(diamant);
+  document.getElementById('dv-event').textContent = diamant.lastEvent||'';
+  dRenderPath(document.getElementById('dv-path'), diamant.board);
+  document.getElementById('dv-players').innerHTML = dPlayersList(diamant, pseudo);
+
+  const me = diamant.players[pseudo];
+  const zone = document.getElementById('dv-myzone');
+  if(!me){
+    zone.innerHTML = '<div class="diamant-voted">👀 Une partie est en cours. Tu pourras jouer à la prochaine !</div>';
+    return;
+  }
+  if(diamant.phase==='gameEnd'){
+    zone.innerHTML = '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+me.banked+'</div><div class="dbank-lbl">Ton trésor</div></div>'+
+      '<div class="dbank-item"><div class="dbank-val">'+dTotalBanked(diamant)+'</div><div class="dbank-lbl">Total du groupe</div></div></div>'+
+      '<div class="diamant-voted">🏁 Partie terminée ! Bravo aux explorateurs.</div>';
+    return;
+  }
+  if(me.status==='out'){
+    zone.innerHTML = '<div class="diamant-voted">🏕️ Tu es rentré au camp avec <strong style="color:var(--amber-bright)">'+me.banked+'</strong> de trésor sécurisé. Regarde les autres continuer…</div>';
+    return;
+  }
+  // me is 'in'
+  if(diamant.phase==='voting'){
+    if(me.vote){
+      zone.innerHTML = '<div class="diamant-voted">✓ Ton choix est enregistré ('+(me.vote==='leave'?'🎒 rentrer':'⛏️ continuer')+'). En attente des autres explorateurs…</div>';
+    } else {
+      zone.innerHTML = '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+me.held+'</div><div class="dbank-lbl">Ton butin en jeu</div></div></div>'+
+        '<div class="diamant-vote-btns">'+
+        '<button class="btn-continue" onclick="diamantVote(\''+escAttr(pseudo)+'\',\'continue\')">⛏️ Continuer</button>'+
+        '<button class="btn-leave" onclick="diamantVote(\''+escAttr(pseudo)+'\',\'leave\')">🎒 Rentrer</button>'+
+        '</div>';
+    }
+  } else {
+    zone.innerHTML = '<div class="diamant-voted">⛏️ Tu explores la grotte — butin en jeu : <strong style="color:var(--amber-bright)">'+me.held+'</strong>. En attente de la prochaine carte…</div>';
+  }
+}
+
 // ── STATS ─────────────────────────────────────────────────────────────────
 function updateStats(){
   document.getElementById('stat-viewers').textContent  = Object.keys(viewers).length;
@@ -1192,6 +1527,7 @@ updateStats();
 renderFireMeter();
 renderAdminFire();
 renderLibrary();
+renderDiamantAdmin();
 // Handle case where fb-ready fired before this script parsed
 if (window.FB) initSync();
 </script>
