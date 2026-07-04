@@ -233,16 +233,16 @@
   // ╔══════════════════════════════════════════════════════════════════╗
   // ║  COLLE TA CONFIG FIREBASE ICI (voir le guide en haut de la page)  ║
   // ╚══════════════════════════════════════════════════════════════════╝
- // Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyBD8G35KMNAc6W-HTPqjGpi8fgQuBuh48w",
-  authDomain: "veillee-village.firebaseapp.com",
-  databaseURL: "https://veillee-village-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "veillee-village",
-  storageBucket: "veillee-village.firebasestorage.app",
-  messagingSenderId: "527854879287",
-  appId: "1:527854879287:web:ffdd2337cacb6c585e35b2"
-};
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyBD8G35KMNAc6W-HTPqjGpi8fgQuBuh48w",
+    authDomain: "veillee-village.firebaseapp.com",
+    databaseURL: "https://veillee-village-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "veillee-village",
+    storageBucket: "veillee-village.firebasestorage.app",
+    messagingSenderId: "527854879287",
+    appId: "1:527854879287:web:ffdd2337cacb6c585e35b2"
+  };
 
 
   // Détection : config non remplie -> mode local (démo hors-ligne)
@@ -635,7 +635,7 @@ function attachListeners(){
   });
 
   onValue(ref(db, 'diamant'), (snap) => {
-    diamant = snap.val() || null;
+    diamant = snap.val() ? dNormalize(snap.val()) : null;
     renderDiamantAdmin();
     if (currentViewerPseudo) renderDiamantViewer(currentViewerPseudo);
   });
@@ -727,7 +727,7 @@ function fbSetDiamant(d){
     const { db, ref, set } = window.FB;
     set(ref(db, 'diamant'), d);
   } else {
-    diamant = d;
+    diamant = dNormalize(d);
     renderDiamantAdmin();
     if(currentViewerPseudo) renderDiamantViewer(currentViewerPseudo);
   }
@@ -1283,6 +1283,16 @@ function dHazLabel(h){ return {serpent:'🐍 Serpent',araignee:'🕷️ Araigné
 function dHazIcon(h){ return {serpent:'🐍',araignee:'🕷️',eboulement:'🪨'}[h]||'⚠️'; }
 function dInPlayers(st){ return Object.values(st.players).filter(p=>p.status==='in'); }
 function dTotalBanked(st){ return Object.values(st.players).reduce((s,p)=>s+p.banked,0); }
+function dNormalize(st){
+  if(!st) return st;
+  // Firebase drops empty arrays/objects/null — rebuild them so the engine never hits undefined
+  st.board       = Array.isArray(st.board) ? st.board : (st.board ? Object.values(st.board) : []);
+  st.deck        = Array.isArray(st.deck)  ? st.deck  : (st.deck  ? Object.values(st.deck)  : []);
+  st.hazardsSeen = (st.hazardsSeen && typeof st.hazardsSeen==='object') ? st.hazardsSeen : {};
+  st.players     = (st.players && typeof st.players==='object') ? st.players : {};
+  st.pathTreasure= (typeof st.pathTreasure==='number') ? st.pathTreasure : 0;
+  return st;
+}
 
 // ── Control handlers (write to Firebase) ──
 function startDiamant(){
@@ -1307,7 +1317,7 @@ function diamantCancel(){
 
 function diamantDraw(){
   if(!diamant || diamant.phase!=='exploring') return;
-  const st = JSON.parse(JSON.stringify(diamant));
+  const st = dNormalize(JSON.parse(JSON.stringify(diamant)));
   if(!st.deck.length){ st.lastEvent='Deck vide, la manche se termine.'; dEndRound(st); fbSetDiamant(st); return; }
   const card = st.deck.shift();
   st.board.push(card);
@@ -1339,7 +1349,7 @@ function diamantDraw(){
 
 function diamantVote(pseudo, vote){
   if(!diamant || diamant.phase!=='voting') return;
-  const st = JSON.parse(JSON.stringify(diamant));
+  const st = dNormalize(JSON.parse(JSON.stringify(diamant)));
   const p = st.players[pseudo];
   if(!p || p.status!=='in') return;
   p.vote = vote;
@@ -1350,7 +1360,7 @@ function diamantVote(pseudo, vote){
 
 function diamantForceResolve(){
   if(!diamant || diamant.phase!=='voting') return;
-  const st = JSON.parse(JSON.stringify(diamant));
+  const st = dNormalize(JSON.parse(JSON.stringify(diamant)));
   dInPlayers(st).forEach(p=>{ if(!p.vote) p.vote='continue'; });
   dResolveVotes(st);
   fbSetDiamant(st);
@@ -1378,7 +1388,7 @@ function dEndRound(st){
 
 function diamantNextRound(){
   if(!diamant || diamant.phase!=='roundEnd') return;
-  const st = JSON.parse(JSON.stringify(diamant));
+  const st = dNormalize(JSON.parse(JSON.stringify(diamant)));
   if(st.round>=st.maxRounds){
     st.phase='gameEnd';
     st.lastEvent='🏁 Partie terminée ! Trésor total sécurisé : '+dTotalBanked(st)+'.';
