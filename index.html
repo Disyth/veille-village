@@ -264,7 +264,7 @@
   // ╔══════════════════════════════════════════════════════════════════╗
   // ║  COLLE TA CONFIG FIREBASE ICI (voir le guide en haut de la page)  ║
   // ╚══════════════════════════════════════════════════════════════════╝
-// Your web app's Firebase configuration
+ // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBD8G35KMNAc6W-HTPqjGpi8fgQuBuh48w",
   authDomain: "veillee-village.firebaseapp.com",
@@ -1677,6 +1677,7 @@ function fNormalize(st){
   st.turn      = (typeof st.turn==='number') ? st.turn : 1;
   st.currentIdx= (typeof st.currentIdx==='number') ? st.currentIdx : 0;
   st.mineLevel = (typeof st.mineLevel==='number') ? st.mineLevel : 1;
+  if(st.lastAction && typeof st.lastAction!=='object') st.lastAction = null;
   return st;
 }
 function fPlayers(st){ return Object.values(st.players); }
@@ -1730,7 +1731,7 @@ function fStartPlanning(st){
   const metiers = fShuffle(F_METIERS_BASE.slice());
   const order = fShuffle(players.map(p=>p.pseudo));
   order.forEach((pseudo,i)=>{ st.players[pseudo].metier = i<metiers.length?metiers[i]:null; st.players[pseudo].location=null; st.players[pseudo].done=false; st.players[pseudo].actionsDone=0; st.players[pseudo].hasMoved=false; });
-  st.turnOrder = order; st.currentIdx=0; st.phase='planning';
+  st.turnOrder = order; st.currentIdx=0; st.phase='planning'; st.lastAction = null;
   st.lastEvent = 'Tour '+st.turn+' — Planification : métiers distribués, chacun choisit son lieu de départ.';
   return st;
 }
@@ -1787,6 +1788,8 @@ function fermeDoAction(pseudo, actionId){
   const msg = act.apply(st);
   p.actionsDone = (p.actionsDone||0)+1;
   st.lastEvent = pseudo+' '+msg+'.';
+  // résultat persistant de la dernière action (ne se fait pas écraser par le passage au joueur suivant)
+  st.lastAction = { pseudo, msg, metier:p.metier, at:Date.now() };
   if(p.actionsDone>=2){ fAdvance(st); }
   fbSetFerme(st);
 }
@@ -1884,6 +1887,15 @@ function fermeAdjustGold(delta){
 const F_RESOURCES = ['bois','bûche','brindille','pierre brute','pierre','minerai de charbon','charbon','minerai de cuivre','cuivre','minerai de fer','fer','poisson','poisson grillé','panais','fraise','haricot','patate','oeuf','lait','graine'];
 
 // ── Rendering ──
+function fLastActionBanner(st){
+  if(!st.lastAction || !st.lastAction.msg) return '';
+  const skull = /crâne/.test(st.lastAction.msg);
+  const border = skull ? 'var(--ember)' : '#9dcf7a';
+  const icon = skull ? '💀' : '✅';
+  return '<div style="display:flex;align-items:center;gap:.6rem;padding:.6rem .9rem;background:rgba(0,0,0,.25);border-left:3px solid '+border+';border-radius:6px;margin-bottom:.8rem;font-size:.92rem;color:var(--amber-pale)">'+
+    '<span style="font-size:1.1rem">'+icon+'</span><span>Dernière action : <strong style="color:var(--amber-bright)">'+escHtml(st.lastAction.pseudo)+'</strong> '+escHtml(st.lastAction.msg.replace(st.lastAction.pseudo+' ',''))+'</span></div>';
+}
+
 function fStatusPills(st){
   const phaseLabel = { lobby:'Lobby', planning:'Planification', action:'Action', gameEnd:'Fin' }[st.phase]||st.phase;
   return '<div class="fturn-pill">Tour <strong>'+st.turn+'/'+st.maxTurns+'</strong></div>'+
@@ -1934,7 +1946,7 @@ function renderFermeAdmin(){
   inactive.style.display='none'; active.style.display='block';
 
   document.getElementById('fa-status').innerHTML = fStatusPills(ferme);
-  document.getElementById('fa-event').textContent = ferme.lastEvent||'';
+  document.getElementById('fa-event').innerHTML = fLastActionBanner(ferme) + '<span style="opacity:.85">'+escHtml(ferme.lastEvent||'')+'</span>';
   document.getElementById('fa-board').innerHTML = fBoard(ferme);
   document.getElementById('fa-players').innerHTML = fPlayersList(ferme);
 
@@ -1991,7 +2003,7 @@ function renderFermeViewer(pseudo){
   if(!ferme || !ferme.active){ wrap.style.display='none'; return; }
   wrap.style.display='block';
   document.getElementById('fv-status').innerHTML = fStatusPills(ferme);
-  document.getElementById('fv-event').textContent = ferme.lastEvent||'';
+  document.getElementById('fv-event').innerHTML = fLastActionBanner(ferme) + '<span style="opacity:.85">'+escHtml(ferme.lastEvent||'')+'</span>';
 
   const zone = document.getElementById('fv-myzone');
   const me = ferme.players[pseudo];
