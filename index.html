@@ -1623,8 +1623,8 @@ function renderDiamantViewer(pseudo){
 
 // ── FERME ENGINE + UI (étape 1 : squelette) ──────────────────────────────────
 const F_METIERS_BASE = ['Pêcheur','Bûcheron','Agriculteur','Mineur'];
-const F_LOCATIONS = ['Ferme','Montagne','Lac','Plage','Forêt','Ranch'];
-const F_LOC_ICON = { Ferme:'🏡', Montagne:'⛰️', Lac:'🎣', Plage:'🏖️', Forêt:'🌲', Ranch:'🐄' };
+const F_LOCATIONS = ['Ferme','Magasin','Montagne','Lac','Plage','Forêt','Ranch'];
+const F_LOC_ICON = { Ferme:'🏡', Magasin:'🏪', Montagne:'⛰️', Lac:'🎣', Plage:'🏖️', Forêt:'🌲', Ranch:'🐄' };
 const F_METIER_ICON = { 'Pêcheur':'🎣', 'Bûcheron':'🪓', 'Agriculteur':'🌱', 'Mineur':'⛏️' };
 const F_MAXTURNS = 10;
 
@@ -1639,6 +1639,14 @@ const F_FISH = [
 ];
 // Valeurs de vente en or (⚠️ VALEURS PAR DÉFAUT — remplace-les par les tiennes)
 const F_SELL_VALUES = { 'poisson':3, 'poisson grillé':6 };
+// Plantes cultivables : val = prix de vente de la récolte
+const F_PLANTS = [
+  { nom:'panais',  val:2 },
+  { nom:'fraise',  val:4 },
+  { nom:'haricot', val:3 },
+  { nom:'patate',  val:3 },
+];
+const F_SEED_PRICE = 1; // prix d'achat d'une graine
 
 // ── Registre d'actions de métier (pattern réutilisable) ──
 // Chaque action : { id, label, desc, locations (null=partout), check(st)->{ok,why}, apply(st)->message }
@@ -1704,12 +1712,53 @@ const F_ACTIONS = {
       check:(st)=>((st.inventory['poisson']||0)>=1?{ok:true}:{ok:false,why:'aucun poisson'}),
       apply:(st)=>{ st.inventory['poisson']-=1; if(st.inventory['poisson']<=0)delete st.inventory['poisson']; const v=F_SELL_VALUES['poisson']||0; st.gold=(st.gold||0)+v; return 'vend 1 poisson (+'+v+' or)'; } },
   ],
+  // Agriculteur : forme fonction (actions dynamiques — vente uniquement des récoltes en stock)
+  'Agriculteur': (st)=>{
+    const base = [
+      { id:'acheter', label:'🌰 Acheter une graine', desc:'-'+F_SEED_PRICE+' or · plantée niv.1', locations:['Magasin'],
+        check:(st)=>((st.gold||0)>=F_SEED_PRICE?{ok:true}:{ok:false,why:'besoin de '+F_SEED_PRICE+' or'}),
+        apply:(st)=>{ st.gold=(st.gold||0)-F_SEED_PRICE; if(!Array.isArray(st.crops))st.crops=[]; st.crops.push({ id:'crop'+Date.now()+'_'+Math.floor(Math.random()*1000), level:1 }); return 'achète une graine (-'+F_SEED_PRICE+' or) et la plante (niveau 1/4)'; } },
+      { id:'arroser', label:'💧 Arroser une plante', desc:'niv. +1 · récolte auto à 4', locations:null,
+        check:(st)=>((st.crops||[]).some(c=>c.level<4)?{ok:true}:{ok:false,why:'aucune plante à arroser'}),
+        apply:(st)=>{
+          const growing=(st.crops||[]).filter(c=>c.level<4);
+          if(!growing.length) return 'arrose… mais le champ est vide';
+          growing.sort((a,b)=>b.level-a.level);
+          const crop=growing[0]; crop.level+=1;
+          if(crop.level>=4){
+            st.crops=st.crops.filter(c=>c.id!==crop.id);
+            const plant=F_PLANTS[Math.floor(Math.random()*F_PLANTS.length)];
+            st.inventory[plant.nom]=(st.inventory[plant.nom]||0)+1;
+            return 'arrose une plante à maturité et récolte 1 '+plant.nom+' 🌾 !';
+          }
+          return 'arrose une plante (niveau '+crop.level+'/4)';
+        } },
+    ];
+    const sells = F_PLANTS.filter(pl=>(st.inventory[pl.nom]||0)>0).map(pl=>({
+      id:'vendre_'+pl.nom, label:'🪙 Vendre 1 '+pl.nom, desc:'+'+pl.val+' or', locations:null,
+      check:(st)=>((st.inventory[pl.nom]||0)>=1?{ok:true}:{ok:false,why:'aucun '+pl.nom}),
+      apply:(st)=>{ st.inventory[pl.nom]-=1; if(st.inventory[pl.nom]<=0)delete st.inventory[pl.nom]; st.gold=(st.gold||0)+pl.val; return 'vend 1 '+pl.nom+' (+'+pl.val+' or)'; }
+    }));
+    return base.concat(sells);
+  },
 };
 
-function fMetierActions(metier){ return F_ACTIONS[metier] || []; }
+// Affichage du champ commun (cultures en cours)
+function fCrops(st){
+  const crops = st.crops||[];
+  if(!crops.length) return '<div style="font-size:.82rem;color:var(--amber-mid);font-style:italic;margin-bottom:.6rem">🌱 Champ commun : vide</div>';
+  const icons=['🌱','🌿','🌾','🌻'];
+  const badges = crops.slice().sort((a,b)=>b.level-a.level).map(c=>{
+    const ic = icons[Math.min(3,(c.level||1)-1)];
+    return '<span class="finv-item">'+ic+' niv. '+c.level+'/4</span>';
+  }).join('');
+  return '<div style="margin-bottom:.6rem"><div style="font-family:\'Cinzel\',serif;font-size:.68rem;letter-spacing:.12em;color:var(--amber-warm);text-transform:uppercase;margin-bottom:.3rem">🌱 Champ commun ('+crops.length+' plante'+(crops.length>1?'s':'')+')</div><div class="finv">'+badges+'</div></div>';
+}
+
+function fMetierActions(metier, st){ const def = F_ACTIONS[metier]; if(typeof def==='function') return def(st||ferme||{inventory:{},crops:[],gold:0}) || []; return def || []; }
 function fHasValidAction(st, pseudo){
   const p = st.players[pseudo]; if(!p) return false;
-  return fMetierActions(p.metier).some(a => (!a.locations || a.locations.indexOf(p.location)>=0) && a.check(st).ok);
+  return fMetierActions(p.metier, st).some(a => (!a.locations || a.locations.indexOf(p.location)>=0) && a.check(st).ok);
 }
 function fShuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
@@ -1723,6 +1772,7 @@ function fNormalize(st){
   st.turn      = (typeof st.turn==='number') ? st.turn : 1;
   st.currentIdx= (typeof st.currentIdx==='number') ? st.currentIdx : 0;
   st.mineLevel = (typeof st.mineLevel==='number') ? st.mineLevel : 1;
+  st.crops = Array.isArray(st.crops) ? st.crops : (st.crops ? Object.values(st.crops) : []);
   if(st.lastAction && typeof st.lastAction!=='object') st.lastAction = null;
   return st;
 }
@@ -1734,7 +1784,7 @@ function startFerme(){
   const target = Math.max(1, parseInt(document.getElementById('ferme-target').value)||4);
   fbSetFerme({
     active:true, phase:'lobby', targetPlayers:target, turn:1, maxTurns:F_MAXTURNS,
-    players:{}, turnOrder:[], currentIdx:0, inventory:{}, gold:0, mineLevel:1, locations:F_LOCATIONS.slice(),
+    players:{}, turnOrder:[], currentIdx:0, inventory:{}, gold:0, mineLevel:1, crops:[], locations:F_LOCATIONS.slice(),
     lastEvent:'Lobby ouvert — en attente des joueurs (0/'+target+').'
   });
   toast('🌾 Lobby de la Ferme ouvert !');
@@ -1826,7 +1876,7 @@ function fermeDoAction(pseudo, actionId){
   const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
   const p = st.players[pseudo];
   if(!p || (p.actionsDone||0)>=2) return;
-  const act = fMetierActions(p.metier).find(a=>a.id===actionId);
+  const act = fMetierActions(p.metier, st).find(a=>a.id===actionId);
   if(!act) return;
   if(act.locations && act.locations.indexOf(p.location)<0){ toast('Action impossible à '+p.location); return; }
   const chk = act.check(st);
@@ -1864,7 +1914,7 @@ function fActionButtons(st, pseudo){
   const done = p.actionsDone||0;
   let html = '<div style="font-size:.8rem;color:var(--amber-warm);margin:.5rem 0 .3rem">Actions '+done+'/2 — '+(p.metier?(F_METIER_ICON[p.metier]+' '+p.metier):'sans métier')+' à '+F_LOC_ICON[p.location]+' '+p.location+'</div>';
   if(done>=2){ return html+'<div class="diamant-voted">Les 2 actions sont faites, le tour se termine.</div>'; }
-  const avail = fMetierActions(p.metier).filter(a=>!a.locations || a.locations.indexOf(p.location)>=0);
+  const avail = fMetierActions(p.metier, st).filter(a=>!a.locations || a.locations.indexOf(p.location)>=0);
   if(!p.metier){
     html += '<div style="font-size:.85rem;color:var(--amber-mid);font-style:italic;margin-bottom:.4rem">Pas de métier ce tour — tu peux te déplacer ou passer.</div>';
   } else if(avail.length===0){
@@ -2015,6 +2065,7 @@ function renderFermeAdmin(){
   document.getElementById('fa-inventory').innerHTML =
     '<div style="font-family:\'Cinzel\',serif;font-size:.7rem;letter-spacing:.15em;color:var(--amber-warm);text-transform:uppercase;margin-bottom:.5rem">Inventaire partagé</div>'+
     fInventory(ferme)+
+    fCrops(ferme)+
     '<div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;margin-top:.5rem">'+
       '<select id="fa-res-select" style="flex:1;min-width:130px">'+resOpts+'</select>'+
       '<input type="number" id="fa-res-qty" value="1" style="width:70px" class="fire-mini-input">'+
@@ -2083,7 +2134,7 @@ function renderFermeViewer(pseudo){
 
   // in-game board is useful for everyone
   let board = fBoard(ferme, {});
-  let inv = fInventory(ferme);
+  let inv = fInventory(ferme) + fCrops(ferme);
 
   if(!me){
     zone.innerHTML = board + inv + '<div class="diamant-voted">👀 Tu n\'es pas dans cette partie. Tu pourras jouer à la prochaine !</div>';
