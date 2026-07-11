@@ -241,6 +241,17 @@
   .fphase-action{ background:rgba(61,109,17,.2); color:#9dcf7a; }
   .fphase-gameEnd{ background:rgba(139,40,0,.2); color:#f08060; }
 
+  .ferme-lastaction { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; padding:.6rem .9rem; background:rgba(0,0,0,.25); border-radius:6px; margin-bottom:.8rem; font-size:.92rem; line-height:1.4; color:var(--amber-pale); }
+  @media(max-width:520px){ .ferme-lastaction { font-size:.85rem; padding:.5rem .7rem; } }
+
+  @media(max-width:520px){
+    .admin-container { padding:0 .8rem 3rem; }
+    .viewer-container { padding:0 .9rem 3rem; }
+    .diamant-status { gap:.5rem; }
+    .dpill, .fturn-pill, .fgold { font-size:.78rem; padding:.2rem .6rem; }
+    .btn-continue, .btn-leave, .btn-draw { font-size:.8rem; padding:.7rem; }
+  }
+
   /* ── BADGES ── */
   .type-badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:.7rem; font-family:'Cinzel',serif; letter-spacing:.08em; text-transform:uppercase; }
   .type-objet { background:rgba(196,106,0,.2); color:var(--amber-glow); border:1px solid rgba(196,106,0,.3); }
@@ -350,6 +361,7 @@ const firebaseConfig = {
         <div class="card">
           <div class="card-title">🌾 La Ferme du Village</div>
           <div class="diamant-status" id="fv-status"></div>
+          <div id="fv-lastaction"></div>
           <div class="diamant-event" id="fv-event"></div>
           <div id="fv-myzone"></div>
         </div>
@@ -463,6 +475,7 @@ const firebaseConfig = {
         </div>
         <div id="ferme-admin-active" style="display:none">
           <div class="diamant-status" id="fa-status"></div>
+          <div id="fa-lastaction"></div>
           <div class="diamant-event" id="fa-event"></div>
           <div id="fa-board"></div>
           <div class="ferme-players" id="fa-players"></div>
@@ -1731,7 +1744,7 @@ function fStartPlanning(st){
   const metiers = fShuffle(F_METIERS_BASE.slice());
   const order = fShuffle(players.map(p=>p.pseudo));
   order.forEach((pseudo,i)=>{ st.players[pseudo].metier = i<metiers.length?metiers[i]:null; st.players[pseudo].location=null; st.players[pseudo].done=false; st.players[pseudo].actionsDone=0; st.players[pseudo].hasMoved=false; });
-  st.turnOrder = order; st.currentIdx=0; st.phase='planning'; st.lastAction = null;
+  st.turnOrder = order; st.currentIdx=0; st.phase='planning';
   st.lastEvent = 'Tour '+st.turn+' — Planification : métiers distribués, chacun choisit son lieu de départ.';
   return st;
 }
@@ -1887,13 +1900,26 @@ function fermeAdjustGold(delta){
 const F_RESOURCES = ['bois','bûche','brindille','pierre brute','pierre','minerai de charbon','charbon','minerai de cuivre','cuivre','minerai de fer','fer','poisson','poisson grillé','panais','fraise','haricot','patate','oeuf','lait','graine'];
 
 // ── Rendering ──
-function fLastActionBanner(st){
+function fLastActionBanner(st, opts){
+  opts = opts||{};
   if(!st.lastAction || !st.lastAction.msg) return '';
   const skull = /crâne/.test(st.lastAction.msg);
   const border = skull ? 'var(--ember)' : '#9dcf7a';
   const icon = skull ? '💀' : '✅';
-  return '<div style="display:flex;align-items:center;gap:.6rem;padding:.6rem .9rem;background:rgba(0,0,0,.25);border-left:3px solid '+border+';border-radius:6px;margin-bottom:.8rem;font-size:.92rem;color:var(--amber-pale)">'+
-    '<span style="font-size:1.1rem">'+icon+'</span><span>Dernière action : <strong style="color:var(--amber-bright)">'+escHtml(st.lastAction.pseudo)+'</strong> '+escHtml(st.lastAction.msg.replace(st.lastAction.pseudo+' ',''))+'</span></div>';
+  const body = escHtml(st.lastAction.msg.replace(st.lastAction.pseudo+' ',''));
+  const dismiss = opts.dismiss
+    ? '<button onclick="fermeClearLastAction()" style="margin-left:auto;flex-shrink:0;background:transparent;border:1px solid rgba(122,61,0,.4);border-radius:4px;color:var(--amber-mid);font-size:.7rem;padding:.2rem .5rem;cursor:pointer">✕</button>'
+    : '';
+  return '<div class="ferme-lastaction" style="border-left:3px solid '+border+'">'+
+    '<span style="font-size:1.1rem;flex-shrink:0">'+icon+'</span>'+
+    '<span style="min-width:0">Dernière action — <strong style="color:var(--amber-bright)">'+escHtml(st.lastAction.pseudo)+'</strong> '+body+'</span>'+
+    dismiss+'</div>';
+}
+function fermeClearLastAction(){
+  if(!ferme) return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  st.lastAction = null;
+  fbSetFerme(st);
 }
 
 function fStatusPills(st){
@@ -1946,7 +1972,8 @@ function renderFermeAdmin(){
   inactive.style.display='none'; active.style.display='block';
 
   document.getElementById('fa-status').innerHTML = fStatusPills(ferme);
-  document.getElementById('fa-event').innerHTML = fLastActionBanner(ferme) + '<span style="opacity:.85">'+escHtml(ferme.lastEvent||'')+'</span>';
+  document.getElementById('fa-lastaction').innerHTML = fLastActionBanner(ferme, {dismiss:true});
+  document.getElementById('fa-event').textContent = ferme.lastEvent||'';
   document.getElementById('fa-board').innerHTML = fBoard(ferme);
   document.getElementById('fa-players').innerHTML = fPlayersList(ferme);
 
@@ -2003,7 +2030,8 @@ function renderFermeViewer(pseudo){
   if(!ferme || !ferme.active){ wrap.style.display='none'; return; }
   wrap.style.display='block';
   document.getElementById('fv-status').innerHTML = fStatusPills(ferme);
-  document.getElementById('fv-event').innerHTML = fLastActionBanner(ferme) + '<span style="opacity:.85">'+escHtml(ferme.lastEvent||'')+'</span>';
+  document.getElementById('fv-lastaction').innerHTML = fLastActionBanner(ferme);
+  document.getElementById('fv-event').textContent = ferme.lastEvent||'';
 
   const zone = document.getElementById('fv-myzone');
   const me = ferme.players[pseudo];
