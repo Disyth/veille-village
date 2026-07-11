@@ -1614,6 +1614,28 @@ const F_LOCATIONS = ['Ferme','Montagne','Lac','Plage','Forêt','Ranch'];
 const F_LOC_ICON = { Ferme:'🏡', Montagne:'⛰️', Lac:'🎣', Plage:'🏖️', Forêt:'🌲', Ranch:'🐄' };
 const F_METIER_ICON = { 'Pêcheur':'🎣', 'Bûcheron':'🪓', 'Agriculteur':'🌱', 'Mineur':'⛏️' };
 const F_MAXTURNS = 10;
+
+// ── Registre d'actions de métier (pattern réutilisable) ──
+// Chaque action : { id, label, desc, locations (null=partout), check(st)->{ok,why}, apply(st)->message }
+const F_ACTIONS = {
+  'Bûcheron': [
+    { id:'couper', label:'🪓 Couper du bois', desc:'+2 bois', locations:['Forêt'],
+      check:(st)=>({ok:true}),
+      apply:(st)=>{ st.inventory['bois']=(st.inventory['bois']||0)+2; return 'coupe du bois (+2 bois)'; } },
+    { id:'buche', label:'🪵 1 bois → 1 bûche', desc:null, locations:null,
+      check:(st)=>((st.inventory['bois']||0)>=1?{ok:true}:{ok:false,why:'besoin de 1 bois'}),
+      apply:(st)=>{ st.inventory['bois']-=1; if(st.inventory['bois']<=0)delete st.inventory['bois']; st.inventory['bûche']=(st.inventory['bûche']||0)+1; return 'transforme 1 bois en 1 bûche'; } },
+    { id:'brindille', label:'🌿 1 bois → 2 brindilles', desc:null, locations:null,
+      check:(st)=>((st.inventory['bois']||0)>=1?{ok:true}:{ok:false,why:'besoin de 1 bois'}),
+      apply:(st)=>{ st.inventory['bois']-=1; if(st.inventory['bois']<=0)delete st.inventory['bois']; st.inventory['brindille']=(st.inventory['brindille']||0)+2; return 'transforme 1 bois en 2 brindilles'; } },
+  ],
+};
+
+function fMetierActions(metier){ return F_ACTIONS[metier] || []; }
+function fHasValidAction(st, pseudo){
+  const p = st.players[pseudo]; if(!p) return false;
+  return fMetierActions(p.metier).some(a => (!a.locations || a.locations.indexOf(p.location)>=0) && a.check(st).ok);
+}
 function fShuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
 function fNormalize(st){
@@ -1677,7 +1699,7 @@ function fStartPlanning(st){
   const players = fPlayers(st);
   const metiers = fShuffle(F_METIERS_BASE.slice());
   const order = fShuffle(players.map(p=>p.pseudo));
-  order.forEach((pseudo,i)=>{ st.players[pseudo].metier = i<metiers.length?metiers[i]:null; st.players[pseudo].location=null; st.players[pseudo].done=false; });
+  order.forEach((pseudo,i)=>{ st.players[pseudo].metier = i<metiers.length?metiers[i]:null; st.players[pseudo].location=null; st.players[pseudo].done=false; st.players[pseudo].actionsDone=0; st.players[pseudo].hasMoved=false; });
   st.turnOrder = order; st.currentIdx=0; st.phase='planning';
   st.lastEvent = 'Tour '+st.turn+' — Planification : métiers distribués, chacun choisit son lieu de départ.';
   return st;
@@ -1706,15 +1728,85 @@ function fermeMove(pseudo, loc){
   fbSetFerme(st);
 }
 
+function fAdvance(st){
+  const cur = fCurrent(st);
+  if(cur){ st.players[cur].done=true; st.players[cur].location='Ferme'; }
+  st.currentIdx += 1;
+  if(st.currentIdx >= st.turnOrder.length){ fEndTurn(st); }
+  else { st.lastEvent = (cur?cur+' a terminé son tour. ':'')+'Au tour de '+fCurrent(st)+'.'; }
+  return st;
+}
 function fermeEndPlayerTurn(){
   if(!ferme || ferme.phase!=='action') return;
   const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
-  const cur = fCurrent(st);
-  if(cur) st.players[cur].done=true;
-  st.currentIdx += 1;
-  if(st.currentIdx >= st.turnOrder.length){ fEndTurn(st); }
-  else { st.lastEvent = (cur?cur+' a terminé. ':'')+'Au tour de '+fCurrent(st)+'.'; }
+  fAdvance(st);
   fbSetFerme(st);
+}
+
+function fermeDoAction(pseudo, actionId){
+  if(!ferme || ferme.phase!=='action') return;
+  if(fCurrent(ferme)!==pseudo) return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  const p = st.players[pseudo];
+  if(!p || (p.actionsDone||0)>=2) return;
+  const act = fMetierActions(p.metier).find(a=>a.id===actionId);
+  if(!act) return;
+  if(act.locations && act.locations.indexOf(p.location)<0){ toast('Action impossible à '+p.location); return; }
+  const chk = act.check(st);
+  if(!chk.ok){ toast(chk.why||'Action impossible'); return; }
+  const msg = act.apply(st);
+  p.actionsDone = (p.actionsDone||0)+1;
+  st.lastEvent = pseudo+' '+msg+'.';
+  if(p.actionsDone>=2){ fAdvance(st); }
+  fbSetFerme(st);
+}
+
+function fermePlayerMove(pseudo, loc){
+  if(!ferme || ferme.phase!=='action') return;
+  if(fCurrent(ferme)!==pseudo) return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  const p = st.players[pseudo];
+  if(!p || p.hasMoved || (p.actionsDone||0)>=2){ toast('Déplacement impossible'); return; }
+  if(st.locations.indexOf(loc)<0) return;
+  const done = p.actionsDone||0;
+  if(done<1){
+    // move-first only allowed if stuck (no valid action here); it consumes the first action slot
+    if(fHasValidAction(st, pseudo)){ toast('Fais d\'abord une action, puis déplace-toi'); return; }
+    p.actionsDone = 1;
+  }
+  p.location = loc; p.hasMoved = true;
+  st.lastEvent = pseudo+' se déplace vers '+F_LOC_ICON[loc]+' '+loc+'.';
+  fbSetFerme(st);
+}
+
+// Boutons d'action pour le joueur courant (utilisés côté joueur ET côté meneur)
+function fActionButtons(st, pseudo){
+  const p = st.players[pseudo]; if(!p) return '';
+  const done = p.actionsDone||0;
+  let html = '<div style="font-size:.8rem;color:var(--amber-warm);margin:.5rem 0 .3rem">Actions '+done+'/2 — '+(p.metier?(F_METIER_ICON[p.metier]+' '+p.metier):'sans métier')+' à '+F_LOC_ICON[p.location]+' '+p.location+'</div>';
+  if(done>=2){ return html+'<div class="diamant-voted">Les 2 actions sont faites, le tour se termine.</div>'; }
+  const avail = fMetierActions(p.metier).filter(a=>!a.locations || a.locations.indexOf(p.location)>=0);
+  if(!p.metier){
+    html += '<div style="font-size:.85rem;color:var(--amber-mid);font-style:italic;margin-bottom:.4rem">Pas de métier ce tour — tu peux te déplacer ou passer.</div>';
+  } else if(avail.length===0){
+    html += '<div style="font-size:.85rem;color:var(--amber-mid);font-style:italic;margin-bottom:.4rem">Aucune action de '+p.metier+' possible ici. Déplace-toi vers le bon lieu.</div>';
+  } else {
+    html += '<div style="display:flex;flex-direction:column;gap:.4rem">';
+    avail.forEach(a=>{
+      const chk = a.check(st);
+      const dis = chk.ok ? '' : 'disabled';
+      const why = chk.ok ? '' : ' <span style="opacity:.7">('+(chk.why||'indispo')+')</span>';
+      html += '<button class="btn-continue" '+dis+' onclick="fermeDoAction(\''+escAttr(pseudo)+'\',\''+a.id+'\')" style="text-align:left">'+a.label+(a.desc?(' — '+a.desc):'')+why+'</button>';
+    });
+    html += '</div>';
+  }
+  const canMove = !p.hasMoved && done<2 && (done>=1 || !fHasValidAction(st,pseudo));
+  if(canMove){
+    html += '<div style="font-size:.8rem;color:var(--amber-warm);margin:.6rem 0 .3rem">'+(done>=1?'Se déplacer, puis 1 dernière action :':'Se déplacer (aucune action possible ici) :')+'</div>'+
+      '<div style="display:flex;gap:.3rem;flex-wrap:wrap">'+
+      st.locations.filter(l=>l!==p.location).map(l=>'<button class="btn-small" onclick="fermePlayerMove(\''+escAttr(pseudo)+'\',\''+escAttr(l)+'\')">'+F_LOC_ICON[l]+' '+l+'</button>').join('')+'</div>';
+  }
+  return html;
 }
 
 function fEndTurn(st){
@@ -1843,11 +1935,9 @@ function renderFermeAdmin(){
       '<button class="btn-draw" onclick="fermeStartAction()">▶ Lancer la phase d\'action</button>'+cancelBtn;
   } else if(ph==='action'){
     const cur = fCurrent(ferme);
-    let moveBtns = '';
-    if(cur){ moveBtns = '<div style="font-size:.8rem;color:var(--amber-warm);margin:.6rem 0 .3rem">Déplacer '+escHtml(cur)+' :</div><div style="display:flex;gap:.3rem;flex-wrap:wrap">'+
-      ferme.locations.map(l=>'<button class="btn-small" onclick="fermeMove(\''+escAttr(cur)+'\',\''+escAttr(l)+'\')">'+F_LOC_ICON[l]+' '+l+'</button>').join('')+'</div>'; }
-    ctrl.innerHTML = '<div class="diamant-voted">▶ Au tour de <strong style="color:var(--amber-bright)">'+(cur||'—')+'</strong>'+(cur&&ferme.players[cur].metier?(' ('+ferme.players[cur].metier+')'):'')+'. Les actions du métier arriveront à l\'étape suivante — pour l\'instant, pilote manuellement.</div>'+
-      moveBtns+
+    const acts = cur ? fActionButtons(ferme, cur) : '';
+    ctrl.innerHTML = '<div class="diamant-voted">▶ Au tour de <strong style="color:var(--amber-bright)">'+(cur||'—')+'</strong>. Tu peux jouer à sa place (en cas d\'absence) :</div>'+
+      acts +
       '<button class="btn-draw" onclick="fermeEndPlayerTurn()" style="margin-top:.8rem">⏭️ Terminer le tour de ce joueur</button>'+cancelBtn;
   } else if(ph==='gameEnd'){
     let head = '';
@@ -1914,8 +2004,8 @@ function renderFermeViewer(pseudo){
     const isMe = (cur===pseudo);
     zone.innerHTML = board + inv +
       (isMe
-        ? '<div class="diamant-voted" style="color:#9dcf7a">▶ C\'est ton tour ! Métier : <strong>'+(me.metier||'—')+'</strong>, lieu : <strong>'+(me.location||'—')+'</strong>. Le meneur pilote tes actions pour l\'instant.</div>'
-        : '<div class="diamant-voted">Au tour de <strong style="color:var(--amber-bright)">'+(cur||'—')+'</strong>. Ton métier : '+(me.metier||'—')+', lieu : '+(me.location||'—')+'.</div>');
+        ? '<div class="diamant-voted" style="color:#9dcf7a">▶ C\'est ton tour !</div>' + fActionButtons(ferme, pseudo) + '<button class="btn-draw" onclick="fermeEndPlayerTurn()" style="margin-top:.8rem">Terminer mon tour</button>'
+        : '<div class="diamant-voted">Au tour de <strong style="color:var(--amber-bright)">'+(cur||'—')+'</strong>. Ton métier ce tour : '+(me.metier||'—')+', ton lieu : '+(me.location||'—')+'.</div>');
     return;
   }
 
