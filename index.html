@@ -1629,6 +1629,35 @@ const F_ACTIONS = {
       check:(st)=>((st.inventory['bois']||0)>=1?{ok:true}:{ok:false,why:'besoin de 1 bois'}),
       apply:(st)=>{ st.inventory['bois']-=1; if(st.inventory['bois']<=0)delete st.inventory['bois']; st.inventory['brindille']=(st.inventory['brindille']||0)+2; return 'transforme 1 bois en 2 brindilles'; } },
   ],
+  'Mineur': [
+    { id:'explorer', label:'⛏️ Explorer la mine', locations:['Montagne'],
+      desc:(st)=>{ const lvl=st.mineLevel||1; return 'niv. '+lvl+'/5 · risque crâne '+(5+(lvl-1)*5)+'%'; },
+      check:(st)=>({ok:true}),
+      apply:(st)=>{
+        const lvl = st.mineLevel||1;
+        const skull = 5 + (lvl-1)*5;
+        const stairs = 15, coal = 30;
+        const rock = 100 - skull - stairs - coal;
+        const r = Math.random()*100;
+        if(r < rock){ st.inventory['pierre brute']=(st.inventory['pierre brute']||0)+1; return 'explore la mine (niv. '+lvl+') et trouve 1 pierre brute'; }
+        if(r < rock+coal){ st.inventory['minerai de charbon']=(st.inventory['minerai de charbon']||0)+1; return 'explore la mine (niv. '+lvl+') et trouve 1 minerai de charbon'; }
+        if(r < rock+coal+stairs){
+          if(lvl<5){ st.mineLevel=lvl+1; return 'découvre un escalier 🪜 et le groupe descend au niveau '+(lvl+1)+' de la mine'; }
+          return 'découvre un escalier, mais la mine est déjà au plus profond (niv. 5)';
+        }
+        const keys = Object.keys(st.inventory);
+        if(keys.length===0){ return 'réveille un crâne de monstre 💀… mais le groupe n\'a aucun objet à perdre !'; }
+        const k = keys[Math.floor(Math.random()*keys.length)];
+        st.inventory[k]-=1; if(st.inventory[k]<=0) delete st.inventory[k];
+        return 'réveille un crâne de monstre 💀 et le groupe perd 1 '+k+' !';
+      } },
+    { id:'pierre', label:'🪨 Pierre brute → pierre', desc:null, locations:null,
+      check:(st)=>((st.inventory['pierre brute']||0)>=1?{ok:true}:{ok:false,why:'besoin de 1 pierre brute'}),
+      apply:(st)=>{ st.inventory['pierre brute']-=1; if(st.inventory['pierre brute']<=0)delete st.inventory['pierre brute']; st.inventory['pierre']=(st.inventory['pierre']||0)+1; return 'transforme 1 pierre brute en 1 pierre'; } },
+    { id:'charbon', label:'⚫ Minerai de charbon → charbon', desc:null, locations:null,
+      check:(st)=>((st.inventory['minerai de charbon']||0)>=1?{ok:true}:{ok:false,why:'besoin de 1 minerai de charbon'}),
+      apply:(st)=>{ st.inventory['minerai de charbon']-=1; if(st.inventory['minerai de charbon']<=0)delete st.inventory['minerai de charbon']; st.inventory['charbon']=(st.inventory['charbon']||0)+1; return 'transforme 1 minerai de charbon en 1 charbon'; } },
+  ],
 };
 
 function fMetierActions(metier){ return F_ACTIONS[metier] || []; }
@@ -1647,6 +1676,7 @@ function fNormalize(st){
   st.gold      = (typeof st.gold==='number') ? st.gold : 0;
   st.turn      = (typeof st.turn==='number') ? st.turn : 1;
   st.currentIdx= (typeof st.currentIdx==='number') ? st.currentIdx : 0;
+  st.mineLevel = (typeof st.mineLevel==='number') ? st.mineLevel : 1;
   return st;
 }
 function fPlayers(st){ return Object.values(st.players); }
@@ -1657,7 +1687,7 @@ function startFerme(){
   const target = Math.max(1, parseInt(document.getElementById('ferme-target').value)||4);
   fbSetFerme({
     active:true, phase:'lobby', targetPlayers:target, turn:1, maxTurns:F_MAXTURNS,
-    players:{}, turnOrder:[], currentIdx:0, inventory:{}, gold:0, locations:F_LOCATIONS.slice(),
+    players:{}, turnOrder:[], currentIdx:0, inventory:{}, gold:0, mineLevel:1, locations:F_LOCATIONS.slice(),
     lastEvent:'Lobby ouvert — en attente des joueurs (0/'+target+').'
   });
   toast('🌾 Lobby de la Ferme ouvert !');
@@ -1796,7 +1826,8 @@ function fActionButtons(st, pseudo){
       const chk = a.check(st);
       const dis = chk.ok ? '' : 'disabled';
       const why = chk.ok ? '' : ' <span style="opacity:.7">('+(chk.why||'indispo')+')</span>';
-      html += '<button class="btn-continue" '+dis+' onclick="fermeDoAction(\''+escAttr(pseudo)+'\',\''+a.id+'\')" style="text-align:left">'+a.label+(a.desc?(' — '+a.desc):'')+why+'</button>';
+      const dtxt = (typeof a.desc==='function') ? a.desc(st) : a.desc;
+      html += '<button class="btn-continue" '+dis+' onclick="fermeDoAction(\''+escAttr(pseudo)+'\',\''+a.id+'\')" style="text-align:left">'+a.label+(dtxt?(' — '+dtxt):'')+why+'</button>';
     });
     html += '</div>';
   }
@@ -1857,6 +1888,7 @@ function fStatusPills(st){
   const phaseLabel = { lobby:'Lobby', planning:'Planification', action:'Action', gameEnd:'Fin' }[st.phase]||st.phase;
   return '<div class="fturn-pill">Tour <strong>'+st.turn+'/'+st.maxTurns+'</strong></div>'+
          '<span class="fphase-badge fphase-'+st.phase+'">'+phaseLabel+'</span>'+
+         '<div class="fturn-pill">⛏️ Mine <strong>niv. '+(st.mineLevel||1)+'/5</strong></div>'+
          '<div class="fgold">🪙 '+st.gold+' or</div>';
 }
 
