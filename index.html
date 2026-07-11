@@ -210,6 +210,37 @@
   .btn-draw:hover { background:rgba(196,106,0,.4); }
   .btn-draw:disabled { opacity:.35; cursor:not-allowed; }
 
+
+  /* ── FERME ── */
+  .ferme-board { display:grid; grid-template-columns:repeat(3,1fr); gap:.6rem; margin-bottom:1rem; }
+  @media(max-width:520px){ .ferme-board{ grid-template-columns:repeat(2,1fr); } }
+  .floc { background:rgba(26,13,0,.5); border:1px solid rgba(122,61,0,.4); border-radius:8px; padding:.7rem; min-height:80px; transition:all .2s; }
+  .floc-header { font-family:'Cinzel',serif; font-size:.8rem; color:var(--amber-warm); margin-bottom:.4rem; display:flex; align-items:center; gap:.3rem; }
+  .floc-pawns { display:flex; flex-wrap:wrap; gap:.3rem; }
+  .fpawn { font-size:.75rem; background:rgba(122,61,0,.3); border:1px solid var(--amber-mid); border-radius:10px; padding:1px 7px; color:var(--amber-light); }
+  .fpawn.current { background:rgba(97,174,27,.3); border-color:#9dcf7a; color:#c5f09a; }
+  .floc-btn { cursor:pointer; }
+  .floc-btn:hover { border-color:var(--amber-warm); background:rgba(122,61,0,.15); }
+  .floc.selected { border-color:var(--amber-glow); background:rgba(196,106,0,.12); }
+  .ferme-players { display:flex; flex-direction:column; gap:.35rem; margin-bottom:1rem; }
+  .fplayer-row { display:flex; align-items:center; gap:.5rem; padding:.4rem .7rem; border-radius:5px; background:rgba(26,13,0,.4); font-size:.88rem; }
+  .fplayer-row.current { background:rgba(97,174,27,.15); border:1px solid rgba(97,174,27,.35); }
+  .fplayer-row.done { opacity:.5; }
+  .fmetier { font-size:.68rem; font-family:'Cinzel',serif; letter-spacing:.03em; padding:1px 7px; border-radius:8px; background:rgba(83,74,183,.2); color:#a89ef0; border:1px solid rgba(83,74,183,.3); }
+  .fmetier.none { background:rgba(122,61,0,.2); color:var(--amber-mid); border-color:rgba(122,61,0,.3); }
+  .floc-tag { font-size:.75rem; color:var(--amber-warm); }
+  .finv { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:.8rem; }
+  .finv-item { background:rgba(26,13,0,.5); border:1px solid var(--amber-mid); border-radius:12px; padding:.2rem .7rem; font-size:.85rem; color:var(--amber-pale); }
+  .finv-item strong { color:var(--amber-bright); font-family:'Cinzel',serif; }
+  .fgold { background:rgba(196,106,0,.2); border:1px solid var(--amber-warm); border-radius:12px; padding:.2rem .8rem; font-size:.9rem; color:var(--amber-bright); font-family:'Cinzel',serif; }
+  .fturn-pill { background:rgba(122,61,0,.2); border:1px solid var(--amber-mid); border-radius:14px; padding:.25rem .9rem; font-size:.85rem; color:var(--amber-warm); }
+  .fturn-pill strong { color:var(--amber-bright); font-family:'Cinzel',serif; }
+  .fphase-badge { font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; padding:.25rem .7rem; border-radius:10px; }
+  .fphase-lobby{ background:rgba(83,74,183,.2); color:#a89ef0; }
+  .fphase-planning{ background:rgba(196,106,0,.2); color:var(--amber-bright); }
+  .fphase-action{ background:rgba(61,109,17,.2); color:#9dcf7a; }
+  .fphase-gameEnd{ background:rgba(139,40,0,.2); color:#f08060; }
+
   /* ── BADGES ── */
   .type-badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:.7rem; font-family:'Cinzel',serif; letter-spacing:.08em; text-transform:uppercase; }
   .type-objet { background:rgba(196,106,0,.2); color:var(--amber-glow); border:1px solid rgba(196,106,0,.3); }
@@ -233,16 +264,16 @@
   // ╔══════════════════════════════════════════════════════════════════╗
   // ║  COLLE TA CONFIG FIREBASE ICI (voir le guide en haut de la page)  ║
   // ╚══════════════════════════════════════════════════════════════════╝
-  // Your web app's Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyBD8G35KMNAc6W-HTPqjGpi8fgQuBuh48w",
-    authDomain: "veillee-village.firebaseapp.com",
-    databaseURL: "https://veillee-village-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "veillee-village",
-    storageBucket: "veillee-village.firebasestorage.app",
-    messagingSenderId: "527854879287",
-    appId: "1:527854879287:web:ffdd2337cacb6c585e35b2"
-  };
+ // Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyBD8G35KMNAc6W-HTPqjGpi8fgQuBuh48w",
+  authDomain: "veillee-village.firebaseapp.com",
+  databaseURL: "https://veillee-village-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "veillee-village",
+  storageBucket: "veillee-village.firebasestorage.app",
+  messagingSenderId: "527854879287",
+  appId: "1:527854879287:web:ffdd2337cacb6c585e35b2"
+};
 
 
   // Détection : config non remplie -> mode local (démo hors-ligne)
@@ -311,6 +342,16 @@
           <div class="diamant-board"><div class="diamant-path" id="dv-path"></div></div>
           <div id="dv-myzone"></div>
           <div class="diamant-players" id="dv-players"></div>
+        </div>
+      </div>
+
+      <!-- Ferme board (shown when a Ferme game is active) -->
+      <div id="viewer-ferme" style="display:none">
+        <div class="card">
+          <div class="card-title">🌾 La Ferme du Village</div>
+          <div class="diamant-status" id="fv-status"></div>
+          <div class="diamant-event" id="fv-event"></div>
+          <div id="fv-myzone"></div>
         </div>
       </div>
 
@@ -402,6 +443,31 @@
           <div class="diamant-board"><div class="diamant-path" id="da-path"></div></div>
           <div class="diamant-players" id="da-players" style="margin-bottom:1rem"></div>
           <div id="da-controls"></div>
+        </div>
+      </div>
+
+      <!-- ══ FERME (module de jeu interactif — étape 1) ══ -->
+      <div class="card admin-full" id="ferme-panel">
+        <div class="section-title">🌾 La Ferme du Village — module de jeu</div>
+        <div id="ferme-admin-inactive">
+          <div style="font-size:.9rem;color:var(--amber-light);line-height:1.6;margin-bottom:1rem">
+            Version squelette : lobby, 10 tours (planification + action), métiers de base attribués au hasard, placement sur la carte, inventaire partagé. Les actions détaillées de chaque métier seront ajoutées ensuite.
+          </div>
+          <div style="display:flex;gap:.8rem;align-items:flex-end;flex-wrap:wrap">
+            <div>
+              <label>Nombre de joueurs</label>
+              <input type="number" min="1" id="ferme-target" class="fire-mini-input" value="4" style="max-width:100px">
+            </div>
+            <button class="btn-draw" onclick="startFerme()" style="flex:1;min-width:180px">🌾 Ouvrir le lobby</button>
+          </div>
+        </div>
+        <div id="ferme-admin-active" style="display:none">
+          <div class="diamant-status" id="fa-status"></div>
+          <div class="diamant-event" id="fa-event"></div>
+          <div id="fa-board"></div>
+          <div class="ferme-players" id="fa-players"></div>
+          <div id="fa-inventory" style="margin-bottom:1rem"></div>
+          <div id="fa-controls"></div>
         </div>
       </div>
 
@@ -576,6 +642,7 @@ let activeGame  = null;  // { id,title,rules,craftRoles,reward } — épreuve en
 let library     = {};    // { id: {id,title,rules,craftRoles,reward} } — bibliothèque
 let fire        = { points:0, grand:50, legendaire:120 };  // feu global permanent
 let diamant     = null;  // partie de Diamant en cours (null si aucune)
+let ferme       = null;  // partie de Ferme en cours (null si aucune)
 let selectedViewer   = null;
 let currentViewerPseudo = null;
 let craftRolesDraft  = [];
@@ -638,6 +705,12 @@ function attachListeners(){
     diamant = snap.val() ? dNormalize(snap.val()) : null;
     renderDiamantAdmin();
     if (currentViewerPseudo) renderDiamantViewer(currentViewerPseudo);
+  });
+
+  onValue(ref(db, 'ferme'), (snap) => {
+    ferme = snap.val() ? fNormalize(snap.val()) : null;
+    renderFermeAdmin();
+    if (currentViewerPseudo) renderFermeViewer(currentViewerPseudo);
   });
 }
 
@@ -733,6 +806,17 @@ function fbSetDiamant(d){
   }
 }
 
+function fbSetFerme(f){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'ferme'), f);
+  } else {
+    ferme = f ? fNormalize(f) : null;
+    renderFermeAdmin();
+    if(currentViewerPseudo) renderFermeViewer(currentViewerPseudo);
+  }
+}
+
 function localAfterAssignmentChange(){
   renderViewerList(); updateStats();
   if(selectedViewer) renderPanel();
@@ -758,6 +842,7 @@ function viewerConnect(){
   document.getElementById('viewer-info').classList.add('visible');
   renderViewerInfo(pseudo);
   renderDiamantViewer(pseudo);
+  renderFermeViewer(pseudo);
 }
 
 function viewerDisconnect(){
@@ -1523,6 +1608,324 @@ function renderDiamantViewer(pseudo){
   }
 }
 
+// ── FERME ENGINE + UI (étape 1 : squelette) ──────────────────────────────────
+const F_METIERS_BASE = ['Pêcheur','Bûcheron','Agriculteur','Mineur'];
+const F_LOCATIONS = ['Ferme','Montagne','Lac','Plage','Forêt','Ranch'];
+const F_LOC_ICON = { Ferme:'🏡', Montagne:'⛰️', Lac:'🎣', Plage:'🏖️', Forêt:'🌲', Ranch:'🐄' };
+const F_METIER_ICON = { 'Pêcheur':'🎣', 'Bûcheron':'🪓', 'Agriculteur':'🌱', 'Mineur':'⛏️' };
+const F_MAXTURNS = 10;
+function fShuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function fNormalize(st){
+  if(!st) return st;
+  st.players   = (st.players && typeof st.players==='object') ? st.players : {};
+  st.turnOrder = Array.isArray(st.turnOrder) ? st.turnOrder : (st.turnOrder ? Object.values(st.turnOrder) : []);
+  st.inventory = (st.inventory && typeof st.inventory==='object') ? st.inventory : {};
+  st.locations = Array.isArray(st.locations) ? st.locations : F_LOCATIONS.slice();
+  st.gold      = (typeof st.gold==='number') ? st.gold : 0;
+  st.turn      = (typeof st.turn==='number') ? st.turn : 1;
+  st.currentIdx= (typeof st.currentIdx==='number') ? st.currentIdx : 0;
+  return st;
+}
+function fPlayers(st){ return Object.values(st.players); }
+function fCurrent(st){ return st.turnOrder[st.currentIdx] || null; }
+
+// ── Control handlers ──
+function startFerme(){
+  const target = Math.max(1, parseInt(document.getElementById('ferme-target').value)||4);
+  fbSetFerme({
+    active:true, phase:'lobby', targetPlayers:target, turn:1, maxTurns:F_MAXTURNS,
+    players:{}, turnOrder:[], currentIdx:0, inventory:{}, gold:0, locations:F_LOCATIONS.slice(),
+    lastEvent:'Lobby ouvert — en attente des joueurs (0/'+target+').'
+  });
+  toast('🌾 Lobby de la Ferme ouvert !');
+}
+
+function fermeCancel(){
+  if(!confirm('Abandonner la partie de la Ferme en cours ?')) return;
+  fbSetFerme(null);
+  toast('Partie de la Ferme annulée.');
+}
+
+function fermeJoin(pseudo){
+  if(!ferme || ferme.phase!=='lobby') return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  if(!st.players[pseudo]) st.players[pseudo] = { pseudo, metier:null, location:null, done:false };
+  const n = fPlayers(st).length;
+  st.lastEvent = 'En attente des joueurs… ('+n+'/'+st.targetPlayers+')';
+  if(n >= st.targetPlayers){ fStartPlanning(st); }
+  fbSetFerme(st);
+}
+
+function fermeLeave(pseudo){
+  if(!ferme || ferme.phase!=='lobby') return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  delete st.players[pseudo];
+  st.lastEvent = 'En attente des joueurs… ('+fPlayers(st).length+'/'+st.targetPlayers+')';
+  fbSetFerme(st);
+}
+
+function fermeForceStart(){
+  if(!ferme || ferme.phase!=='lobby') return;
+  if(fPlayers(ferme).length===0){ toast('Aucun joueur dans le lobby !'); return; }
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  fStartPlanning(st);
+  fbSetFerme(st);
+}
+
+function fStartPlanning(st){
+  const players = fPlayers(st);
+  const metiers = fShuffle(F_METIERS_BASE.slice());
+  const order = fShuffle(players.map(p=>p.pseudo));
+  order.forEach((pseudo,i)=>{ st.players[pseudo].metier = i<metiers.length?metiers[i]:null; st.players[pseudo].location=null; st.players[pseudo].done=false; });
+  st.turnOrder = order; st.currentIdx=0; st.phase='planning';
+  st.lastEvent = 'Tour '+st.turn+' — Planification : métiers distribués, chacun choisit son lieu de départ.';
+  return st;
+}
+
+function fermeSetLocation(pseudo, loc){
+  if(!ferme || ferme.phase!=='planning') return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  if(st.players[pseudo] && st.locations.indexOf(loc)>=0) st.players[pseudo].location=loc;
+  fbSetFerme(st);
+}
+
+function fermeStartAction(){
+  if(!ferme || ferme.phase!=='planning') return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  fPlayers(st).forEach(p=>{ if(!p.location) p.location='Ferme'; });
+  st.phase='action'; st.currentIdx=0;
+  st.lastEvent = 'Tour '+st.turn+' — Phase d\'action. Au tour de '+(st.turnOrder[0]||'—')+'.';
+  fbSetFerme(st);
+}
+
+function fermeMove(pseudo, loc){
+  if(!ferme || ferme.phase!=='action') return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  if(st.players[pseudo] && st.locations.indexOf(loc)>=0){ st.players[pseudo].location=loc; st.lastEvent=pseudo+' se déplace vers '+F_LOC_ICON[loc]+' '+loc+'.'; }
+  fbSetFerme(st);
+}
+
+function fermeEndPlayerTurn(){
+  if(!ferme || ferme.phase!=='action') return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  const cur = fCurrent(st);
+  if(cur) st.players[cur].done=true;
+  st.currentIdx += 1;
+  if(st.currentIdx >= st.turnOrder.length){ fEndTurn(st); }
+  else { st.lastEvent = (cur?cur+' a terminé. ':'')+'Au tour de '+fCurrent(st)+'.'; }
+  fbSetFerme(st);
+}
+
+function fEndTurn(st){
+  if(st.turn >= st.maxTurns){ st.phase='gameEnd'; st.result=null; st.lastEvent='🏁 Fin du 10e tour ! Déclare victoire ou défaite.'; return st; }
+  st.turn += 1; return fStartPlanning(st);
+}
+
+function fermeDeclare(victory){
+  if(!ferme) return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  st.phase='gameEnd'; st.result = victory?'victory':'defeat';
+  st.lastEvent = victory ? '🎉 Victoire ! Les objectifs de grand-père sont remplis.' : '😞 Défaite… objectifs non atteints.';
+  fbSetFerme(st);
+}
+
+function fermeEndToFire(){
+  if(!ferme) return;
+  const pts = parseInt(prompt('Combien de points ajouter au feu de camp ?', ferme.result==='victory'?'30':'0'));
+  if(isNaN(pts)) return;
+  if(pts>0) fbSetFire(Object.assign({}, fire, { points:(fire.points||0)+pts }));
+  fbSetFerme(null);
+  toast(pts>0?('🔥 +'+pts+' pts au feu ! Partie clôturée.'):'Partie clôturée.');
+}
+
+// Inventory adjust
+function fermeAddResource(){
+  if(!ferme) return;
+  const sel = document.getElementById('fa-res-select');
+  const qty = parseInt(document.getElementById('fa-res-qty').value)||1;
+  const key = sel.value;
+  if(!key) return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  st.inventory[key] = (st.inventory[key]||0) + qty;
+  if(st.inventory[key]<=0) delete st.inventory[key];
+  fbSetFerme(st);
+}
+function fermeAdjustGold(delta){
+  if(!ferme) return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  st.gold = Math.max(0, (st.gold||0)+delta);
+  fbSetFerme(st);
+}
+
+const F_RESOURCES = ['bois','bûche','brindille','pierre brute','pierre','minerai de charbon','charbon','minerai de cuivre','cuivre','minerai de fer','fer','poisson','poisson grillé','panais','fraise','haricot','patate','oeuf','lait','graine'];
+
+// ── Rendering ──
+function fStatusPills(st){
+  const phaseLabel = { lobby:'Lobby', planning:'Planification', action:'Action', gameEnd:'Fin' }[st.phase]||st.phase;
+  return '<div class="fturn-pill">Tour <strong>'+st.turn+'/'+st.maxTurns+'</strong></div>'+
+         '<span class="fphase-badge fphase-'+st.phase+'">'+phaseLabel+'</span>'+
+         '<div class="fgold">🪙 '+st.gold+' or</div>';
+}
+
+function fBoard(st, opts){
+  opts = opts||{};
+  const cur = fCurrent(st);
+  return '<div class="ferme-board">'+ st.locations.map(loc=>{
+    const here = fPlayers(st).filter(p=>p.location===loc);
+    const pawns = here.map(p=>'<span class="fpawn'+(p.pseudo===cur?' current':'')+'">'+escHtml(p.pseudo)+'</span>').join('');
+    const clickable = opts.onPick ? ' floc-btn" onclick="'+opts.onPick+'(\''+escAttr(loc)+'\')"' : '"';
+    const sel = (opts.selected===loc)?' selected':'';
+    return '<div class="floc'+sel+(opts.onPick?' floc-btn':'')+'" '+(opts.onPick?('onclick="'+opts.onPick+'(\''+escAttr(loc)+'\')"'):'')+'>'+
+      '<div class="floc-header">'+F_LOC_ICON[loc]+' '+loc+'</div>'+
+      '<div class="floc-pawns">'+pawns+'</div></div>';
+  }).join('') + '</div>';
+}
+
+function fPlayersList(st, highlight){
+  const cur = fCurrent(st);
+  return fPlayers(st).map(p=>{
+    const isCur = (st.phase==='action' && p.pseudo===cur);
+    const metier = p.metier ? '<span class="fmetier">'+(F_METIER_ICON[p.metier]||'')+' '+p.metier+'</span>' : '<span class="fmetier none">sans métier</span>';
+    const loc = p.location ? '<span class="floc-tag">'+F_LOC_ICON[p.location]+' '+p.location+'</span>' : '<span class="floc-tag" style="opacity:.5">non placé</span>';
+    const hl = (p.pseudo===highlight)?'style="outline:1px solid var(--amber-warm)"':'';
+    return '<div class="fplayer-row'+(isCur?' current':'')+(p.done?' done':'')+'" '+hl+'>'+
+      '<span>'+(isCur?'▶ ':'')+escHtml(p.pseudo)+'</span>'+metier+loc+
+      (p.done?'<span style="margin-left:auto;font-size:.75rem;color:#9dcf7a">✓ fini</span>':'')+'</div>';
+  }).join('');
+}
+
+function fInventory(st){
+  const items = Object.keys(st.inventory);
+  if(!items.length) return '<div class="finv"><span style="color:var(--amber-mid);font-style:italic;font-size:.85rem">Inventaire vide</span></div>';
+  return '<div class="finv">'+items.map(k=>'<span class="finv-item">'+escHtml(k)+' <strong>×'+st.inventory[k]+'</strong></span>').join('')+'</div>';
+}
+
+function renderFermeAdmin(){
+  const panel = document.getElementById('ferme-panel');
+  if(!panel) return;
+  const inactive = document.getElementById('ferme-admin-inactive');
+  const active = document.getElementById('ferme-admin-active');
+  if(!ferme || !ferme.active){ inactive.style.display='block'; active.style.display='none'; return; }
+  inactive.style.display='none'; active.style.display='block';
+
+  document.getElementById('fa-status').innerHTML = fStatusPills(ferme);
+  document.getElementById('fa-event').textContent = ferme.lastEvent||'';
+  document.getElementById('fa-board').innerHTML = fBoard(ferme);
+  document.getElementById('fa-players').innerHTML = fPlayersList(ferme);
+
+  // inventory + meneur adjust
+  const resOpts = F_RESOURCES.map(r=>'<option value="'+r+'">'+r+'</option>').join('');
+  document.getElementById('fa-inventory').innerHTML =
+    '<div style="font-family:\'Cinzel\',serif;font-size:.7rem;letter-spacing:.15em;color:var(--amber-warm);text-transform:uppercase;margin-bottom:.5rem">Inventaire partagé</div>'+
+    fInventory(ferme)+
+    '<div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;margin-top:.5rem">'+
+      '<select id="fa-res-select" style="flex:1;min-width:130px">'+resOpts+'</select>'+
+      '<input type="number" id="fa-res-qty" value="1" style="width:70px" class="fire-mini-input">'+
+      '<button class="btn-small" onclick="fermeAddResource()">± Ressource</button>'+
+      '<span style="margin-left:auto;display:flex;gap:.3rem;align-items:center">🪙'+
+        '<button class="btn-icon" onclick="fermeAdjustGold(-5)">−5</button>'+
+        '<button class="btn-icon" onclick="fermeAdjustGold(-1)">−</button>'+
+        '<button class="btn-icon" onclick="fermeAdjustGold(1)">+</button>'+
+        '<button class="btn-icon" onclick="fermeAdjustGold(5)">+5</button>'+
+      '</span>'+
+    '</div>';
+
+  const ctrl = document.getElementById('fa-controls');
+  const ph = ferme.phase;
+  const cancelBtn = '<button class="btn-deactivate" onclick="fermeCancel()" style="margin-top:.6rem">✕ Abandonner la partie</button>';
+  if(ph==='lobby'){
+    ctrl.innerHTML = '<div class="diamant-voted">🚪 '+fPlayers(ferme).length+'/'+ferme.targetPlayers+' joueurs ont rejoint. La partie démarrera automatiquement, ou force le départ :</div>'+
+      '<button class="btn-draw" onclick="fermeForceStart()">▶ Démarrer maintenant</button>'+cancelBtn;
+  } else if(ph==='planning'){
+    const placed = fPlayers(ferme).filter(p=>p.location).length;
+    ctrl.innerHTML = '<div class="diamant-voted">📍 Placement : '+placed+'/'+fPlayers(ferme).length+' joueurs placés. Tu peux aussi les placer toi-même en cliquant sur les lieux ci-dessus (à venir), ou lancer directement.</div>'+
+      '<button class="btn-draw" onclick="fermeStartAction()">▶ Lancer la phase d\'action</button>'+cancelBtn;
+  } else if(ph==='action'){
+    const cur = fCurrent(ferme);
+    let moveBtns = '';
+    if(cur){ moveBtns = '<div style="font-size:.8rem;color:var(--amber-warm);margin:.6rem 0 .3rem">Déplacer '+escHtml(cur)+' :</div><div style="display:flex;gap:.3rem;flex-wrap:wrap">'+
+      ferme.locations.map(l=>'<button class="btn-small" onclick="fermeMove(\''+escAttr(cur)+'\',\''+escAttr(l)+'\')">'+F_LOC_ICON[l]+' '+l+'</button>').join('')+'</div>'; }
+    ctrl.innerHTML = '<div class="diamant-voted">▶ Au tour de <strong style="color:var(--amber-bright)">'+(cur||'—')+'</strong>'+(cur&&ferme.players[cur].metier?(' ('+ferme.players[cur].metier+')'):'')+'. Les actions du métier arriveront à l\'étape suivante — pour l\'instant, pilote manuellement.</div>'+
+      moveBtns+
+      '<button class="btn-draw" onclick="fermeEndPlayerTurn()" style="margin-top:.8rem">⏭️ Terminer le tour de ce joueur</button>'+cancelBtn;
+  } else if(ph==='gameEnd'){
+    let head = '';
+    if(ferme.result==='victory') head='<div class="diamant-voted" style="color:#9dcf7a">🎉 Victoire déclarée !</div>';
+    else if(ferme.result==='defeat') head='<div class="diamant-voted" style="color:#f08060">😞 Défaite déclarée.</div>';
+    else head='<div class="diamant-voted">🏁 Fin des 10 tours. Les objectifs de grand-père sont-ils remplis ?</div>';
+    ctrl.innerHTML = head +
+      '<div style="display:flex;gap:.8rem;margin-top:.6rem">'+
+        '<button class="btn-continue" onclick="fermeDeclare(true)">🎉 Victoire</button>'+
+        '<button class="btn-leave" onclick="fermeDeclare(false)">😞 Défaite</button>'+
+      '</div>'+
+      '<button class="btn-draw" onclick="fermeEndToFire()" style="margin-top:.8rem">🔥 Clôturer (+ points au feu)</button>';
+  }
+}
+
+function renderFermeViewer(pseudo){
+  const wrap = document.getElementById('viewer-ferme');
+  if(!wrap) return;
+  if(!ferme || !ferme.active){ wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  document.getElementById('fv-status').innerHTML = fStatusPills(ferme);
+  document.getElementById('fv-event').textContent = ferme.lastEvent||'';
+
+  const zone = document.getElementById('fv-myzone');
+  const me = ferme.players[pseudo];
+  const ph = ferme.phase;
+
+  if(ph==='lobby'){
+    if(me){
+      zone.innerHTML = '<div class="diamant-voted">✓ Tu as rejoint la partie ! En attente des autres ('+fPlayers(ferme).length+'/'+ferme.targetPlayers+')…</div>'+
+        '<button class="btn-small" onclick="fermeLeave(\''+escAttr(pseudo)+'\')" style="width:100%">↩ Quitter le lobby</button>';
+    } else {
+      zone.innerHTML = '<div class="diamant-voted">🚪 Une partie de la Ferme se prépare ! Rejoins avant le départ.</div>'+
+        '<button class="btn-continue" onclick="fermeJoin(\''+escAttr(pseudo)+'\')" style="width:100%">🌾 Rejoindre la partie</button>';
+    }
+    return;
+  }
+
+  // in-game board is useful for everyone
+  let board = fBoard(ferme, {});
+  let inv = fInventory(ferme);
+
+  if(!me){
+    zone.innerHTML = board + inv + '<div class="diamant-voted">👀 Tu n\'es pas dans cette partie. Tu pourras jouer à la prochaine !</div>';
+    return;
+  }
+
+  if(ph==='planning'){
+    const myLoc = me.location;
+    zone.innerHTML =
+      '<div class="diamant-voted">Ton métier ce tour : <strong style="color:#a89ef0">'+(me.metier?(F_METIER_ICON[me.metier]+' '+me.metier):'sans métier')+'</strong>. Choisis ton lieu de départ :</div>'+
+      '<div class="ferme-board">'+ ferme.locations.map(loc=>{
+        const here = fPlayers(ferme).filter(p=>p.location===loc);
+        const pawns = here.map(p=>'<span class="fpawn">'+escHtml(p.pseudo)+'</span>').join('');
+        const sel = (myLoc===loc)?' selected':'';
+        return '<div class="floc floc-btn'+sel+'" onclick="fermeSetLocation(\''+escAttr(pseudo)+'\',\''+escAttr(loc)+'\')">'+
+          '<div class="floc-header">'+F_LOC_ICON[loc]+' '+loc+'</div><div class="floc-pawns">'+pawns+'</div></div>';
+      }).join('') +'</div>'+ inv;
+    return;
+  }
+
+  if(ph==='action'){
+    const cur = fCurrent(ferme);
+    const isMe = (cur===pseudo);
+    zone.innerHTML = board + inv +
+      (isMe
+        ? '<div class="diamant-voted" style="color:#9dcf7a">▶ C\'est ton tour ! Métier : <strong>'+(me.metier||'—')+'</strong>, lieu : <strong>'+(me.location||'—')+'</strong>. Le meneur pilote tes actions pour l\'instant.</div>'
+        : '<div class="diamant-voted">Au tour de <strong style="color:var(--amber-bright)">'+(cur||'—')+'</strong>. Ton métier : '+(me.metier||'—')+', lieu : '+(me.location||'—')+'.</div>');
+    return;
+  }
+
+  if(ph==='gameEnd'){
+    let msg = ferme.result==='victory' ? '🎉 Victoire ! Grand-père est fier de vous.' : ferme.result==='defeat' ? '😞 Défaite… ce sera pour la prochaine fois.' : '🏁 Fin de la partie.';
+    zone.innerHTML = board + inv + '<div class="diamant-voted">'+msg+'</div>';
+    return;
+  }
+}
+
 // ── STATS ─────────────────────────────────────────────────────────────────
 function updateStats(){
   document.getElementById('stat-viewers').textContent  = Object.keys(viewers).length;
@@ -1538,6 +1941,7 @@ renderFireMeter();
 renderAdminFire();
 renderLibrary();
 renderDiamantAdmin();
+renderFermeAdmin();
 // Handle case where fb-ready fired before this script parsed
 if (window.FB) initSync();
 </script>
