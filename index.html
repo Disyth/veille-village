@@ -1628,6 +1628,18 @@ const F_LOC_ICON = { Ferme:'🏡', Montagne:'⛰️', Lac:'🎣', Plage:'🏖️
 const F_METIER_ICON = { 'Pêcheur':'🎣', 'Bûcheron':'🪓', 'Agriculteur':'🌱', 'Mineur':'⛏️' };
 const F_MAXTURNS = 10;
 
+// ── Config Pêcheur (à ajuster) ──
+// Espèces de poisson : val = difficulté (le dé d6 doit être ≥ à cette valeur pour attraper)
+const F_FISH = [
+  { nom:'Sardine',   val:2 },
+  { nom:'Truite',    val:3 },
+  { nom:'Bar',       val:4 },
+  { nom:'Saumon',    val:5 },
+  { nom:'Esturgeon', val:6 },
+];
+// Valeurs de vente en or (⚠️ VALEURS PAR DÉFAUT — remplace-les par les tiennes)
+const F_SELL_VALUES = { 'poisson':3, 'poisson grillé':6 };
+
 // ── Registre d'actions de métier (pattern réutilisable) ──
 // Chaque action : { id, label, desc, locations (null=partout), check(st)->{ok,why}, apply(st)->message }
 const F_ACTIONS = {
@@ -1670,6 +1682,27 @@ const F_ACTIONS = {
     { id:'charbon', label:'⚫ Minerai de charbon → charbon', desc:null, locations:null,
       check:(st)=>((st.inventory['minerai de charbon']||0)>=1?{ok:true}:{ok:false,why:'besoin de 1 minerai de charbon'}),
       apply:(st)=>{ st.inventory['minerai de charbon']-=1; if(st.inventory['minerai de charbon']<=0)delete st.inventory['minerai de charbon']; st.inventory['charbon']=(st.inventory['charbon']||0)+1; return 'transforme 1 minerai de charbon en 1 charbon'; } },
+  ],
+  'Pêcheur': [
+    { id:'pecher', label:'🎣 Pêcher', locations:['Lac','Plage'],
+      desc:'carte poisson + dé',
+      check:(st)=>({ok:true}),
+      apply:(st)=>{
+        const fish = F_FISH[Math.floor(Math.random()*F_FISH.length)];
+        const roll = 1 + Math.floor(Math.random()*6);
+        if(roll >= fish.val){
+          st.inventory['poisson']=(st.inventory['poisson']||0)+1;
+          return 'pêche un(e) '+fish.nom+' (difficulté '+fish.val+') · dé 🎲 '+roll+' ✓ attrapé ! (+1 poisson)';
+        }
+        return 'pêche un(e) '+fish.nom+' (difficulté '+fish.val+') · dé 🎲 '+roll+' ✗ le poisson s\'échappe';
+      } },
+    { id:'griller', label:'🔥 Griller un poisson', desc:'1 poisson + 1 bois → 1 poisson grillé', locations:null,
+      check:(st)=>{ if((st.inventory['poisson']||0)<1) return {ok:false,why:'besoin de 1 poisson'}; if((st.inventory['bois']||0)<1) return {ok:false,why:'besoin de 1 bois'}; return {ok:true}; },
+      apply:(st)=>{ st.inventory['poisson']-=1; if(st.inventory['poisson']<=0)delete st.inventory['poisson']; st.inventory['bois']-=1; if(st.inventory['bois']<=0)delete st.inventory['bois']; st.inventory['poisson grillé']=(st.inventory['poisson grillé']||0)+1; return 'grille un poisson (1 poisson + 1 bois → 1 poisson grillé)'; } },
+    { id:'vendre_poisson', label:'🪙 Vendre un poisson', locations:null,
+      desc:(st)=>'+'+(F_SELL_VALUES['poisson']||0)+' or',
+      check:(st)=>((st.inventory['poisson']||0)>=1?{ok:true}:{ok:false,why:'aucun poisson'}),
+      apply:(st)=>{ st.inventory['poisson']-=1; if(st.inventory['poisson']<=0)delete st.inventory['poisson']; const v=F_SELL_VALUES['poisson']||0; st.gold=(st.gold||0)+v; return 'vend 1 poisson (+'+v+' or)'; } },
   ],
 };
 
