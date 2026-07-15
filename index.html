@@ -270,27 +270,35 @@
   .toast.show { transform:translateX(-50%) translateY(0); }
 </style>
 <!-- Firebase SDK (module) -->
-<script type="module">
+<!-- Config Firebase externe : à déposer UNE SEULE FOIS sur Netlify (voir le guide).
+       Ce fichier n'est jamais écrasé par les mises à jour de l'app. -->
+  <script src="firebase-config.js"></script>
+
+  <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getDatabase, ref, onValue, set, update, remove, get, child, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
   // ╔══════════════════════════════════════════════════════════════════╗
-  // ║  COLLE TA CONFIG FIREBASE ICI (voir le guide en haut de la page)  ║
+  // ║  La config Firebase vit dans le fichier SÉPARÉ « firebase-config.js »  ║
+  // ║  (déposé une seule fois sur Netlify). L'app la lit ici automatiquement.  ║
+  // ║  Ce fichier index.html ne contient AUCUN identifiant.                    ║
   // ╚══════════════════════════════════════════════════════════════════╝
- // Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyBD8G35KMNAc6W-HTPqjGpi8fgQuBuh48w",
-  authDomain: "veillee-village.firebaseapp.com",
-  databaseURL: "https://veillee-village-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "veillee-village",
-  storageBucket: "veillee-village.firebasestorage.app",
-  messagingSenderId: "527854879287",
-  appId: "1:527854879287:web:ffdd2337cacb6c585e35b2"
-};
+  const PLACEHOLDER = {
+    apiKey: "TON_API_KEY",
+    authDomain: "TON_PROJET.firebaseapp.com",
+    databaseURL: "https://TON_PROJET-default-rtdb.firebaseio.com",
+    projectId: "TON_PROJET",
+    storageBucket: "TON_PROJET.appspot.com",
+    messagingSenderId: "XXXXXXXX",
+    appId: "1:XXXX:web:XXXX"
+  };
+  // Récupère la config externe si présente, sinon retombe sur le placeholder (mode local hors-ligne)
+  const firebaseConfig = (window.FIREBASE_CONFIG && typeof window.FIREBASE_CONFIG === "object")
+    ? window.FIREBASE_CONFIG
+    : PLACEHOLDER;
 
-
-  // Détection : config non remplie -> mode local (démo hors-ligne)
+  // Détection : config non remplie / fichier absent -> mode local (démo hors-ligne)
   const isConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey !== "TON_API_KEY";
 
   if (isConfigured) {
