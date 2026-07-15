@@ -252,6 +252,9 @@
     .btn-continue, .btn-leave, .btn-draw { font-size:.8rem; padding:.7rem; }
   }
 
+  .finv-item { white-space:normal; word-break:break-word; }
+  @media(max-width:520px){ .finv-item { font-size:.8rem; padding:.2rem .55rem; } .finv { gap:.35rem; } }
+
   /* ── BADGES ── */
   .type-badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:.7rem; font-family:'Cinzel',serif; letter-spacing:.08em; text-transform:uppercase; }
   .type-objet { background:rgba(196,106,0,.2); color:var(--amber-glow); border:1px solid rgba(196,106,0,.3); }
@@ -275,7 +278,7 @@
   // ╔══════════════════════════════════════════════════════════════════╗
   // ║  COLLE TA CONFIG FIREBASE ICI (voir le guide en haut de la page)  ║
   // ╚══════════════════════════════════════════════════════════════════╝
-  // Your web app's Firebase configuration
+ // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBD8G35KMNAc6W-HTPqjGpi8fgQuBuh48w",
   authDomain: "veillee-village.firebaseapp.com",
@@ -1728,7 +1731,8 @@ const F_ACTIONS = {
         (st.crops||[]).forEach(c=>{ c.level=(c.level||1)+1; });
         const harvested=[]; const remaining=[];
         (st.crops||[]).forEach(c=>{
-          const max = F_CROP_MAX[c.type] || 4;
+          const max = F_CROP_MAX[c.type];
+          if(!c.type || !max){ return; } // culture invalide : on l'ignore (sécurité)
           if(c.level>=max){ st.inventory[c.type]=(st.inventory[c.type]||0)+1; harvested.push(c.type); }
           else remaining.push(c);
         });
@@ -1782,6 +1786,12 @@ function fNormalize(st){
   st.currentIdx= (typeof st.currentIdx==='number') ? st.currentIdx : 0;
   st.mineLevel = (typeof st.mineLevel==='number') ? st.mineLevel : 1;
   st.crops = Array.isArray(st.crops) ? st.crops : (st.crops ? Object.values(st.crops) : []);
+  // Répare/purge les cultures héritées d'anciennes parties (sans type valide) pour éviter les récoltes "undefined"
+  const _validTypes = (typeof F_CROP_MAX!=='undefined') ? Object.keys(F_CROP_MAX) : ['panais','tomate','salade'];
+  st.crops = st.crops
+    .filter(c => c && typeof c==='object')
+    .map(c => ({ id: c.id || ('crop'+Math.random().toString(36).slice(2)), type: c.type, level: (typeof c.level==='number' && c.level>=1) ? c.level : 1 }))
+    .filter(c => _validTypes.indexOf(c.type) >= 0);
   if(st.lastAction && typeof st.lastAction!=='object') st.lastAction = null;
   return st;
 }
@@ -2154,6 +2164,7 @@ function renderFermeViewer(pseudo){
     const myLoc = me.location;
     zone.innerHTML =
       '<div class="diamant-voted">Ton métier ce tour : <strong style="color:#a89ef0">'+(me.metier?(F_METIER_ICON[me.metier]+' '+me.metier):'sans métier')+'</strong>. Choisis ton lieu de départ :</div>'+
+      inv +
       '<div class="ferme-board">'+ ferme.locations.map(loc=>{
         const here = fPlayers(ferme).filter(p=>p.location===loc);
         const pawns = here.map(p=>'<span class="fpawn">'+escHtml(p.pseudo)+'</span>').join('');
