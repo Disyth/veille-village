@@ -28,17 +28,44 @@ function dNormalize(st){
 
 // ── Control handlers (write to Firebase) ──
 function startDiamant(){
-  const pseudos = Object.values(viewers).map(v=>(v&&v.pseudo)?v.pseudo:v).filter(p=>typeof p==='string');
-  if(pseudos.length===0){ toast('Aucun villageois connecté pour jouer !'); return; }
-  if(!confirm('Lancer une partie de Diamant avec les '+pseudos.length+' villageois connectés ?')) return;
-  const players={};
-  pseudos.forEach(p=>{ players[p]={pseudo:p,status:'in',held:0,banked:0,vote:null}; });
+  // Ouvre un lobby vide : les joueurs volontaires rejoignent, le meneur lance quand il veut
   fbSetDiamant({
-    active:true, round:1, maxRounds:D_MAXROUNDS, phase:'exploring',
-    deck:dNewDeck(), board:[], pathTreasure:0, hazardsSeen:{}, players,
-    lastEvent:'La partie commence ! Révèle la première carte.'
+    active:true, round:1, maxRounds:D_MAXROUNDS, phase:'lobby',
+    deck:[], board:[], pathTreasure:0, hazardsSeen:{}, players:{},
+    lastEvent:'Lobby ouvert — les explorateurs peuvent rejoindre la partie.'
   });
-  toast('💎 Partie de Diamant lancée !');
+  toast('💎 Lobby de Diamant ouvert !');
+}
+
+function diamantJoin(pseudo){
+  if(!diamant || diamant.phase!=='lobby') return;
+  const st = dNormalize(JSON.parse(JSON.stringify(diamant)));
+  if(!st.players[pseudo]) st.players[pseudo] = { pseudo, status:'in', held:0, banked:0, vote:null };
+  st.lastEvent = Object.keys(st.players).length+' explorateur(s) dans le lobby.';
+  fbSetDiamant(st);
+}
+
+function diamantLeave(pseudo){
+  if(!diamant || diamant.phase!=='lobby') return;
+  const st = dNormalize(JSON.parse(JSON.stringify(diamant)));
+  delete st.players[pseudo];
+  st.lastEvent = Object.keys(st.players).length+' explorateur(s) dans le lobby.';
+  fbSetDiamant(st);
+}
+
+function diamantLaunch(){
+  if(!diamant || diamant.phase!=='lobby') return;
+  const n = Object.keys(diamant.players).length;
+  if(n===0){ toast('Aucun explorateur n\'a rejoint le lobby !'); return; }
+  const st = dNormalize(JSON.parse(JSON.stringify(diamant)));
+  // (re)initialise l'état des joueurs présents et démarre la première manche
+  Object.values(st.players).forEach(p=>{ p.status='in'; p.held=0; p.banked=0; p.vote=null; });
+  st.phase='exploring';
+  st.round=1;
+  st.deck=dNewDeck(); st.board=[]; st.pathTreasure=0; st.hazardsSeen={};
+  st.lastEvent='La partie commence avec '+n+' explorateur(s) ! Révèle la première carte.';
+  fbSetDiamant(st);
+  toast('💎 Partie lancée avec '+n+' joueur(s) !');
 }
 
 function diamantCancel(){
@@ -185,14 +212,24 @@ function renderDiamantAdmin(){
   if(!diamant || !diamant.active){ inactive.style.display='block'; active.style.display='none'; return; }
   inactive.style.display='none'; active.style.display='block';
 
-  document.getElementById('da-status').innerHTML = dStatusPills(diamant);
+  const ph = diamant.phase;
+  const nPlayers = Object.keys(diamant.players||{}).length;
+
+  if(ph==='lobby'){
+    document.getElementById('da-status').innerHTML = '<div class="dpill">🚪 Lobby ouvert</div><div class="dpill">Explorateurs <strong>'+nPlayers+'</strong></div>';
+  } else {
+    document.getElementById('da-status').innerHTML = dStatusPills(diamant);
+  }
   document.getElementById('da-event').textContent = diamant.lastEvent||'';
   dRenderPath(document.getElementById('da-path'), diamant.board);
   document.getElementById('da-players').innerHTML = dPlayersList(diamant);
 
   const ctrl = document.getElementById('da-controls');
-  const ph = diamant.phase;
-  if(ph==='exploring'){
+  if(ph==='lobby'){
+    ctrl.innerHTML = '<div class="diamant-voted">🚪 '+nPlayers+' explorateur(s) ont rejoint. Lance quand tu veux — la partie démarrera avec les joueurs présents.</div>'+
+      '<button class="btn-draw" onclick="diamantLaunch()">💎 Lancer la partie'+(nPlayers?(' ('+nPlayers+' joueur'+(nPlayers>1?'s':'')+')'):'')+'</button>'+
+      '<button class="btn-deactivate" onclick="diamantCancel()" style="margin-top:.6rem">✕ Fermer le lobby</button>';
+  } else if(ph==='exploring'){
     ctrl.innerHTML = '<button class="btn-draw" onclick="diamantDraw()">🎴 Révéler une carte ('+diamant.deck.length+' restantes)</button>'+
       '<button class="btn-deactivate" onclick="diamantCancel()" style="margin-top:.6rem">✕ Abandonner la partie</button>';
   } else if(ph==='voting'){
@@ -225,6 +262,18 @@ function renderDiamantViewer(pseudo){
 
   const me = diamant.players[pseudo];
   const zone = document.getElementById('dv-myzone');
+
+  if(diamant.phase==='lobby'){
+    if(me){
+      zone.innerHTML = '<div class="diamant-voted">✓ Tu as rejoint le lobby ! En attente du lancement par le meneur…</div>'+
+        '<button class="btn-small" onclick="diamantLeave(\''+escAttr(pseudo)+'\')" style="width:100%">↩ Quitter le lobby</button>';
+    } else {
+      zone.innerHTML = '<div class="diamant-voted">🚪 Une partie de Diamant se prépare ! Rejoins avant le lancement.</div>'+
+        '<button class="btn-continue" onclick="diamantJoin(\''+escAttr(pseudo)+'\')" style="width:100%">💎 Rejoindre la partie</button>';
+    }
+    return;
+  }
+
   if(!me){
     zone.innerHTML = '<div class="diamant-voted">👀 Une partie est en cours. Tu pourras jouer à la prochaine !</div>';
     return;

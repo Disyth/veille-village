@@ -147,6 +147,9 @@ function fHasValidAction(st, pseudo){
   const p = st.players[pseudo]; if(!p) return false;
   return fMetierActions(p.metier, st).some(a => (!a.locations || a.locations.indexOf(p.location)>=0) && a.check(st).ok);
 }
+const F_LOC_CAP = 2; // nombre max de joueurs par lieu
+function fLocationCount(st, loc, exceptPseudo){ return fPlayers(st).filter(p=>p.location===loc && p.pseudo!==exceptPseudo).length; }
+function fCanEnter(st, loc, pseudo){ return fLocationCount(st, loc, pseudo) < F_LOC_CAP; }
 function fShuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
 function fNormalize(st){
@@ -217,25 +220,45 @@ function fermeForceStart(){
 
 function fStartPlanning(st){
   const players = fPlayers(st);
-  const metiers = fShuffle(F_METIERS_BASE.slice());
   const order = fShuffle(players.map(p=>p.pseudo));
-  order.forEach((pseudo,i)=>{ st.players[pseudo].metier = i<metiers.length?metiers[i]:null; st.players[pseudo].location=null; st.players[pseudo].done=false; st.players[pseudo].actionsDone=0; st.players[pseudo].hasMoved=false; });
+  // Les joueurs choisissent eux-mêmes leur métier ET leur lieu (dans n'importe quel ordre)
+  order.forEach(pseudo=>{ st.players[pseudo].metier=null; st.players[pseudo].location=null; st.players[pseudo].done=false; st.players[pseudo].actionsDone=0; st.players[pseudo].hasMoved=false; });
   st.turnOrder = order; st.currentIdx=0; st.phase='planning';
-  st.lastEvent = 'Tour '+st.turn+' — Planification : métiers distribués, chacun choisit son lieu de départ.';
+  st.lastEvent = 'Tour '+st.turn+' — Planification : chacun choisit son métier et son lieu de départ.';
   return st;
+}
+
+function fermeSetMetier(pseudo, metier){
+  if(!ferme || ferme.phase!=='planning') return;
+  if(F_METIERS_BASE.indexOf(metier)<0) return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  if(st.players[pseudo]) st.players[pseudo].metier = metier;
+  fbSetFerme(st);
 }
 
 function fermeSetLocation(pseudo, loc){
   if(!ferme || ferme.phase!=='planning') return;
   const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
-  if(st.players[pseudo] && st.locations.indexOf(loc)>=0) st.players[pseudo].location=loc;
+  if(!st.players[pseudo] || st.locations.indexOf(loc)<0) return;
+  if(st.players[pseudo].location===loc){ st.players[pseudo].location=null; fbSetFerme(st); return; } // re-clic = désélection
+  if(!fCanEnter(st, loc, pseudo)){ toast('Ce lieu est déjà occupé par '+F_LOC_CAP+' joueurs !'); return; }
+  st.players[pseudo].location=loc;
   fbSetFerme(st);
 }
 
 function fermeStartAction(){
   if(!ferme || ferme.phase!=='planning') return;
   const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
-  fPlayers(st).forEach(p=>{ if(!p.location) p.location='Ferme'; });
+  // Tous les joueurs doivent avoir choisi un métier
+  const sansMetier = fPlayers(st).filter(p=>!p.metier).map(p=>p.pseudo);
+  if(sansMetier.length){ toast('En attente du choix de métier : '+sansMetier.join(', ')); return; }
+  // Placement auto des joueurs non placés, en respectant la limite de 2 par lieu
+  fPlayers(st).forEach(p=>{
+    if(!p.location){
+      const spot = st.locations.find(l=>fCanEnter(st, l, p.pseudo)) || 'Ferme';
+      p.location = spot;
+    }
+  });
   st.phase='action'; st.currentIdx=0;
   st.lastEvent = 'Tour '+st.turn+' — Phase d\'action. Au tour de '+(st.turnOrder[0]||'—')+'.';
   fbSetFerme(st);
@@ -244,7 +267,9 @@ function fermeStartAction(){
 function fermeMove(pseudo, loc){
   if(!ferme || ferme.phase!=='action') return;
   const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
-  if(st.players[pseudo] && st.locations.indexOf(loc)>=0){ st.players[pseudo].location=loc; st.lastEvent=pseudo+' se déplace vers '+F_LOC_ICON[loc]+' '+loc+'.'; }
+  if(!st.players[pseudo] || st.locations.indexOf(loc)<0) return;
+  if(st.players[pseudo].location!==loc && !fCanEnter(st, loc, pseudo)){ toast('Ce lieu est déjà complet ('+F_LOC_CAP+' joueurs).'); return; }
+  st.players[pseudo].location=loc; st.lastEvent=pseudo+' se déplace vers '+F_LOC_ICON[loc]+' '+loc+'.';
   fbSetFerme(st);
 }
 
@@ -290,6 +315,7 @@ function fermePlayerMove(pseudo, loc){
   const p = st.players[pseudo];
   if(!p || p.hasMoved || (p.actionsDone||0)>=2){ toast('Déplacement impossible'); return; }
   if(st.locations.indexOf(loc)<0) return;
+  if(!fCanEnter(st, loc, pseudo)){ toast('Ce lieu est déjà complet ('+F_LOC_CAP+' joueurs).'); return; }
   const done = p.actionsDone||0;
   if(done<1){
     // move-first only allowed if stuck (no valid action here); it consumes the first action slot
@@ -478,9 +504,14 @@ function renderFermeAdmin(){
     ctrl.innerHTML = '<div class="diamant-voted">🚪 '+fPlayers(ferme).length+'/'+ferme.targetPlayers+' joueurs ont rejoint. La partie démarrera automatiquement, ou force le départ :</div>'+
       '<button class="btn-draw" onclick="fermeForceStart()">▶ Démarrer maintenant</button>'+cancelBtn;
   } else if(ph==='planning'){
+    const total = fPlayers(ferme).length;
+    const withMetier = fPlayers(ferme).filter(p=>p.metier).length;
     const placed = fPlayers(ferme).filter(p=>p.location).length;
-    ctrl.innerHTML = '<div class="diamant-voted">📍 Placement : '+placed+'/'+fPlayers(ferme).length+' joueurs placés. Tu peux aussi les placer toi-même en cliquant sur les lieux ci-dessus (à venir), ou lancer directement.</div>'+
-      '<button class="btn-draw" onclick="fermeStartAction()">▶ Lancer la phase d\'action</button>'+cancelBtn;
+    const allReady = withMetier===total;
+    ctrl.innerHTML = '<div class="diamant-voted">📋 Planification — métiers choisis : <strong>'+withMetier+'/'+total+'</strong> · lieux choisis : <strong>'+placed+'/'+total+'</strong>.'+
+      (allReady?'':' <span style="color:var(--amber-warm)">En attente des choix de métier.</span>')+
+      '<br><span style="font-size:.8rem;opacity:.8">Les joueurs non placés seront mis automatiquement au lancement.</span></div>'+
+      '<button class="btn-draw" onclick="fermeStartAction()"'+(allReady?'':' disabled style="opacity:.4;cursor:not-allowed"')+'>▶ Lancer la phase d\'action</button>'+cancelBtn;
   } else if(ph==='action'){
     const cur = fCurrent(ferme);
     const acts = cur ? fActionButtons(ferme, cur) : '';
@@ -536,16 +567,28 @@ function renderFermeViewer(pseudo){
 
   if(ph==='planning'){
     const myLoc = me.location;
+    // Choix du métier
+    const metierBtns = F_METIERS_BASE.map(m=>{
+      const chosen = (me.metier===m);
+      return '<button class="btn-small" onclick="fermeSetMetier(\''+escAttr(pseudo)+'\',\''+escAttr(m)+'\')" style="'+(chosen?'background:rgba(83,74,183,.35);border-color:#a89ef0;color:#c5bdf7':'')+'">'+(F_METIER_ICON[m]||'')+' '+m+(chosen?' ✓':'')+'</button>';
+    }).join('');
+    // Choix du lieu (avec occupation X/2, lieux complets désactivés)
+    const board = '<div class="ferme-board">'+ ferme.locations.map(loc=>{
+      const here = fPlayers(ferme).filter(p=>p.location===loc);
+      const pawns = here.map(p=>'<span class="fpawn'+(p.pseudo===pseudo?' current':'')+'">'+escHtml(p.pseudo)+'</span>').join('');
+      const sel = (myLoc===loc)?' selected':'';
+      const full = here.length>=F_LOC_CAP && myLoc!==loc;
+      const cnt = '<span style="font-size:.7rem;color:'+(full?'var(--ember)':'var(--amber-warm)')+'">'+here.length+'/'+F_LOC_CAP+'</span>';
+      const click = full ? '' : ' onclick="fermeSetLocation(\''+escAttr(pseudo)+'\',\''+escAttr(loc)+'\')"';
+      return '<div class="floc'+(full?'':' floc-btn')+sel+'"'+click+' style="'+(full?'opacity:.45;cursor:not-allowed':'')+'">'+
+        '<div class="floc-header">'+F_LOC_ICON[loc]+' '+loc+' '+cnt+'</div><div class="floc-pawns">'+pawns+'</div></div>';
+    }).join('') +'</div>';
     zone.innerHTML =
-      '<div class="diamant-voted">Ton métier ce tour : <strong style="color:#a89ef0">'+(me.metier?(F_METIER_ICON[me.metier]+' '+me.metier):'sans métier')+'</strong>. Choisis ton lieu de départ :</div>'+
-      inv +
-      '<div class="ferme-board">'+ ferme.locations.map(loc=>{
-        const here = fPlayers(ferme).filter(p=>p.location===loc);
-        const pawns = here.map(p=>'<span class="fpawn">'+escHtml(p.pseudo)+'</span>').join('');
-        const sel = (myLoc===loc)?' selected':'';
-        return '<div class="floc floc-btn'+sel+'" onclick="fermeSetLocation(\''+escAttr(pseudo)+'\',\''+escAttr(loc)+'\')">'+
-          '<div class="floc-header">'+F_LOC_ICON[loc]+' '+loc+'</div><div class="floc-pawns">'+pawns+'</div></div>';
-      }).join('') +'</div>'+ inv;
+      '<div class="diamant-voted">Choisis ton <strong style="color:#a89ef0">métier</strong> et ton <strong style="color:var(--amber-bright)">lieu de départ</strong> (dans l\'ordre que tu veux) :</div>'+
+      '<div style="font-size:.78rem;color:var(--amber-warm);margin:.2rem 0 .3rem">Métier '+(me.metier?'✓':'—')+' :</div>'+
+      '<div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem">'+metierBtns+'</div>'+
+      '<div style="font-size:.78rem;color:var(--amber-warm);margin:.2rem 0 .3rem">Lieu '+(myLoc?'✓':'—')+' (max '+F_LOC_CAP+' par lieu) :</div>'+
+      board + inv;
     return;
   }
 
