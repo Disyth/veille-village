@@ -1,0 +1,2223 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La Grande Veillée du Village</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --amber-deep: #1a0d00; --amber-dark: #2e1a00; --amber-mid: #7a3d00;
+    --amber-warm: #c46a00; --amber-glow: #e8920a; --amber-bright: #f5b832;
+    --amber-light: #ffd97a; --amber-pale: #fff3cc; --ember: #e84a0a;
+    --ember-dim: #8b2800; --parchment: #fdf5e0; --ink: #2a1a00;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Crimson Text',Georgia,serif; background:var(--amber-deep); color:var(--amber-pale); min-height:100vh; overflow-x:hidden; position:relative; }
+  body::before { content:''; position:fixed; inset:0; background: radial-gradient(ellipse 60% 40% at 50% 100%,rgba(232,74,10,.15) 0%,transparent 70%), radial-gradient(ellipse 40% 60% at 20% 80%,rgba(196,106,0,.08) 0%,transparent 60%), radial-gradient(ellipse 40% 60% at 80% 80%,rgba(196,106,0,.08) 0%,transparent 60%); pointer-events:none; z-index:0; }
+  #app { position:relative; z-index:1; min-height:100vh; }
+
+  nav { display:flex; justify-content:center; padding:1.5rem 2rem 0; position:relative; z-index:10; }
+  nav button { font-family:'Cinzel',serif; font-size:.75rem; letter-spacing:.15em; text-transform:uppercase; padding:.6rem 1.6rem; background:transparent; border:1px solid var(--amber-mid); color:var(--amber-warm); cursor:pointer; transition:all .3s; }
+  nav button:first-child { border-radius:4px 0 0 4px; }
+  nav button:last-child { border-radius:0 4px 4px 0; border-left:none; }
+  nav button.active { background:var(--amber-mid); color:var(--amber-bright); border-color:var(--amber-warm); }
+  nav button:not(.active):hover { background:rgba(122,61,0,.2); color:var(--amber-light); }
+
+  header { text-align:center; padding:2.5rem 2rem 1.5rem; }
+  .fire-icon { font-size:2.8rem; display:block; margin-bottom:.5rem; animation:flicker 2.5s ease-in-out infinite; filter:drop-shadow(0 0 12px rgba(232,74,10,.6)); }
+  @keyframes flicker { 0%,100%{transform:scaleY(1) scaleX(1);opacity:1} 20%{transform:scaleY(1.04) scaleX(.98);opacity:.95} 50%{transform:scaleY(.97) scaleX(1.01);opacity:1} 75%{transform:scaleY(1.02) scaleX(.99);opacity:.97} }
+  h1 { font-family:'Cinzel',serif; font-size:clamp(1.4rem,4vw,2.2rem); font-weight:700; color:var(--amber-bright); letter-spacing:.05em; text-shadow:0 0 30px rgba(245,184,50,.4); line-height:1.2; }
+  .subtitle { font-family:'Crimson Text',serif; font-style:italic; color:var(--amber-warm); font-size:1.05rem; margin-top:.3rem; letter-spacing:.03em; }
+
+  .divider { display:flex; align-items:center; gap:1rem; margin:.5rem auto 1.5rem; max-width:700px; padding:0 2rem; }
+  .divider::before,.divider::after { content:''; flex:1; height:1px; background:linear-gradient(to right,transparent,var(--amber-mid),transparent); }
+  .divider-gem { width:6px; height:6px; background:var(--amber-warm); transform:rotate(45deg); flex-shrink:0; }
+
+  .page { display:none; animation:fadeIn .4s ease; }
+  .page.active { display:block; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ── VIEWER ── */
+  .viewer-container { max-width:480px; margin:0 auto; padding:0 1.5rem 3rem; }
+  .card { background:rgba(46,26,0,.7); border:1px solid var(--amber-mid); border-radius:8px; padding:1.8rem; margin-bottom:1.5rem; backdrop-filter:blur(4px); }
+  .card-title { font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.2em; text-transform:uppercase; color:var(--amber-warm); margin-bottom:1rem; }
+  .input-group { margin-bottom:1.2rem; }
+  label { display:block; font-size:.9rem; color:var(--amber-light); margin-bottom:.4rem; font-style:italic; }
+  input[type="text"],input[type="password"] { width:100%; background:rgba(26,13,0,.6); border:1px solid var(--amber-mid); border-radius:4px; padding:.7rem 1rem; font-family:'Crimson Text',serif; font-size:1.1rem; color:var(--amber-pale); outline:none; transition:border-color .2s; }
+  input[type="text"]::placeholder,input[type="password"]::placeholder { color:var(--amber-mid); opacity:.8; }
+  input[type="text"]:focus,input[type="password"]:focus { border-color:var(--amber-glow); }
+  .btn-primary { width:100%; padding:.85rem; background:var(--amber-mid); border:1px solid var(--amber-warm); border-radius:4px; font-family:'Cinzel',serif; font-size:.85rem; letter-spacing:.1em; color:var(--amber-bright); cursor:pointer; transition:all .25s; text-transform:uppercase; }
+  .btn-primary:hover { background:var(--amber-warm); color:var(--amber-pale); }
+  .btn-primary:active { transform:scale(.98); }
+  .viewer-info { display:none; }
+  .viewer-info.visible { display:block; animation:fadeIn .4s ease; }
+  .info-greeting { font-family:'Cinzel',serif; font-size:1rem; color:var(--amber-bright); margin-bottom:.4rem; }
+  .info-empty { text-align:center; padding:2rem; color:var(--amber-mid); font-style:italic; }
+  .info-item { background:rgba(26,13,0,.5); border:1px solid var(--amber-mid); border-radius:6px; padding:1rem 1.2rem; margin-bottom:.8rem; }
+  .info-type { font-family:'Cinzel',serif; font-size:.65rem; letter-spacing:.18em; text-transform:uppercase; color:var(--amber-warm); margin-bottom:.3rem; }
+  .info-content { font-size:1.1rem; color:var(--amber-pale); line-height:1.5; }
+  .item-icon { font-size:1.6rem; margin-bottom:.4rem; display:block; }
+
+  /* ── GAME card viewer ── */
+  .game-card { background:rgba(61,109,17,.1); border:1px solid rgba(97,174,27,.35); border-radius:8px; padding:1.5rem 1.8rem; margin-bottom:1.5rem; animation:fadeIn .5s ease; }
+  .game-card-header { display:flex; align-items:center; gap:.8rem; margin-bottom:1rem; }
+  .game-card-icon { font-size:1.6rem; }
+  .game-card-title { font-family:'Cinzel',serif; font-size:1rem; color:#c5f09a; letter-spacing:.05em; }
+  .game-card-subtitle { font-size:.8rem; color:rgba(157,207,122,.6); font-style:italic; }
+  .game-card-divider { height:1px; background:rgba(97,174,27,.2); margin:.8rem 0; }
+  .game-rules { font-size:1rem; color:var(--amber-pale); line-height:1.7; white-space:pre-wrap; }
+  .live-badge { display:inline-flex; align-items:center; gap:.4rem; background:rgba(61,109,17,.25); border:1px solid rgba(97,174,27,.4); border-radius:12px; padding:.2rem .7rem; font-family:'Cinzel',serif; font-size:.6rem; letter-spacing:.12em; color:#9dcf7a; margin-left:auto; flex-shrink:0; }
+
+  /* ── CRAFT viewer ── */
+  .craft-viewer-card { background:rgba(83,74,183,.08); border:1px solid rgba(83,74,183,.3); border-radius:8px; padding:1.2rem 1.5rem; margin-bottom:1.2rem; }
+  .craft-viewer-title { font-family:'Cinzel',serif; font-size:.85rem; letter-spacing:.12em; color:#a89ef0; text-transform:uppercase; margin-bottom:.8rem; display:flex; align-items:center; gap:.5rem; }
+  .recipe-card { background:rgba(26,13,0,.4); border:1px solid rgba(122,61,0,.3); border-radius:6px; padding:.8rem 1rem; margin-bottom:.6rem; }
+  .recipe-card.craftable { border-color:rgba(83,74,183,.4); background:rgba(83,74,183,.07); }
+  .recipe-output { font-size:1rem; color:var(--amber-pale); margin-bottom:.4rem; font-weight:600; }
+  .recipe-cost { font-size:.85rem; color:var(--amber-warm); font-style:italic; margin-bottom:.6rem; line-height:1.7; }
+  .recipe-cost .ok { color:#9dcf7a; }
+  .recipe-cost .missing { color:var(--ember); }
+  .btn-craft { padding:.45rem 1rem; background:rgba(83,74,183,.25); border:1px solid rgba(83,74,183,.5); border-radius:4px; font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.1em; color:#c5bff8; cursor:pointer; transition:all .2s; text-transform:uppercase; }
+  .btn-craft:hover:not(:disabled) { background:rgba(83,74,183,.4); color:#e0dcff; }
+  .btn-craft:disabled { opacity:.35; cursor:not-allowed; }
+
+  /* ── ADMIN ── */
+  .admin-container { max-width:900px; margin:0 auto; padding:0 1.5rem 3rem; display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
+  @media(max-width:680px){ .admin-container{ grid-template-columns:1fr; } }
+  .admin-full { grid-column:1 / -1; }
+  .section-title { font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.2em; text-transform:uppercase; color:var(--amber-warm); margin-bottom:1rem; display:flex; align-items:center; gap:.6rem; }
+  .section-title::after { content:''; flex:1; height:1px; background:var(--amber-mid); opacity:.5; }
+  .viewer-list { max-height:320px; overflow-y:auto; }
+  .viewer-list::-webkit-scrollbar { width:4px; }
+  .viewer-list::-webkit-scrollbar-thumb { background:var(--amber-mid); border-radius:2px; }
+  .viewer-row { display:flex; align-items:center; gap:.8rem; padding:.6rem .8rem; border-radius:4px; cursor:pointer; transition:background .2s; border:1px solid transparent; margin-bottom:.3rem; }
+  .viewer-row:hover { background:rgba(122,61,0,.2); }
+  .viewer-row.selected { background:rgba(122,61,0,.35); border-color:var(--amber-mid); }
+  .viewer-avatar { width:32px; height:32px; background:var(--amber-mid); border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Cinzel',serif; font-size:.75rem; color:var(--amber-bright); flex-shrink:0; }
+  .viewer-name-row { flex:1; font-size:1rem; color:var(--amber-pale); }
+  .viewer-badge-count { font-size:.75rem; color:var(--amber-warm); background:rgba(122,61,0,.3); padding:2px 7px; border-radius:10px; }
+  .assign-form { display:flex; flex-direction:column; gap:.9rem; }
+  select { width:100%; background:rgba(26,13,0,.6); border:1px solid var(--amber-mid); border-radius:4px; padding:.7rem 1rem; font-family:'Crimson Text',serif; font-size:1rem; color:var(--amber-pale); outline:none; cursor:pointer; }
+  select option { background:#2e1a00; }
+  textarea { width:100%; background:rgba(26,13,0,.6); border:1px solid var(--amber-mid); border-radius:4px; padding:.7rem 1rem; font-family:'Crimson Text',serif; font-size:1rem; color:var(--amber-pale); resize:vertical; min-height:90px; outline:none; transition:border-color .2s; }
+  textarea::placeholder { color:var(--amber-mid); opacity:.8; }
+  textarea:focus { border-color:var(--amber-glow); }
+  .empty-state { text-align:center; padding:2rem; color:var(--amber-mid); font-style:italic; font-size:.95rem; }
+  .no-selection { text-align:center; color:var(--amber-mid); font-style:italic; padding:1rem; font-size:.95rem; }
+  .btn-delete { background:transparent; border:1px solid rgba(232,74,10,.3); color:rgba(232,74,10,.5); border-radius:3px; width:24px; height:24px; cursor:pointer; font-size:.75rem; flex-shrink:0; transition:all .2s; display:flex; align-items:center; justify-content:center; }
+  .btn-delete:hover { border-color:var(--ember); color:var(--ember); background:rgba(232,74,10,.1); }
+  .btn-small { padding:.5rem 1rem; background:transparent; border:1px solid var(--amber-mid); border-radius:4px; font-family:'Cinzel',serif; font-size:.65rem; letter-spacing:.1em; color:var(--amber-warm); cursor:pointer; transition:all .2s; text-transform:uppercase; }
+  .btn-small:hover { background:rgba(122,61,0,.2); border-color:var(--amber-warm); color:var(--amber-light); }
+  .stats-bar { display:flex; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+  .stat-pill { background:rgba(122,61,0,.2); border:1px solid var(--amber-mid); border-radius:20px; padding:.3rem .9rem; font-size:.85rem; color:var(--amber-warm); display:flex; align-items:center; gap:.4rem; }
+  .stat-pill strong { color:var(--amber-bright); font-family:'Cinzel',serif; }
+  .search-input { width:100%; background:rgba(26,13,0,.4); border:1px solid rgba(122,61,0,.4); border-radius:4px; padding:.5rem .8rem; font-family:'Crimson Text',serif; font-size:.95rem; color:var(--amber-pale); outline:none; margin-bottom:.8rem; }
+  .search-input::placeholder { color:var(--amber-mid); opacity:.7; }
+  .search-input:focus { border-color:var(--amber-warm); }
+  .templates { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.3rem; }
+  .tpl-btn { background:rgba(26,13,0,.5); border:1px solid rgba(122,61,0,.5); border-radius:12px; padding:.25rem .7rem; font-size:.8rem; color:var(--amber-warm); cursor:pointer; transition:all .2s; font-family:'Crimson Text',serif; font-style:italic; }
+  .tpl-btn:hover { background:rgba(122,61,0,.2); color:var(--amber-light); }
+
+  /* ── GAME admin ── */
+  .game-status-bar { display:flex; align-items:center; gap:.8rem; padding:.7rem 1rem; border-radius:6px; margin-bottom:1rem; border:1px solid; font-family:'Cinzel',serif; font-size:.75rem; letter-spacing:.1em; }
+  .game-status-bar.inactive { background:rgba(26,13,0,.4); border-color:rgba(122,61,0,.3); color:var(--amber-mid); }
+  .game-status-bar.active { background:rgba(61,109,17,.15); border-color:rgba(97,174,27,.4); color:#9dcf7a; }
+  .status-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .inactive .status-dot { background:var(--amber-mid); }
+  .active .status-dot { background:#9dcf7a; animation:pulse-dot 1.8s ease-in-out infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.7)} }
+  .btn-activate { width:100%; padding:1rem; background:rgba(61,109,17,.2); border:1px solid rgba(97,174,27,.5); border-radius:6px; font-family:'Cinzel',serif; font-size:.85rem; letter-spacing:.1em; color:#9dcf7a; cursor:pointer; transition:all .25s; text-transform:uppercase; margin-top:.5rem; }
+  .btn-activate:hover { background:rgba(61,109,17,.35); color:#c5f09a; }
+  .btn-deactivate { width:100%; padding:.7rem; background:transparent; border:1px solid rgba(232,74,10,.3); border-radius:6px; font-family:'Cinzel',serif; font-size:.72rem; letter-spacing:.1em; color:rgba(232,74,10,.6); cursor:pointer; transition:all .25s; text-transform:uppercase; margin-top:.5rem; }
+  .btn-deactivate:hover { background:rgba(232,74,10,.08); color:var(--ember); border-color:var(--ember); }
+
+  /* ── CRAFT admin builder ── */
+  .craft-section-toggle { display:flex; align-items:center; justify-content:space-between; margin-bottom:.7rem; }
+  .craft-toggle-label { font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.15em; text-transform:uppercase; color:#a89ef0; }
+  .craft-toggle-btn { background:transparent; border:1px solid rgba(83,74,183,.3); border-radius:4px; color:#a89ef0; font-size:.7rem; font-family:'Cinzel',serif; letter-spacing:.1em; padding:.3rem .8rem; cursor:pointer; transition:all .2s; text-transform:uppercase; }
+  .craft-toggle-btn:hover { background:rgba(83,74,183,.1); }
+  .craft-role-builder { background:rgba(26,13,0,.5); border:1px solid rgba(83,74,183,.25); border-radius:6px; padding:1rem 1.1rem; margin-bottom:.8rem; }
+  .craft-role-header { display:flex; align-items:center; gap:.7rem; margin-bottom:.8rem; }
+  .craft-role-name-input { flex:1; background:rgba(26,13,0,.6); border:1px solid rgba(83,74,183,.35); border-radius:4px; padding:.45rem .8rem; font-family:'Crimson Text',serif; font-size:1rem; color:var(--amber-pale); outline:none; }
+  .craft-role-name-input:focus { border-color:#a89ef0; }
+  .craft-recipe-block { background:rgba(0,0,0,.2); border-radius:4px; padding:.6rem .7rem; margin-bottom:.5rem; }
+  .craft-recipe-row { display:grid; grid-template-columns:1fr 52px auto; gap:.4rem; align-items:center; margin-bottom:.3rem; }
+  .craft-input { background:rgba(26,13,0,.5); border:1px solid rgba(122,61,0,.4); border-radius:4px; padding:.35rem .6rem; font-family:'Crimson Text',serif; font-size:.9rem; color:var(--amber-pale); outline:none; width:100%; }
+  .craft-input:focus { border-color:var(--amber-warm); }
+  .craft-qty-input { width:52px; text-align:center; background:rgba(26,13,0,.5); border:1px solid rgba(122,61,0,.4); border-radius:4px; padding:.35rem .4rem; font-family:'Cinzel',serif; font-size:.85rem; color:var(--amber-bright); outline:none; }
+  .btn-icon { background:transparent; border:1px solid rgba(122,61,0,.4); border-radius:4px; color:var(--amber-mid); width:26px; height:26px; cursor:pointer; font-size:.8rem; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all .15s; }
+  .btn-icon:hover:not(:disabled) { border-color:var(--ember); color:var(--ember); }
+  .btn-icon:disabled { opacity:.3; cursor:not-allowed; }
+  .craft-output-row { display:flex; align-items:center; gap:.5rem; margin-top:.4rem; }
+  .craft-arrow { color:var(--amber-mid); font-size:.9rem; flex-shrink:0; }
+  .btn-add-recipe { background:transparent; border:1px dashed rgba(122,61,0,.4); border-radius:4px; color:var(--amber-mid); font-size:.75rem; font-family:'Cinzel',serif; letter-spacing:.08em; padding:.3rem .8rem; cursor:pointer; transition:all .2s; margin-top:.4rem; }
+  .btn-add-recipe:hover { border-color:var(--amber-warm); color:var(--amber-warm); }
+  .btn-add-role { background:transparent; border:1px dashed rgba(83,74,183,.35); border-radius:6px; color:#a89ef0; font-size:.8rem; font-family:'Cinzel',serif; letter-spacing:.08em; padding:.5rem 1rem; cursor:pointer; transition:all .2s; width:100%; margin-top:.4rem; }
+  .btn-add-role:hover { border-color:#a89ef0; background:rgba(83,74,183,.08); }
+
+
+  /* ── FIRE METER ── */
+  .fire-meter { background:rgba(46,26,0,.7); border:1px solid var(--amber-mid); border-radius:8px; padding:1.4rem 1.6rem; margin-bottom:1.5rem; text-align:center; backdrop-filter:blur(4px); }
+  .fire-visual { font-size:2.6rem; line-height:1; margin-bottom:.5rem; filter:drop-shadow(0 0 14px rgba(232,74,10,.5)); transition:all .4s; }
+  .fire-tier-label { font-family:'Cinzel',serif; font-size:1.1rem; letter-spacing:.08em; margin-bottom:.2rem; }
+  .fire-tier-petit { color:#9dcf7a; }
+  .fire-tier-grand { color:var(--amber-bright); }
+  .fire-tier-legendaire { color:#f5b832; text-shadow:0 0 20px rgba(245,184,50,.6); }
+  .fire-count { font-size:.9rem; color:var(--amber-warm); font-style:italic; }
+  .fire-progress { height:8px; background:rgba(26,13,0,.6); border-radius:4px; margin:.9rem 0 .5rem; overflow:hidden; border:1px solid rgba(122,61,0,.4); }
+  .fire-progress-bar { height:100%; background:linear-gradient(to right,var(--ember),var(--amber-bright)); border-radius:4px; transition:width .5s ease; }
+  .fire-thresholds { display:flex; justify-content:space-between; font-size:.7rem; color:var(--amber-mid); font-family:'Cinzel',serif; letter-spacing:.05em; }
+  .fire-config-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem; }
+  .fire-mini-input { width:100%; background:rgba(26,13,0,.6); border:1px solid var(--amber-mid); border-radius:4px; padding:.5rem .8rem; font-family:'Cinzel',serif; font-size:.95rem; color:var(--amber-bright); outline:none; text-align:center; }
+  .fire-mini-input:focus { border-color:var(--amber-glow); }
+
+
+  /* ── DIAMANT ── */
+  .diamant-board { background:rgba(26,13,0,.5); border:1px solid rgba(196,106,0,.4); border-radius:8px; padding:1rem; margin-bottom:1rem; overflow-x:auto; }
+  .diamant-path { display:flex; gap:.5rem; align-items:center; min-height:76px; }
+  .dcard { flex-shrink:0; width:52px; height:70px; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:'Cinzel',serif; border:1px solid; animation:fadeIn .3s ease; }
+  .dcard-treasure { background:linear-gradient(160deg,rgba(196,106,0,.3),rgba(139,40,0,.2)); border-color:var(--amber-warm); color:var(--amber-bright); }
+  .dcard-treasure .dval { font-size:1.4rem; font-weight:700; }
+  .dcard-treasure .dico { font-size:1rem; }
+  .dcard-hazard { background:rgba(139,40,0,.25); border-color:var(--ember); color:#f08060; }
+  .dcard-hazard .dico { font-size:1.7rem; }
+  .dcard-empty { color:var(--amber-mid); font-style:italic; font-family:'Crimson Text',serif; font-size:.85rem; padding:0 1rem; }
+  .diamant-status { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:.8rem; }
+  .dpill { background:rgba(122,61,0,.2); border:1px solid var(--amber-mid); border-radius:14px; padding:.25rem .8rem; font-size:.8rem; color:var(--amber-warm); }
+  .dpill strong { color:var(--amber-bright); font-family:'Cinzel',serif; }
+  .diamant-event { font-style:italic; color:var(--amber-light); font-size:.95rem; line-height:1.5; padding:.7rem 1rem; background:rgba(0,0,0,.2); border-radius:6px; border-left:3px solid var(--amber-warm); margin-bottom:1rem; }
+  .diamant-players { display:flex; flex-direction:column; gap:.4rem; }
+  .dplayer-row { display:flex; align-items:center; gap:.6rem; padding:.4rem .7rem; border-radius:5px; background:rgba(26,13,0,.4); font-size:.9rem; }
+  .dplayer-row.out { opacity:.5; }
+  .dplayer-status { font-size:.7rem; font-family:'Cinzel',serif; letter-spacing:.05em; padding:1px 7px; border-radius:8px; }
+  .dstatus-in { background:rgba(61,109,17,.25); color:#9dcf7a; }
+  .dstatus-out { background:rgba(122,61,0,.25); color:var(--amber-warm); }
+  .dvote-badge { margin-left:auto; font-size:.75rem; }
+  .dvote-done { color:#9dcf7a; }
+  .dvote-wait { color:var(--amber-mid); }
+  .diamant-vote-btns { display:flex; gap:.8rem; margin-top:1rem; }
+  .btn-continue { flex:1; padding:1rem; background:rgba(61,109,17,.2); border:1px solid rgba(97,174,27,.5); border-radius:6px; font-family:'Cinzel',serif; font-size:.9rem; letter-spacing:.08em; color:#9dcf7a; cursor:pointer; transition:all .2s; text-transform:uppercase; }
+  .btn-continue:hover { background:rgba(61,109,17,.35); }
+  .btn-leave { flex:1; padding:1rem; background:rgba(196,106,0,.2); border:1px solid var(--amber-warm); border-radius:6px; font-family:'Cinzel',serif; font-size:.9rem; letter-spacing:.08em; color:var(--amber-bright); cursor:pointer; transition:all .2s; text-transform:uppercase; }
+  .btn-leave:hover { background:rgba(196,106,0,.35); }
+  .diamant-voted { text-align:center; padding:1rem; font-style:italic; color:var(--amber-warm); }
+  .dbank { display:flex; gap:1.2rem; justify-content:center; margin:.5rem 0; }
+  .dbank-item { text-align:center; }
+  .dbank-val { font-family:'Cinzel',serif; font-size:1.5rem; color:var(--amber-bright); }
+  .dbank-lbl { font-size:.7rem; color:var(--amber-warm); text-transform:uppercase; letter-spacing:.1em; }
+  .btn-draw { width:100%; padding:1rem; background:rgba(196,106,0,.25); border:1px solid var(--amber-warm); border-radius:6px; font-family:'Cinzel',serif; font-size:.9rem; letter-spacing:.1em; color:var(--amber-bright); cursor:pointer; transition:all .2s; text-transform:uppercase; }
+  .btn-draw:hover { background:rgba(196,106,0,.4); }
+  .btn-draw:disabled { opacity:.35; cursor:not-allowed; }
+
+
+  /* ── FERME ── */
+  .ferme-board { display:grid; grid-template-columns:repeat(3,1fr); gap:.6rem; margin-bottom:1rem; }
+  @media(max-width:520px){ .ferme-board{ grid-template-columns:repeat(2,1fr); } }
+  .floc { background:rgba(26,13,0,.5); border:1px solid rgba(122,61,0,.4); border-radius:8px; padding:.7rem; min-height:80px; transition:all .2s; }
+  .floc-header { font-family:'Cinzel',serif; font-size:.8rem; color:var(--amber-warm); margin-bottom:.4rem; display:flex; align-items:center; gap:.3rem; }
+  .floc-pawns { display:flex; flex-wrap:wrap; gap:.3rem; }
+  .fpawn { font-size:.75rem; background:rgba(122,61,0,.3); border:1px solid var(--amber-mid); border-radius:10px; padding:1px 7px; color:var(--amber-light); }
+  .fpawn.current { background:rgba(97,174,27,.3); border-color:#9dcf7a; color:#c5f09a; }
+  .floc-btn { cursor:pointer; }
+  .floc-btn:hover { border-color:var(--amber-warm); background:rgba(122,61,0,.15); }
+  .floc.selected { border-color:var(--amber-glow); background:rgba(196,106,0,.12); }
+  .ferme-players { display:flex; flex-direction:column; gap:.35rem; margin-bottom:1rem; }
+  .fplayer-row { display:flex; align-items:center; gap:.5rem; padding:.4rem .7rem; border-radius:5px; background:rgba(26,13,0,.4); font-size:.88rem; }
+  .fplayer-row.current { background:rgba(97,174,27,.15); border:1px solid rgba(97,174,27,.35); }
+  .fplayer-row.done { opacity:.5; }
+  .fmetier { font-size:.68rem; font-family:'Cinzel',serif; letter-spacing:.03em; padding:1px 7px; border-radius:8px; background:rgba(83,74,183,.2); color:#a89ef0; border:1px solid rgba(83,74,183,.3); }
+  .fmetier.none { background:rgba(122,61,0,.2); color:var(--amber-mid); border-color:rgba(122,61,0,.3); }
+  .floc-tag { font-size:.75rem; color:var(--amber-warm); }
+  .finv { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:.8rem; }
+  .finv-item { background:rgba(26,13,0,.5); border:1px solid var(--amber-mid); border-radius:12px; padding:.2rem .7rem; font-size:.85rem; color:var(--amber-pale); }
+  .finv-item strong { color:var(--amber-bright); font-family:'Cinzel',serif; }
+  .fgold { background:rgba(196,106,0,.2); border:1px solid var(--amber-warm); border-radius:12px; padding:.2rem .8rem; font-size:.9rem; color:var(--amber-bright); font-family:'Cinzel',serif; }
+  .fturn-pill { background:rgba(122,61,0,.2); border:1px solid var(--amber-mid); border-radius:14px; padding:.25rem .9rem; font-size:.85rem; color:var(--amber-warm); }
+  .fturn-pill strong { color:var(--amber-bright); font-family:'Cinzel',serif; }
+  .fphase-badge { font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; padding:.25rem .7rem; border-radius:10px; }
+  .fphase-lobby{ background:rgba(83,74,183,.2); color:#a89ef0; }
+  .fphase-planning{ background:rgba(196,106,0,.2); color:var(--amber-bright); }
+  .fphase-action{ background:rgba(61,109,17,.2); color:#9dcf7a; }
+  .fphase-gameEnd{ background:rgba(139,40,0,.2); color:#f08060; }
+
+  .ferme-lastaction { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; padding:.6rem .9rem; background:rgba(0,0,0,.25); border-radius:6px; margin-bottom:.8rem; font-size:.92rem; line-height:1.4; color:var(--amber-pale); }
+  @media(max-width:520px){ .ferme-lastaction { font-size:.85rem; padding:.5rem .7rem; } }
+
+  @media(max-width:520px){
+    .admin-container { padding:0 .8rem 3rem; }
+    .viewer-container { padding:0 .9rem 3rem; }
+    .diamant-status { gap:.5rem; }
+    .dpill, .fturn-pill, .fgold { font-size:.78rem; padding:.2rem .6rem; }
+    .btn-continue, .btn-leave, .btn-draw { font-size:.8rem; padding:.7rem; }
+  }
+
+  .finv-item { white-space:normal; word-break:break-word; }
+  @media(max-width:520px){ .finv-item { font-size:.8rem; padding:.2rem .55rem; } .finv { gap:.35rem; } }
+
+  /* ── BADGES ── */
+  .type-badge { display:inline-block; padding:2px 8px; border-radius:3px; font-size:.7rem; font-family:'Cinzel',serif; letter-spacing:.08em; text-transform:uppercase; }
+  .type-objet { background:rgba(196,106,0,.2); color:var(--amber-glow); border:1px solid rgba(196,106,0,.3); }
+  .type-role  { background:rgba(139,40,0,.2); color:#f08060; border:1px solid rgba(139,40,0,.3); }
+  .type-info  { background:rgba(27,46,13,.4); color:#9dcf7a; border:1px solid rgba(61,109,17,.3); }
+  .type-secret{ background:rgba(83,74,183,.2); color:#a89ef0; border:1px solid rgba(83,74,183,.3); }
+
+  .admin-pass-hint { font-size:.8rem; color:var(--amber-mid); font-style:italic; text-align:center; margin-top:.5rem; }
+  .lock-overlay { text-align:center; padding:3rem 1.5rem; }
+  .lock-overlay h2 { font-family:'Cinzel',serif; color:var(--amber-bright); font-size:1.2rem; margin-bottom:1rem; letter-spacing:.1em; }
+
+  .toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(80px); background:var(--amber-mid); border:1px solid var(--amber-warm); border-radius:6px; padding:.6rem 1.4rem; font-family:'Cinzel',serif; font-size:.75rem; letter-spacing:.1em; color:var(--amber-bright); transition:transform .3s ease; z-index:100; }
+  .toast.show { transform:translateX(-50%) translateY(0); }
+</style>
+<!-- Firebase SDK (module) -->
+<!-- Config Firebase externe : à déposer UNE SEULE FOIS sur Netlify (voir le guide).
+       Ce fichier n'est jamais écrasé par les mises à jour de l'app. -->
+  <script src="firebase-config.js"></script>
+
+  <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getDatabase, ref, onValue, set, update, remove, get, child, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  La config Firebase vit dans le fichier SÉPARÉ « firebase-config.js »  ║
+  // ║  (déposé une seule fois sur Netlify). L'app la lit ici automatiquement.  ║
+  // ║  Ce fichier index.html ne contient AUCUN identifiant.                    ║
+  // ╚══════════════════════════════════════════════════════════════════╝
+  const PLACEHOLDER = {
+    apiKey: "TON_API_KEY",
+    authDomain: "TON_PROJET.firebaseapp.com",
+    databaseURL: "https://TON_PROJET-default-rtdb.firebaseio.com",
+    projectId: "TON_PROJET",
+    storageBucket: "TON_PROJET.appspot.com",
+    messagingSenderId: "XXXXXXXX",
+    appId: "1:XXXX:web:XXXX"
+  };
+  // Récupère la config externe si présente, sinon retombe sur le placeholder (mode local hors-ligne)
+  const firebaseConfig = (window.FIREBASE_CONFIG && typeof window.FIREBASE_CONFIG === "object")
+    ? window.FIREBASE_CONFIG
+    : PLACEHOLDER;
+
+  // Détection : config non remplie / fichier absent -> mode local (démo hors-ligne)
+  const isConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey !== "TON_API_KEY";
+
+  if (isConfigured) {
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
+    // Expose une API minimale au reste du script (non-module)
+    window.FB = {
+      ready: true,
+      db, ref, onValue, set, update, remove, get, child, serverTimestamp
+    };
+    window.dispatchEvent(new Event('fb-ready'));
+  } else {
+    window.FB = { ready: false };
+    window.dispatchEvent(new Event('fb-ready'));
+  }
+</script>
+</head>
+<body>
+<div id="app">
+
+  <!-- Bandeau de configuration (visible tant que Firebase n'est pas configuré) -->
+  <div id="setup-banner" style="display:none;max-width:760px;margin:1rem auto 0;padding:1rem 1.4rem;background:rgba(139,40,0,.15);border:1px solid rgba(232,74,10,.4);border-radius:8px;font-size:.9rem;line-height:1.6;color:var(--amber-light)">
+    <strong style="color:var(--amber-bright);font-family:'Cinzel',serif;letter-spacing:.05em">⚙️ Mode local (hors-ligne)</strong><br>
+    La synchronisation temps réel entre appareils n'est pas encore active. Pour l'activer, ouvre ce fichier dans un éditeur, colle ta config Firebase dans le bloc <code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:3px">firebaseConfig</code> en haut, puis héberge le fichier (voir le guide fourni).
+  </div>
+
+  <!-- Indicateur de connexion (visible quand Firebase est actif) -->
+  <div id="conn-indicator" style="display:none;position:fixed;top:10px;right:12px;z-index:50;font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;padding:.25rem .7rem;border-radius:12px;background:rgba(61,109,17,.2);border:1px solid rgba(97,174,27,.4);color:#9dcf7a">
+    <span style="width:6px;height:6px;border-radius:50%;background:#9dcf7a;display:inline-block;margin-right:4px;animation:pulse-dot 1.8s ease-in-out infinite"></span>En ligne
+  </div>
+
+  <nav>
+    <button id="btn-viewer" class="active" onclick="showPage('viewer')">🌿 Je rejoins la veillée</button>
+    <button id="btn-admin" onclick="showPage('admin-gate')">🔥 Meneur de jeu</button>
+  </nav>
+
+  <header>
+    <span class="fire-icon">🔥</span>
+    <h1>La Grande Veillée du Village</h1>
+    <p class="subtitle">Rassemblez les ressources, préparez le grand feu…</p>
+  </header>
+  <div class="divider"><div class="divider-gem"></div></div>
+
+  <!-- ══ VIEWER PAGE ══ -->
+  <div id="page-viewer" class="page active">
+    <div class="viewer-container">
+
+      <!-- Fire meter — global & permanent (always visible) -->
+      <div class="fire-meter" id="viewer-fire-meter">
+        <div class="fire-visual" id="fire-visual">🔥</div>
+        <div class="fire-tier-label" id="fire-tier-label">Petit feu</div>
+        <div class="fire-count" id="fire-count">0 point</div>
+        <div class="fire-progress"><div class="fire-progress-bar" id="fire-progress-bar" style="width:0%"></div></div>
+        <div class="fire-thresholds" id="fire-thresholds"></div>
+      </div>
+
+      <!-- Diamant board (shown when a Diamant game is active) -->
+      <div id="viewer-diamant" style="display:none">
+        <div class="card">
+          <div class="card-title">💎 Diamant — La Grotte aux Trésors</div>
+          <div class="diamant-status" id="dv-status"></div>
+          <div class="diamant-event" id="dv-event"></div>
+          <div class="diamant-board"><div class="diamant-path" id="dv-path"></div></div>
+          <div id="dv-myzone"></div>
+          <div class="diamant-players" id="dv-players"></div>
+        </div>
+      </div>
+
+      <!-- Ferme board (shown when a Ferme game is active) -->
+      <div id="viewer-ferme" style="display:none">
+        <div class="card">
+          <div class="card-title">🌾 La Ferme du Village</div>
+          <div class="diamant-status" id="fv-status"></div>
+          <div id="fv-lastaction"></div>
+          <div class="diamant-event" id="fv-event"></div>
+          <div id="fv-myzone"></div>
+        </div>
+      </div>
+
+      <!-- Active game card -->
+      <div class="game-card" id="viewer-game-card" style="display:none">
+        <div class="game-card-header">
+          <span class="game-card-icon">🏕️</span>
+          <div>
+            <div class="game-card-title" id="viewer-game-title"></div>
+            <div class="game-card-subtitle">Consignes du meneur</div>
+          </div>
+          <div class="live-badge"><span style="width:6px;height:6px;border-radius:50%;background:#9dcf7a;display:inline-block;animation:pulse-dot 1.8s ease-in-out infinite"></span>&nbsp;EN JEU</div>
+        </div>
+        <div class="game-card-divider"></div>
+        <div class="game-rules" id="viewer-game-rules"></div>
+      </div>
+
+      <!-- Login -->
+      <div class="card" id="login-card">
+        <div class="card-title">✦ Rejoindre la veillée</div>
+        <div class="input-group">
+          <label>Ton pseudo Twitch</label>
+          <input type="text" id="viewer-pseudo" placeholder="ex: DruideDuChat" maxlength="30" autocomplete="off" onkeydown="if(event.key==='Enter')viewerConnect()">
+        </div>
+        <button class="btn-primary" onclick="viewerConnect()">🪵 Entrer dans le cercle</button>
+      </div>
+
+      <!-- Info + craft -->
+      <div class="viewer-info" id="viewer-info">
+        <div class="card">
+          <div class="card-title">✦ Ton rôle dans la veillée</div>
+          <div class="info-greeting" id="greeting-name"></div>
+          <div style="font-size:.9rem;color:var(--amber-warm);font-style:italic;margin-bottom:1.2rem" id="greeting-status"></div>
+          <div id="info-items-list"></div>
+        </div>
+        <!-- Craft section -->
+        <div id="viewer-craft-section" style="display:none">
+          <div class="craft-viewer-card">
+            <div class="craft-viewer-title">⚗️ <span id="viewer-craft-role-name"></span></div>
+            <div id="viewer-recipes-list"></div>
+          </div>
+        </div>
+        <button class="btn-small" onclick="viewerDisconnect()" style="width:100%;margin-top:.5rem">↩ Changer de pseudo</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ ADMIN GATE ══ -->
+  <div id="page-admin-gate" class="page">
+    <div class="viewer-container">
+      <div class="card lock-overlay">
+        <h2>⚔ Accès Meneur de Jeu</h2>
+        <div class="input-group">
+          <label>Mot de passe</label>
+          <input type="password" id="admin-pass-input" placeholder="••••••••" onkeydown="if(event.key==='Enter')adminLogin()">
+        </div>
+        <button class="btn-primary" onclick="adminLogin()">Entrer dans la salle du conseil</button>
+        <p class="admin-pass-hint">Défaut : <strong style="color:var(--amber-warm)">veillée</strong></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ADMIN ══ -->
+  <div id="page-admin" class="page">
+    <div class="admin-container">
+
+      <!-- Stats -->
+      <div class="admin-full">
+        <div class="stats-bar">
+          <div class="stat-pill">Villageois <strong id="stat-viewers">0</strong></div>
+          <div class="stat-pill">Objets attribués <strong id="stat-assigns">0</strong></div>
+          <div class="stat-pill">🔥 Feu <strong id="stat-fire">—</strong></div>
+        </div>
+      </div>
+
+      <!-- ══ DIAMANT (module de jeu interactif) ══ -->
+      <div class="card admin-full" id="diamant-panel">
+        <div class="section-title">💎 Diamant — module de jeu</div>
+        <div id="diamant-admin-inactive">
+          <div style="font-size:.9rem;color:var(--amber-light);line-height:1.6;margin-bottom:1rem">
+            Une partie coopérative sur 5 manches. Les villageois connectés explorent la grotte, votent pour continuer ou rentrer, et sécurisent leur trésor. Le total alimente le feu à la fin.
+          </div>
+          <button class="btn-draw" onclick="startDiamant()">💎 Lancer une partie de Diamant</button>
+        </div>
+        <div id="diamant-admin-active" style="display:none">
+          <div class="diamant-status" id="da-status"></div>
+          <div class="diamant-event" id="da-event"></div>
+          <div class="diamant-board"><div class="diamant-path" id="da-path"></div></div>
+          <div class="diamant-players" id="da-players" style="margin-bottom:1rem"></div>
+          <div id="da-controls"></div>
+        </div>
+      </div>
+
+      <!-- ══ FERME (module de jeu interactif — étape 1) ══ -->
+      <div class="card admin-full" id="ferme-panel">
+        <div class="section-title">🌾 La Ferme du Village — module de jeu</div>
+        <div id="ferme-admin-inactive">
+          <div style="font-size:.9rem;color:var(--amber-light);line-height:1.6;margin-bottom:1rem">
+            Version squelette : lobby, 10 tours (planification + action), métiers de base attribués au hasard, placement sur la carte, inventaire partagé. Les actions détaillées de chaque métier seront ajoutées ensuite.
+          </div>
+          <div style="display:flex;gap:.8rem;align-items:flex-end;flex-wrap:wrap">
+            <div>
+              <label>Nombre de joueurs</label>
+              <input type="number" min="1" id="ferme-target" class="fire-mini-input" value="4" style="max-width:100px">
+            </div>
+            <button class="btn-draw" onclick="startFerme()" style="flex:1;min-width:180px">🌾 Ouvrir le lobby</button>
+          </div>
+        </div>
+        <div id="ferme-admin-active" style="display:none">
+          <div class="diamant-status" id="fa-status"></div>
+          <div id="fa-lastaction"></div>
+          <div class="diamant-event" id="fa-event"></div>
+          <div id="fa-board"></div>
+          <div class="ferme-players" id="fa-players"></div>
+          <div id="fa-inventory" style="margin-bottom:1rem"></div>
+          <div id="fa-controls"></div>
+        </div>
+      </div>
+
+      <!-- ══ FIRE CONFIG (global, permanent) ══ -->
+      <div class="card admin-full">
+        <div class="section-title">🔥 Feu de camp de la veillée</div>
+        <div style="display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap;margin-bottom:1rem">
+          <div style="text-align:center">
+            <div id="admin-fire-visual" style="font-size:2rem;line-height:1">🔥</div>
+            <div id="admin-fire-tier" style="font-family:'Cinzel',serif;font-size:.85rem;color:var(--amber-bright)">Petit feu</div>
+          </div>
+          <div style="flex:1;min-width:200px">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.4rem">
+              <span style="font-size:.85rem;color:var(--amber-warm)">Points :</span>
+              <strong id="admin-fire-points" style="font-family:'Cinzel',serif;font-size:1.3rem;color:var(--amber-bright)">0</strong>
+              <div style="display:flex;gap:.3rem;margin-left:auto">
+                <button class="btn-icon" onclick="adjustFirePoints(-5)" title="-5">−5</button>
+                <button class="btn-icon" onclick="adjustFirePoints(-1)" title="-1">−</button>
+                <button class="btn-icon" onclick="adjustFirePoints(1)" title="+1">+</button>
+                <button class="btn-icon" onclick="adjustFirePoints(5)" title="+5">+5</button>
+              </div>
+            </div>
+            <div class="fire-progress"><div class="fire-progress-bar" id="admin-fire-bar" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div class="fire-config-row">
+          <div>
+            <div style="font-size:.75rem;color:var(--amber-bright);text-align:center;margin-bottom:.3rem;font-family:'Cinzel',serif">🔥 Grand feu dès</div>
+            <input type="number" min="1" id="fire-threshold-grand" class="fire-mini-input" value="50" onchange="saveFireConfig()">
+          </div>
+          <div>
+            <div style="font-size:.75rem;color:#f5b832;text-align:center;margin-bottom:.3rem;font-family:'Cinzel',serif">✨ Légendaire dès</div>
+            <input type="number" min="1" id="fire-threshold-legendaire" class="fire-mini-input" value="120" onchange="saveFireConfig()">
+          </div>
+        </div>
+        <div style="font-size:.78rem;color:var(--amber-mid);font-style:italic;margin-top:.6rem;text-align:center">Le feu est permanent : il gagne des points quand une épreuve réussit et ne redescend jamais tout seul.</div>
+      </div>
+
+      <!-- ══ ÉPREUVE EN COURS (bandeau) ══ -->
+      <div class="card admin-full" id="active-epreuve-card" style="display:none;border-color:rgba(97,174,27,.4)">
+        <div class="section-title" style="color:#9dcf7a">⚡ Épreuve en cours</div>
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div id="active-epreuve-title" style="font-family:'Cinzel',serif;font-size:1.1rem;color:var(--amber-bright)"></div>
+            <div id="active-epreuve-reward" style="font-size:.85rem;color:#9dcf7a;font-style:italic"></div>
+          </div>
+          <button class="btn-small" onclick="editActiveEpreuve()" style="border-color:rgba(168,158,240,.4);color:#a89ef0">✎ Modifier</button>
+        </div>
+        <div style="display:flex;gap:.8rem;margin-top:1rem">
+          <button class="btn-activate" onclick="finishEpreuveSuccess()" style="flex:2">✅ Épreuve réussie <span id="reward-hint"></span></button>
+          <button class="btn-deactivate" onclick="finishEpreuve()" style="flex:1;margin-top:0">✕ Terminer</button>
+        </div>
+      </div>
+
+      <!-- ══ BIBLIOTHÈQUE D'ÉPREUVES ══ -->
+      <div class="card admin-full">
+        <div class="section-title">📚 Bibliothèque d'épreuves</div>
+        <input class="search-input" type="text" id="search-epreuves" placeholder="Rechercher une épreuve…" oninput="renderLibrary()">
+        <div id="library-list" style="max-height:260px;overflow-y:auto;margin-bottom:1rem">
+          <div class="empty-state">Aucune épreuve enregistrée</div>
+        </div>
+        <button class="btn-add-role" onclick="openEpreuveEditor()" style="border-color:rgba(97,174,27,.4);color:#9dcf7a">+ Créer une nouvelle épreuve</button>
+      </div>
+
+      <!-- ══ ÉDITEUR D'ÉPREUVE (création / modification) ══ -->
+      <div class="card admin-full" id="epreuve-editor" style="display:none;border-color:rgba(168,158,240,.3)">
+        <div class="section-title" id="editor-title" style="color:#a89ef0">✎ Nouvelle épreuve</div>
+        <input type="hidden" id="editor-id">
+        <div style="margin-bottom:1rem">
+          <label>Titre de l'épreuve</label>
+          <input type="text" id="game-title" placeholder="Ex : La Forêt des Murmures" maxlength="60">
+        </div>
+        <div style="margin-bottom:1rem">
+          <label>Règles &amp; objectifs</label>
+          <textarea id="game-rules" style="min-height:120px" placeholder="🎯 Objectif : Rassemblez 10 fagots avant que la lune se lève…"></textarea>
+        </div>
+        <div style="margin-bottom:1rem">
+          <label>🔥 Récompense en points <span style="color:var(--amber-mid);font-size:.8rem">(points ajoutés au feu si l'épreuve réussit)</span></label>
+          <input type="number" min="0" id="game-reward" class="fire-mini-input" value="20" style="max-width:140px">
+        </div>
+
+        <!-- Craft roles -->
+        <div class="craft-section-toggle">
+          <span class="craft-toggle-label">⚗️ Rôles artisans <span style="color:rgba(168,158,240,.5);font-size:.65rem">(optionnel)</span></span>
+          <button class="craft-toggle-btn" id="craft-toggle-btn" onclick="toggleCraftSection()">+ Ajouter des rôles</button>
+        </div>
+        <div id="craft-section" style="display:none;margin-bottom:1rem">
+          <div id="craft-roles-list"></div>
+          <button class="btn-add-role" onclick="addCraftRole()">+ Nouveau rôle artisan</button>
+        </div>
+
+        <div style="display:flex;gap:.8rem">
+          <button class="btn-activate" id="btn-save-epreuve" onclick="saveEpreuve()" style="flex:2">💾 Enregistrer</button>
+          <button class="btn-activate" id="btn-save-launch" onclick="saveAndLaunch()" style="flex:2;background:rgba(196,106,0,.2);border-color:var(--amber-warm);color:var(--amber-bright)">💾 Enregistrer + Lancer</button>
+          <button class="btn-deactivate" onclick="closeEpreuveEditor()" style="flex:1;margin-top:0">Annuler</button>
+        </div>
+      </div>
+
+      <!-- Viewer list -->
+      <div class="card">
+        <div class="section-title">Villageois connectés</div>
+        <input class="search-input" type="text" id="search-viewers" placeholder="Rechercher…" oninput="renderViewerList()">
+        <div class="viewer-list" id="viewer-list-el">
+          <div class="empty-state">Aucun villageois connecté</div>
+        </div>
+      </div>
+
+      <!-- Unified viewer panel -->
+      <div class="card admin-full" id="viewer-panel">
+        <div id="panel-empty" style="text-align:center;padding:2rem 1rem">
+          <div style="font-size:2rem;margin-bottom:.6rem;opacity:.3">👆</div>
+          <div style="color:var(--amber-mid);font-style:italic;font-size:.95rem">Sélectionne un villageois pour gérer ses attributions</div>
+        </div>
+        <div id="panel-content" style="display:none">
+          <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.4rem">
+            <div id="panel-avatar" style="width:44px;height:44px;background:var(--amber-mid);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Cinzel',serif;font-size:1rem;color:var(--amber-bright);flex-shrink:0"></div>
+            <div>
+              <div id="panel-name" style="font-family:'Cinzel',serif;font-size:1.1rem;color:var(--amber-bright);letter-spacing:.05em"></div>
+              <div id="panel-count" style="font-size:.85rem;color:var(--amber-warm);font-style:italic"></div>
+            </div>
+            <button onclick="clearSelection()" style="margin-left:auto;background:transparent;border:1px solid rgba(122,61,0,.4);border-radius:4px;color:var(--amber-mid);font-size:.7rem;font-family:'Cinzel',serif;letter-spacing:.08em;padding:.3rem .7rem;cursor:pointer;text-transform:uppercase">✕ Fermer</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+            <div>
+              <div class="section-title">Ce que possède ce villageois</div>
+              <div id="panel-items-list" style="min-height:80px"></div>
+            </div>
+            <div>
+              <div class="section-title">Attribuer</div>
+              <div class="assign-form">
+                <div>
+                  <label>Type</label>
+                  <select id="assign-type" onchange="updateTemplates()">
+                    <option value="objet">🪵 Objet</option>
+                    <option value="role">🎭 Rôle</option>
+                    <option value="info">📜 Information secrète</option>
+                    <option value="secret">🔮 Secret</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Contenu</label>
+                  <textarea id="assign-content" placeholder="Ex : Tu possèdes une torche enchantée…"></textarea>
+                  <div class="templates" id="templates-list"></div>
+                </div>
+                <button class="btn-primary" onclick="assignToViewer()">⚡ Attribuer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const ADMIN_PASSWORD = 'veillée';
+
+const TEMPLATES = {
+  objet: ['Une torche enchantée (éclaire le chemin)','Un fagot de bois sacré (+2 flammes)','Une outre d\'eau de source','Une braise magique (relance une épreuve)','Un sac de graines mystérieuses'],
+  role:  ['L\'Ancien du Village (peut donner un indice)','Le Forgeron (double la valeur du prochain bois)','La Sorcière des Bois (peut voler un objet)','Le Barde (booste le moral +1)','L\'Éclaireur (voit la prochaine épreuve)'],
+  info:  ['Le deuxième sentier mène à la forêt cachée.','La fontaine se tarira au 3e round.','L\'Ancien cache un trésor sous le grand chêne.','Le loup rôde côté Est cette nuit.'],
+  secret:['Tu es en réalité l\'esprit du feu. Ne le dis à personne.','Tu sais que la carte du trésor est fausse.','Tu peux sacrifier ton objet pour sauver un autre joueur.'],
+};
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+let viewers     = {};   // { key: {pseudo,joined} }
+let assignments = [];    // [ {id,viewer,type,content,qty} ]
+let activeGame  = null;  // { id,title,rules,craftRoles,reward } — épreuve en cours
+let library     = {};    // { id: {id,title,rules,craftRoles,reward} } — bibliothèque
+let fire        = { points:0, grand:50, legendaire:120 };  // feu global permanent
+let diamant     = null;  // partie de Diamant en cours (null si aucune)
+let ferme       = null;  // partie de Ferme en cours (null si aucune)
+let selectedViewer   = null;
+let currentViewerPseudo = null;
+let craftRolesDraft  = [];
+let craftSectionOpen = false;
+
+// ── FIREBASE SYNC LAYER ─────────────────────────────────────────────────────
+let ONLINE = false;   // true once Firebase is configured & listeners attached
+
+function initSync(){
+  if (window.FB && window.FB.ready) {
+    ONLINE = true;
+    document.getElementById('conn-indicator').style.display = 'block';
+    document.getElementById('setup-banner').style.display   = 'none';
+    attachListeners();
+  } else {
+    ONLINE = false;
+    document.getElementById('setup-banner').style.display   = 'block';
+    document.getElementById('conn-indicator').style.display = 'none';
+  }
+}
+window.addEventListener('fb-ready', initSync);
+
+function attachListeners(){
+  const { db, ref, onValue } = window.FB;
+
+  onValue(ref(db, 'viewers'), (snap) => {
+    viewers = snap.val() || {};
+    renderViewerList();
+    updateStats();
+  });
+
+  onValue(ref(db, 'assignments'), (snap) => {
+    const obj = snap.val() || {};
+    assignments = Object.values(obj);
+    renderViewerList();
+    updateStats();
+    if (selectedViewer) renderPanel();
+    if (currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
+  });
+
+  onValue(ref(db, 'activeGame'), (snap) => {
+    activeGame = snap.val() || null;
+    updateGameUI();
+    updateViewerGameCard();
+    if (currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
+  });
+
+  onValue(ref(db, 'library'), (snap) => {
+    library = snap.val() || {};
+    renderLibrary();
+  });
+
+  onValue(ref(db, 'fire'), (snap) => {
+    fire = snap.val() || { points:0, grand:50, legendaire:120 };
+    renderFireMeter();
+    renderAdminFire();
+  });
+
+  onValue(ref(db, 'diamant'), (snap) => {
+    diamant = snap.val() ? dNormalize(snap.val()) : null;
+    renderDiamantAdmin();
+    if (currentViewerPseudo) renderDiamantViewer(currentViewerPseudo);
+  });
+
+  onValue(ref(db, 'ferme'), (snap) => {
+    ferme = snap.val() ? fNormalize(snap.val()) : null;
+    renderFermeAdmin();
+    if (currentViewerPseudo) renderFermeViewer(currentViewerPseudo);
+  });
+}
+
+// Write helpers — write to Firebase if online, else mutate local mirror + re-render
+function fbSetViewer(pseudo){
+  if (ONLINE){
+    const { db, ref, set, serverTimestamp } = window.FB;
+    set(ref(db, 'viewers/' + fbKey(pseudo)), { pseudo, joined: serverTimestamp() });
+  } else {
+    if(!viewers[pseudo]) viewers[pseudo] = { pseudo, joined: Date.now() };
+    renderViewerList(); updateStats();
+  }
+}
+
+function fbPushAssignment(a){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'assignments/' + a.id), a);
+  } else {
+    assignments.push(a);
+    localAfterAssignmentChange();
+  }
+}
+
+function fbUpdateAssignment(a){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'assignments/' + a.id), a);
+  } else {
+    localAfterAssignmentChange();
+  }
+}
+
+function fbRemoveAssignment(id){
+  if (ONLINE){
+    const { db, ref, remove } = window.FB;
+    remove(ref(db, 'assignments/' + id));
+  } else {
+    assignments = assignments.filter(a=>a.id!==id);
+    localAfterAssignmentChange();
+  }
+}
+
+function fbSetGame(game){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'activeGame'), game);
+  } else {
+    activeGame = game;
+    updateGameUI(); updateViewerGameCard();
+    if(currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
+  }
+}
+
+function fbSaveEpreuve(ep){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'library/' + ep.id), ep);
+  } else {
+    library[ep.id] = ep;
+    renderLibrary();
+  }
+}
+
+function fbDeleteEpreuve(id){
+  if (ONLINE){
+    const { db, ref, remove } = window.FB;
+    remove(ref(db, 'library/' + id));
+  } else {
+    delete library[id];
+    renderLibrary();
+  }
+}
+
+function fbSetFire(f){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'fire'), f);
+  } else {
+    fire = f;
+    renderFireMeter(); renderAdminFire();
+  }
+}
+
+function fbSetDiamant(d){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'diamant'), d);
+  } else {
+    diamant = dNormalize(d);
+    renderDiamantAdmin();
+    if(currentViewerPseudo) renderDiamantViewer(currentViewerPseudo);
+  }
+}
+
+function fbSetFerme(f){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'ferme'), f);
+  } else {
+    ferme = f ? fNormalize(f) : null;
+    renderFermeAdmin();
+    if(currentViewerPseudo) renderFermeViewer(currentViewerPseudo);
+  }
+}
+
+function localAfterAssignmentChange(){
+  renderViewerList(); updateStats();
+  if(selectedViewer) renderPanel();
+  if(currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
+}
+
+// Firebase keys can't contain . # $ [ ] / — sanitize pseudo
+function fbKey(s){ return String(s).replace(/[.#$\[\]/]/g,'_'); }
+
+// ── UTILS ─────────────────────────────────────────────────────────────────
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s){ return String(s).replace(/'/g,"\\'"); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
+function showPage(name){ document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById('page-'+name).classList.add('active'); document.getElementById('btn-viewer').classList.toggle('active',name==='viewer'); document.getElementById('btn-admin').classList.toggle('active',name==='admin'||name==='admin-gate'); }
+
+// ── VIEWER ────────────────────────────────────────────────────────────────
+function viewerConnect(){
+  const pseudo = document.getElementById('viewer-pseudo').value.trim();
+  if(!pseudo){ toast('Entre ton pseudo !'); return; }
+  currentViewerPseudo = pseudo;
+  fbSetViewer(pseudo);
+  document.getElementById('login-card').style.display = 'none';
+  document.getElementById('viewer-info').classList.add('visible');
+  renderViewerInfo(pseudo);
+  renderDiamantViewer(pseudo);
+  renderFermeViewer(pseudo);
+}
+
+function viewerDisconnect(){
+  currentViewerPseudo = null;
+  document.getElementById('login-card').style.display = 'block';
+  document.getElementById('viewer-info').classList.remove('visible');
+  document.getElementById('viewer-pseudo').value = '';
+}
+
+function renderViewerInfo(pseudo){
+  document.getElementById('greeting-name').textContent = '✦ Bienvenue, ' + pseudo;
+  const myItems = assignments.filter(a => a.viewer === pseudo);
+  document.getElementById('greeting-status').textContent =
+    myItems.length === 0 ? 'Tu attends ton rôle autour du feu…' :
+    myItems.length === 1 ? 'Le meneur t\'a confié quelque chose.' :
+    'Le meneur t\'a confié ' + myItems.length + ' choses.';
+
+  renderCraftSection(pseudo);
+
+  const list = document.getElementById('info-items-list');
+  if(myItems.length === 0){ list.innerHTML = '<div class="info-empty">🌑 Rien encore… Le meneur va bientôt agir.</div>'; return; }
+  const icons = {objet:'🪵',role:'🎭',info:'📜',secret:'🔮'};
+  const labels= {objet:'Objet',role:'Rôle',info:'Information',secret:'Secret'};
+  list.innerHTML = myItems.map(a => {
+    const qtyBadge = (a.type==='objet' && (a.qty??1)>1)
+      ? `<span style="margin-left:.5rem;font-family:'Cinzel',serif;font-size:.85rem;color:var(--amber-glow);font-weight:600">×${a.qty}</span>` : '';
+    return `<div class="info-item">
+      <span class="item-icon">${icons[a.type]||'📦'}</span>
+      <div class="info-type">${labels[a.type]||a.type}</div>
+      <div class="info-content">${escHtml(a.content)}${qtyBadge}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── VIEWER GAME CARD ──────────────────────────────────────────────────────
+function updateViewerGameCard(){
+  const card = document.getElementById('viewer-game-card');
+  if(!activeGame){ card.style.display='none'; return; }
+  card.style.display = 'block';
+  document.getElementById('viewer-game-title').textContent = activeGame.title;
+  document.getElementById('viewer-game-rules').textContent = activeGame.rules;
+}
+
+// ── CRAFT VIEWER ──────────────────────────────────────────────────────────
+function renderCraftSection(pseudo){
+  const sec = document.getElementById('viewer-craft-section');
+  if(!sec) return;
+  if(!activeGame || !activeGame.craftRoles || activeGame.craftRoles.length===0){ sec.style.display='none'; return; }
+
+  const myRoleAssignments = assignments.filter(a => a.viewer===pseudo && a.type==='role');
+  const matchedRole = activeGame.craftRoles.find(cr =>
+    myRoleAssignments.some(a => a.content.toLowerCase().includes(cr.name.toLowerCase()))
+  );
+  if(!matchedRole){ sec.style.display='none'; return; }
+
+  sec.style.display = 'block';
+  document.getElementById('viewer-craft-role-name').textContent = matchedRole.name;
+
+  const myObjets = assignments.filter(a => a.viewer===pseudo && a.type==='objet');
+  const recipesEl = document.getElementById('viewer-recipes-list');
+
+  if(matchedRole.recipes.length===0){
+    recipesEl.innerHTML='<div style="color:var(--amber-mid);font-style:italic;font-size:.9rem">Aucune recette pour ce rôle.</div>';
+    return;
+  }
+
+  recipesEl.innerHTML = matchedRole.recipes.map((rc,ri) => {
+    const costChecks = rc.cost.map(c => {
+      const found = myObjets.find(o => o.content.toLowerCase().includes(c.name.toLowerCase()));
+      const have  = found ? (found.qty??1) : 0;
+      return {...c, have, ok: have>=c.qty};
+    });
+    const canCraft = costChecks.every(c=>c.ok);
+    const costHtml = costChecks.map(c =>
+      `<span class="${c.ok?'ok':'missing'}">${escHtml(c.name)} ×${c.qty} (tu en as : ${c.have})</span>`
+    ).join('<br>');
+    return `<div class="recipe-card ${canCraft?'craftable':''}">
+      <div class="recipe-output">⚗️ ${escHtml(rc.output)}</div>
+      <div class="recipe-cost">${costHtml}</div>
+      <button class="btn-craft" ${canCraft?'':'disabled'} onclick="craftItem('${escAttr(pseudo)}','${escAttr(String(matchedRole.id))}','${escAttr(String(rc.id))}')">
+        ${canCraft?'✦ Fabriquer':'✕ Ressources manquantes'}
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function craftItem(pseudo, roleId, recipeId){
+  if(!activeGame || !activeGame.craftRoles){ return; }
+  const role = activeGame.craftRoles.find(r => String(r.id)===String(roleId));
+  const rc   = role && role.recipes.find(r => String(r.id)===String(recipeId));
+  if(!rc){ toast('Recette introuvable'); return; }
+
+  // Re-check the viewer really has the resources (safety against stale UI)
+  const myObjets = assignments.filter(a => a.viewer===pseudo && a.type==='objet');
+  const enough = rc.cost.every(c => {
+    const found = myObjets.find(o => o.content.toLowerCase().includes(c.name.toLowerCase()));
+    return found && (found.qty??1) >= c.qty;
+  });
+  if(!enough){ toast('Ressources insuffisantes'); renderCraftSection(pseudo); return; }
+
+  // Consume resources
+  rc.cost.forEach(c => {
+    const found = assignments.find(a => a.viewer===pseudo && a.type==='objet'
+      && a.content.toLowerCase().includes(c.name.toLowerCase()));
+    if(found){
+      const left = (found.qty??1) - c.qty;
+      if(left<=0) fbRemoveAssignment(found.id);
+      else { found.qty = left; fbUpdateAssignment(found); }
+    }
+  });
+  // Add crafted object — stack onto an existing identical objet if the viewer has one
+  const existing = assignments.find(a => a.viewer===pseudo && a.type==='objet'
+    && a.content.toLowerCase() === rc.output.toLowerCase());
+  if(existing){
+    existing.qty = (existing.qty??1) + 1;
+    fbUpdateAssignment(existing);
+  } else {
+    fbPushAssignment({ id:String(Date.now())+Math.floor(Math.random()*1000), viewer:pseudo, type:'objet', content:rc.output, qty:1 });
+  }
+  toast('⚗️ ' + rc.output + ' fabriqué !');
+}
+
+// ── ADMIN LOGIN ───────────────────────────────────────────────────────────
+function adminLogin(){
+  if(document.getElementById('admin-pass-input').value === ADMIN_PASSWORD){
+    document.getElementById('admin-pass-input').value='';
+    showPage('admin');
+    renderViewerList();
+    updateStats();
+  } else { toast('⛔ Mot de passe incorrect'); }
+}
+
+// ── VIEWER LIST ───────────────────────────────────────────────────────────
+function renderViewerList(){
+  const q   = (document.getElementById('search-viewers')?.value||'').toLowerCase();
+  const el  = document.getElementById('viewer-list-el');
+  // Use the stored pseudo (real display name) rather than the sanitized key
+  const names = Object.values(viewers)
+    .map(v => (v && v.pseudo) ? v.pseudo : v)
+    .filter(n => typeof n === 'string' && n.toLowerCase().includes(q));
+  if(!names.length){ el.innerHTML='<div class="empty-state">Aucun villageois</div>'; return; }
+  el.innerHTML = names.map(name => {
+    const count = assignments.filter(a=>a.viewer===name).length;
+    return `<div class="viewer-row${selectedViewer===name?' selected':''}" onclick="selectViewer('${escAttr(name)}')">
+      <div class="viewer-avatar">${name.slice(0,2).toUpperCase()}</div>
+      <div class="viewer-name-row">${escHtml(name)}</div>
+      ${count>0?`<span class="viewer-badge-count">${count}</span>`:''}
+    </div>`;
+  }).join('');
+}
+
+function selectViewer(name){
+  selectedViewer = name;
+  renderViewerList();
+  renderPanel();
+  updateTemplates();
+}
+
+function clearSelection(){
+  selectedViewer = null;
+  renderViewerList();
+  document.getElementById('panel-empty').style.display='block';
+  document.getElementById('panel-content').style.display='none';
+}
+
+// ── PANEL ─────────────────────────────────────────────────────────────────
+function renderPanel(){
+  if(!selectedViewer) return;
+  document.getElementById('panel-empty').style.display='none';
+  document.getElementById('panel-content').style.display='block';
+  document.getElementById('panel-avatar').textContent = selectedViewer.slice(0,2).toUpperCase();
+  document.getElementById('panel-name').textContent   = selectedViewer;
+  const myItems = assignments.filter(a=>a.viewer===selectedViewer);
+  document.getElementById('panel-count').textContent  =
+    myItems.length===0 ? 'Aucun objet attribué' :
+    myItems.length===1 ? '1 objet attribué' : myItems.length+' objets attribués';
+
+  const typeLabel={objet:'Objet',role:'Rôle',info:'Information',secret:'Secret'};
+  const typeClass={objet:'type-objet',role:'type-role',info:'type-info',secret:'type-secret'};
+  const typeIcon ={objet:'🪵',role:'🎭',info:'📜',secret:'🔮'};
+  const listEl=document.getElementById('panel-items-list');
+  if(!myItems.length){ listEl.innerHTML='<div class="empty-state" style="padding:1rem 0;font-size:.9rem">Rien attribué pour l\'instant</div>'; return; }
+
+  listEl.innerHTML = myItems.map(a => {
+    const isObjet = a.type==='objet';
+    const qty = a.qty??1;
+    const stepper = isObjet ? `
+      <div style="display:flex;align-items:center;gap:0;margin-top:6px">
+        <button onclick="changeQty('${escAttr(a.id)}',-1)" style="width:26px;height:26px;background:rgba(26,13,0,.6);border:1px solid var(--amber-mid);border-radius:4px 0 0 4px;color:var(--amber-warm);font-size:1rem;cursor:pointer;line-height:1;transition:all .15s" onmouseover="this.style.background='rgba(122,61,0,.3)'" onmouseout="this.style.background='rgba(26,13,0,.6)'">−</button>
+        <div style="min-width:36px;height:26px;background:rgba(26,13,0,.4);border-top:1px solid var(--amber-mid);border-bottom:1px solid var(--amber-mid);display:flex;align-items:center;justify-content:center;font-family:'Cinzel',serif;font-size:.85rem;color:var(--amber-bright);font-weight:600">×${qty}</div>
+        <button onclick="changeQty('${escAttr(a.id)}',+1)" style="width:26px;height:26px;background:rgba(26,13,0,.6);border:1px solid var(--amber-mid);border-radius:0 4px 4px 0;color:var(--amber-warm);font-size:1rem;cursor:pointer;line-height:1;transition:all .15s" onmouseover="this.style.background='rgba(122,61,0,.3)'" onmouseout="this.style.background='rgba(26,13,0,.6)'">+</button>
+      </div>` : '';
+    return `<div style="display:flex;align-items:flex-start;gap:.7rem;padding:.65rem .4rem;border-bottom:1px solid rgba(122,61,0,.2)">
+      <span style="font-size:1.2rem;flex-shrink:0;margin-top:2px">${typeIcon[a.type]||'📦'}</span>
+      <div style="flex:1">
+        <div style="margin-bottom:3px"><span class="type-badge ${typeClass[a.type]||''}">${typeLabel[a.type]||a.type}</span></div>
+        <div style="font-size:.97rem;color:var(--amber-pale);line-height:1.45">${escHtml(a.content)}</div>
+        ${stepper}
+      </div>
+      <button class="btn-delete" onclick="deleteAssignment('${escAttr(a.id)}')" title="Retirer">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ── ASSIGN ────────────────────────────────────────────────────────────────
+function updateTemplates(){
+  const type = document.getElementById('assign-type')?.value;
+  const tpls = TEMPLATES[type]||[];
+  document.getElementById('templates-list').innerHTML = tpls.map(t=>`<button class="tpl-btn" onclick="useTpl(this)">${t}</button>`).join('');
+}
+function useTpl(btn){ document.getElementById('assign-content').value=btn.textContent; }
+
+function assignToViewer(){
+  if(!selectedViewer){ toast('Sélectionne un villageois !'); return; }
+  const type    = document.getElementById('assign-type').value;
+  const content = document.getElementById('assign-content').value.trim();
+  if(!content){ toast('Entre un contenu !'); return; }
+  const qty = type==='objet' ? 1 : null;
+  fbPushAssignment({ id:String(Date.now())+Math.floor(Math.random()*1000), viewer:selectedViewer, type, content, qty });
+  document.getElementById('assign-content').value='';
+  toast('✓ Attribué à '+selectedViewer+' !');
+}
+
+function deleteAssignment(id){
+  fbRemoveAssignment(id);
+}
+
+function changeQty(id, delta){
+  const a = assignments.find(a=>String(a.id)===String(id));
+  if(!a) return;
+  const newQty = (a.qty??1)+delta;
+  if(newQty<=0){ if(!confirm('Retirer cet objet complètement ?')) return; deleteAssignment(id); return; }
+  a.qty = newQty;
+  fbUpdateAssignment(a);
+}
+
+// ── ÉPREUVE EDITOR (create / edit in library) ──────────────────────────────
+function harvestCraftRoles(){
+  return craftRolesDraft
+    .map(r=>({ id:String(r.id), name:r.name.trim(),
+      recipes: r.recipes.filter(rc=>rc.output.trim()).map(rc=>({
+        id:String(rc.id), output:rc.output.trim(),
+        cost: rc.cost.filter(c=>c.name.trim()).map(c=>({name:c.name.trim(),qty:Math.max(1,parseInt(c.qty)||1)}))
+      }))
+    }))
+    .filter(r=>r.name && r.recipes.length);
+}
+
+function openEpreuveEditor(ep){
+  document.getElementById('epreuve-editor').style.display = 'block';
+  document.getElementById('editor-title').textContent = ep ? '✎ Modifier l\'épreuve' : '✎ Nouvelle épreuve';
+  document.getElementById('editor-id').value    = ep ? ep.id : '';
+  document.getElementById('game-title').value   = ep ? ep.title : '';
+  document.getElementById('game-rules').value   = ep ? ep.rules : '';
+  document.getElementById('game-reward').value  = ep ? (ep.reward??20) : 20;
+  // load craft roles into draft
+  craftRolesDraft = ep && ep.craftRoles ? JSON.parse(JSON.stringify(ep.craftRoles)) : [];
+  craftSectionOpen = craftRolesDraft.length>0;
+  document.getElementById('craft-section').style.display = craftSectionOpen?'block':'none';
+  document.getElementById('craft-toggle-btn').textContent = craftSectionOpen?'− Masquer':'+ Ajouter des rôles';
+  renderCraftRoles();
+  document.getElementById('epreuve-editor').scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function closeEpreuveEditor(){
+  document.getElementById('epreuve-editor').style.display = 'none';
+  craftRolesDraft = [];
+}
+
+function buildEpreuveFromForm(){
+  const title = document.getElementById('game-title').value.trim();
+  const rules = document.getElementById('game-rules').value.trim();
+  if(!title){ toast('Donne un titre à l\'épreuve !'); return null; }
+  if(!rules){ toast('Ajoute les règles et objectifs !'); return null; }
+  const id = document.getElementById('editor-id').value || (String(Date.now())+Math.floor(Math.random()*1000));
+  const reward = Math.max(0, parseInt(document.getElementById('game-reward').value)||0);
+  return { id, title, rules, reward, craftRoles: harvestCraftRoles() };
+}
+
+function saveEpreuve(){
+  const ep = buildEpreuveFromForm();
+  if(!ep) return;
+  fbSaveEpreuve(ep);
+  closeEpreuveEditor();
+  toast('💾 Épreuve enregistrée !');
+}
+
+function saveAndLaunch(){
+  const ep = buildEpreuveFromForm();
+  if(!ep) return;
+  fbSaveEpreuve(ep);
+  fbSetGame(ep);
+  closeEpreuveEditor();
+  toast('🏕️ Épreuve lancée !');
+}
+
+// ── LIBRARY ─────────────────────────────────────────────────────────────────
+function renderLibrary(){
+  const el = document.getElementById('library-list');
+  if(!el) return;
+  const q = (document.getElementById('search-epreuves')?.value||'').toLowerCase();
+  const list = Object.values(library).filter(ep => ep && ep.title && ep.title.toLowerCase().includes(q));
+  if(!list.length){
+    el.innerHTML = '<div class="empty-state">'+(q?'Aucune épreuve trouvée':'Aucune épreuve enregistrée')+'</div>';
+    return;
+  }
+  el.innerHTML = list.map(ep => {
+    const roleCount = (ep.craftRoles||[]).length;
+    const isActive = activeGame && String(activeGame.id)===String(ep.id);
+    return `<div style="display:flex;align-items:center;gap:.7rem;padding:.7rem .6rem;border-bottom:1px solid rgba(122,61,0,.2)">
+      <div style="flex:1;min-width:0">
+        <div style="font-family:'Cinzel',serif;font-size:.95rem;color:var(--amber-bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(ep.title)}${isActive?' <span style=\'color:#9dcf7a;font-size:.7rem\'>● en cours</span>':''}</div>
+        <div style="font-size:.78rem;color:var(--amber-warm)">🔥 +${ep.reward??0} pts${roleCount?' · ⚗️ '+roleCount+' rôle'+(roleCount>1?'s':''):''}</div>
+      </div>
+      <button class="btn-small" onclick="launchFromLibrary('${escAttr(String(ep.id))}')" style="border-color:rgba(97,174,27,.4);color:#9dcf7a">▶ Lancer</button>
+      <button class="btn-small" onclick="editFromLibrary('${escAttr(String(ep.id))}')" style="border-color:rgba(168,158,240,.4);color:#a89ef0">✎</button>
+      <button class="btn-delete" onclick="deleteFromLibrary('${escAttr(String(ep.id))}')" title="Supprimer">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function launchFromLibrary(id){
+  const ep = library[id] || Object.values(library).find(e=>String(e.id)===String(id));
+  if(!ep){ toast('Épreuve introuvable'); return; }
+  fbSetGame(JSON.parse(JSON.stringify(ep)));
+  toast('🏕️ « '+ep.title+' » lancée !');
+}
+
+function editFromLibrary(id){
+  const ep = library[id] || Object.values(library).find(e=>String(e.id)===String(id));
+  if(ep) openEpreuveEditor(ep);
+}
+
+function deleteFromLibrary(id){
+  if(!confirm('Supprimer cette épreuve de la bibliothèque ?')) return;
+  fbDeleteEpreuve(id);
+  toast('Épreuve supprimée.');
+}
+
+// ── ÉPREUVE EN COURS ────────────────────────────────────────────────────────
+function editActiveEpreuve(){
+  if(activeGame) openEpreuveEditor(activeGame);
+}
+
+function finishEpreuveSuccess(){
+  const reward = activeGame ? (activeGame.reward||0) : 0;
+  const newFire = Object.assign({}, fire, { points: (fire.points||0) + reward });
+  fbSetFire(newFire);
+  fbSetGame(null);
+  toast('✅ Épreuve réussie ! +'+reward+' pts au feu');
+}
+
+function finishEpreuve(){
+  fbSetGame(null);
+  toast('Épreuve terminée (objets et feu conservés).');
+}
+
+function updateGameUI(){
+  const card = document.getElementById('active-epreuve-card');
+  if(!card) return;
+  if(activeGame){
+    card.style.display = 'block';
+    document.getElementById('active-epreuve-title').textContent = activeGame.title;
+    document.getElementById('active-epreuve-reward').textContent = '🔥 Récompense : +'+(activeGame.reward||0)+' points si réussie';
+    document.getElementById('reward-hint').textContent = '(+'+(activeGame.reward||0)+' pts)';
+  } else {
+    card.style.display = 'none';
+  }
+  renderLibrary();
+}
+
+// ── CRAFT BUILDER ─────────────────────────────────────────────────────────
+function toggleCraftSection(){
+  craftSectionOpen = !craftSectionOpen;
+  document.getElementById('craft-section').style.display = craftSectionOpen?'block':'none';
+  document.getElementById('craft-toggle-btn').textContent = craftSectionOpen?'− Masquer':'+ Ajouter des rôles';
+  if(craftSectionOpen && craftRolesDraft.length===0) addCraftRole();
+}
+
+function addCraftRole(){
+  const id = Date.now();
+  craftRolesDraft.push({ id, name:'', recipes:[] });
+  addCraftRecipe(id);
+  renderCraftRoles();
+}
+
+function removeCraftRole(roleId){
+  craftRolesDraft = craftRolesDraft.filter(r=>r.id!==roleId);
+  renderCraftRoles();
+}
+
+function addCraftRecipe(roleId){
+  const role = craftRolesDraft.find(r=>r.id===roleId);
+  if(!role) return;
+  role.recipes.push({ id:Date.now()+Math.random(), output:'', cost:[{name:'',qty:1}] });
+  renderCraftRoles();
+}
+
+function removeCraftRecipe(roleId,recipeId){
+  const role = craftRolesDraft.find(r=>r.id===roleId);
+  if(role) role.recipes = role.recipes.filter(r=>r.id!==recipeId);
+  renderCraftRoles();
+}
+
+function addCraftCost(roleId,recipeId){
+  const role   = craftRolesDraft.find(r=>r.id===roleId);
+  const recipe = role && role.recipes.find(r=>r.id===recipeId);
+  if(recipe){ recipe.cost.push({name:'',qty:1}); renderCraftRoles(); }
+}
+
+function removeCraftCost(roleId,recipeId,ci){
+  const role   = craftRolesDraft.find(r=>r.id===roleId);
+  const recipe = role && role.recipes.find(r=>r.id===recipeId);
+  if(recipe){ recipe.cost.splice(ci,1); renderCraftRoles(); }
+}
+
+function syncCraftField(roleId,field,value){ const r=craftRolesDraft.find(r=>r.id===roleId); if(r) r[field]=value; }
+function syncRecipeField(roleId,recipeId,field,value){ const role=craftRolesDraft.find(r=>r.id===roleId); const rc=role&&role.recipes.find(r=>r.id===recipeId); if(rc) rc[field]=value; }
+function syncCostField(roleId,recipeId,ci,field,value){
+  const role=craftRolesDraft.find(r=>r.id===roleId);
+  const rc=role&&role.recipes.find(r=>r.id===recipeId);
+  if(rc&&rc.cost[ci]) rc.cost[ci][field]=field==='qty'?Math.max(1,parseInt(value)||1):value;
+}
+
+function renderCraftRoles(){
+  const el=document.getElementById('craft-roles-list');
+  if(!el) return;
+  el.innerHTML = craftRolesDraft.map(role=>`
+    <div class="craft-role-builder">
+      <div class="craft-role-header">
+        <span style="font-size:1.1rem">🎭</span>
+        <input class="craft-role-name-input" placeholder="Nom du rôle (ex: Forgeron)" value="${escHtml(role.name)}" oninput="syncCraftField(${role.id},'name',this.value)">
+        <button class="btn-icon" onclick="removeCraftRole(${role.id})">✕</button>
+      </div>
+      <div style="font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.12em;color:rgba(168,158,240,.6);text-transform:uppercase;margin-bottom:.5rem">Recettes — Ressources consommées → Objet fabriqué</div>
+      ${role.recipes.map(rc=>`
+        <div class="craft-recipe-block">
+          <div style="font-size:.75rem;color:var(--amber-mid);font-style:italic;margin-bottom:.4rem">Coûts :</div>
+          ${rc.cost.map((c,ci)=>`
+            <div class="craft-recipe-row">
+              <input class="craft-input" placeholder="Ressource (ex: Bois)" value="${escHtml(c.name)}" oninput="syncCostField(${role.id},${rc.id},${ci},'name',this.value)">
+              <input class="craft-qty-input" type="number" min="1" value="${c.qty}" oninput="syncCostField(${role.id},${rc.id},${ci},'qty',this.value)">
+              <button class="btn-icon" onclick="removeCraftCost(${role.id},${rc.id},${ci})" ${rc.cost.length<=1?'disabled':''}>−</button>
+            </div>`).join('')}
+          <button class="btn-add-recipe" onclick="addCraftCost(${role.id},${rc.id})">+ ajouter une ressource</button>
+          <div class="craft-output-row" style="margin-top:.6rem">
+            <span class="craft-arrow">→ Fabrique :</span>
+            <input class="craft-input" style="flex:1" placeholder="Nom de l'objet fabriqué" value="${escHtml(rc.output)}" oninput="syncRecipeField(${role.id},${rc.id},'output',this.value)">
+            <button class="btn-icon" onclick="removeCraftRecipe(${role.id},${rc.id})">✕</button>
+          </div>
+        </div>`).join('')}
+      <button class="btn-add-recipe" onclick="addCraftRecipe(${role.id})">+ Ajouter une recette</button>
+    </div>`).join('');
+}
+
+
+// ── FIRE (global, permanent, points-based) ──────────────────────────────────
+function fireTier(points){
+  if(points >= (fire.legendaire||120)) return 'legendaire';
+  if(points >= (fire.grand||50)) return 'grand';
+  return 'petit';
+}
+
+function renderFireMeter(){
+  const el = document.getElementById('viewer-fire-meter');
+  if(!el) return;
+  const points = fire.points||0;
+  const tier = fireTier(points);
+  const visuals = { petit:'🔥', grand:'🔥🔥', legendaire:'🔥🔥🔥' };
+  const labels  = { petit:'Petit feu', grand:'Grand feu', legendaire:'Feu Légendaire ✨' };
+  document.getElementById('fire-visual').textContent = visuals[tier];
+  const lab = document.getElementById('fire-tier-label');
+  lab.textContent = labels[tier];
+  lab.className = 'fire-tier-label fire-tier-' + tier;
+  document.getElementById('fire-count').textContent = points + (points>1?' points':' point');
+  const pct = Math.min(100, Math.round(points / (fire.legendaire||120) * 100));
+  document.getElementById('fire-progress-bar').style.width = pct + '%';
+  document.getElementById('fire-thresholds').innerHTML =
+    '<span>0</span><span>🔥 '+(fire.grand||50)+'</span><span>✨ '+(fire.legendaire||120)+'</span>';
+}
+
+function renderAdminFire(){
+  const pts = fire.points||0;
+  const tier = fireTier(pts);
+  const visuals = { petit:'🔥', grand:'🔥🔥', legendaire:'🔥🔥🔥' };
+  const labels  = { petit:'Petit feu', grand:'Grand feu', legendaire:'Légendaire ✨' };
+  const v=document.getElementById('admin-fire-visual'); if(v) v.textContent=visuals[tier];
+  const t=document.getElementById('admin-fire-tier'); if(t){ t.textContent=labels[tier]; t.className=''; t.style.color = tier==='legendaire'?'#f5b832':tier==='grand'?'var(--amber-bright)':'#9dcf7a'; }
+  const p=document.getElementById('admin-fire-points'); if(p) p.textContent=pts;
+  const bar=document.getElementById('admin-fire-bar'); if(bar) bar.style.width = Math.min(100, Math.round(pts/(fire.legendaire||120)*100))+'%';
+  // sync threshold inputs if not focused
+  const g=document.getElementById('fire-threshold-grand');
+  const l=document.getElementById('fire-threshold-legendaire');
+  if(g && document.activeElement!==g) g.value = fire.grand||50;
+  if(l && document.activeElement!==l) l.value = fire.legendaire||120;
+}
+
+function adjustFirePoints(delta){
+  const newFire = Object.assign({}, fire, { points: Math.max(0, (fire.points||0)+delta) });
+  fbSetFire(newFire);
+}
+
+function saveFireConfig(){
+  const grand = Math.max(1, parseInt(document.getElementById('fire-threshold-grand').value)||50);
+  const legendaire = Math.max(grand+1, parseInt(document.getElementById('fire-threshold-legendaire').value)||120);
+  fbSetFire(Object.assign({}, fire, { grand, legendaire }));
+}
+
+// ── DIAMANT ENGINE + UI ──────────────────────────────────────────────────────
+const D_HAZARDS = ['serpent','araignee','eboulement'];
+const D_TREASURES = [1,2,3,4,5,5,7,7,9,11,11,13,14,15,17];
+const D_MAXROUNDS = 5;
+let __dseq = 0;
+function dCardId(){ return 'c'+Date.now()+'_'+(__dseq++); }
+function dShuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function dNewDeck(){
+  const cards=[];
+  D_TREASURES.forEach(v=>cards.push({id:dCardId(),type:'treasure',value:v}));
+  D_HAZARDS.forEach(t=>{ for(let i=0;i<3;i++) cards.push({id:dCardId(),type:'hazard',hazard:t}); });
+  return dShuffle(cards);
+}
+function dHazLabel(h){ return {serpent:'🐍 Serpent',araignee:'🕷️ Araignée',eboulement:'🪨 Éboulement'}[h]||h; }
+function dHazIcon(h){ return {serpent:'🐍',araignee:'🕷️',eboulement:'🪨'}[h]||'⚠️'; }
+function dInPlayers(st){ return Object.values(st.players).filter(p=>p.status==='in'); }
+function dTotalBanked(st){ return Object.values(st.players).reduce((s,p)=>s+p.banked,0); }
+function dNormalize(st){
+  if(!st) return st;
+  // Firebase drops empty arrays/objects/null — rebuild them so the engine never hits undefined
+  st.board       = Array.isArray(st.board) ? st.board : (st.board ? Object.values(st.board) : []);
+  st.deck        = Array.isArray(st.deck)  ? st.deck  : (st.deck  ? Object.values(st.deck)  : []);
+  st.hazardsSeen = (st.hazardsSeen && typeof st.hazardsSeen==='object') ? st.hazardsSeen : {};
+  st.players     = (st.players && typeof st.players==='object') ? st.players : {};
+  st.pathTreasure= (typeof st.pathTreasure==='number') ? st.pathTreasure : 0;
+  return st;
+}
+
+// ── Control handlers (write to Firebase) ──
+function startDiamant(){
+  const pseudos = Object.values(viewers).map(v=>(v&&v.pseudo)?v.pseudo:v).filter(p=>typeof p==='string');
+  if(pseudos.length===0){ toast('Aucun villageois connecté pour jouer !'); return; }
+  if(!confirm('Lancer une partie de Diamant avec les '+pseudos.length+' villageois connectés ?')) return;
+  const players={};
+  pseudos.forEach(p=>{ players[p]={pseudo:p,status:'in',held:0,banked:0,vote:null}; });
+  fbSetDiamant({
+    active:true, round:1, maxRounds:D_MAXROUNDS, phase:'exploring',
+    deck:dNewDeck(), board:[], pathTreasure:0, hazardsSeen:{}, players,
+    lastEvent:'La partie commence ! Révèle la première carte.'
+  });
+  toast('💎 Partie de Diamant lancée !');
+}
+
+function diamantCancel(){
+  if(!confirm('Abandonner la partie de Diamant en cours ? (le trésor sécurisé ne sera pas ajouté au feu)')) return;
+  fbSetDiamant(null);
+  toast('Partie de Diamant annulée.');
+}
+
+function diamantDraw(){
+  if(!diamant || diamant.phase!=='exploring') return;
+  const st = dNormalize(JSON.parse(JSON.stringify(diamant)));
+  if(!st.deck.length){ st.lastEvent='Deck vide, la manche se termine.'; dEndRound(st); fbSetDiamant(st); return; }
+  const card = st.deck.shift();
+  st.board.push(card);
+  if(card.type==='treasure'){
+    const ins = dInPlayers(st); const N=ins.length;
+    if(N>0){
+      const share=Math.floor(card.value/N), rem=card.value%N;
+      ins.forEach(p=>p.held+=share); st.pathTreasure+=rem;
+      st.lastEvent='💎 Trésor de '+card.value+' ! Chaque explorateur ('+N+') gagne '+share+(rem?(' — '+rem+' sur le chemin.'):'.');
+    }
+    Object.values(st.players).forEach(p=>{ if(p.status==='in') p.vote=null; });
+    st.phase='voting';
+  } else {
+    const seen = st.hazardsSeen[card.hazard]||0;
+    if(seen>=1){
+      const lost = dInPlayers(st).reduce((s,p)=>s+p.held,0)+st.pathTreasure;
+      dInPlayers(st).forEach(p=>p.held=0); st.pathTreasure=0; st.hazardsSeen[card.hazard]=seen+1;
+      st.lastEvent='💥 Double '+dHazLabel(card.hazard)+' ! Manche perdue. '+lost+' trésor'+(lost>1?'s':'')+' non sécurisé'+(lost>1?'s':'')+' perdu'+(lost>1?'s':'')+'.';
+      dEndRound(st); fbSetDiamant(st); return;
+    } else {
+      st.hazardsSeen[card.hazard]=1;
+      Object.values(st.players).forEach(p=>{ if(p.status==='in') p.vote=null; });
+      st.phase='voting';
+      st.lastEvent='⚠️ '+dHazLabel(card.hazard)+' ! Un deuxième serait fatal. Continuer ou rentrer ?';
+    }
+  }
+  fbSetDiamant(st);
+}
+
+function diamantVote(pseudo, vote){
+  if(!diamant || diamant.phase!=='voting') return;
+  const st = dNormalize(JSON.parse(JSON.stringify(diamant)));
+  const p = st.players[pseudo];
+  if(!p || p.status!=='in') return;
+  p.vote = vote;
+  const ins = dInPlayers(st);
+  if(ins.every(pl=>pl.vote)) dResolveVotes(st);
+  fbSetDiamant(st);
+}
+
+function diamantForceResolve(){
+  if(!diamant || diamant.phase!=='voting') return;
+  const st = dNormalize(JSON.parse(JSON.stringify(diamant)));
+  dInPlayers(st).forEach(p=>{ if(!p.vote) p.vote='continue'; });
+  dResolveVotes(st);
+  fbSetDiamant(st);
+}
+
+function dResolveVotes(st){
+  const ins = dInPlayers(st);
+  const leavers = ins.filter(p=>p.vote==='leave');
+  const M = leavers.length;
+  if(M>0){
+    const share=Math.floor(st.pathTreasure/M), rem=st.pathTreasure%M;
+    leavers.forEach(p=>{ p.banked+=p.held+share; p.held=0; p.status='out'; p.vote=null; });
+    st.pathTreasure=rem;
+    st.lastEvent=M+' explorateur'+(M>1?'s rentrent':' rentre')+' au camp avec leur butin.';
+  } else { st.lastEvent='Tout le monde continue l\'exploration !'; }
+  dInPlayers(st).forEach(p=>p.vote=null);
+  if(dInPlayers(st).length===0){ dEndRound(st); return; }
+  st.phase='exploring';
+}
+
+function dEndRound(st){
+  dInPlayers(st).forEach(p=>{ p.held=0; p.status='out'; p.vote=null; });
+  st.pathTreasure=0; st.phase='roundEnd';
+}
+
+function diamantNextRound(){
+  if(!diamant || diamant.phase!=='roundEnd') return;
+  const st = dNormalize(JSON.parse(JSON.stringify(diamant)));
+  if(st.round>=st.maxRounds){
+    st.phase='gameEnd';
+    st.lastEvent='🏁 Partie terminée ! Trésor total sécurisé : '+dTotalBanked(st)+'.';
+    fbSetDiamant(st); return;
+  }
+  st.round+=1; st.deck=dNewDeck(); st.board=[]; st.pathTreasure=0; st.hazardsSeen={};
+  Object.values(st.players).forEach(p=>{ p.status='in'; p.held=0; p.vote=null; });
+  st.phase='exploring';
+  st.lastEvent='Manche '+st.round+' ! Tous repartent dans la grotte.';
+  fbSetDiamant(st);
+}
+
+function diamantEndToFire(){
+  if(!diamant) return;
+  const total = dTotalBanked(diamant);
+  if(!confirm('Ajouter '+total+' points au feu de camp et clôturer la partie ?')) return;
+  fbSetFire(Object.assign({}, fire, { points:(fire.points||0)+total }));
+  fbSetDiamant(null);
+  toast('🔥 +'+total+' points au feu ! Partie clôturée.');
+}
+
+// ── Rendering ──
+function dRenderPath(el, board){
+  if(!el) return;
+  if(!board || !board.length){ el.innerHTML='<div class="dcard-empty">La grotte est encore inexplorée…</div>'; return; }
+  el.innerHTML = board.map(c=>{
+    if(c.type==='treasure') return '<div class="dcard dcard-treasure"><span class="dico">💎</span><span class="dval">'+c.value+'</span></div>';
+    return '<div class="dcard dcard-hazard"><span class="dico">'+dHazIcon(c.hazard)+'</span></div>';
+  }).join('');
+  el.scrollLeft = el.scrollWidth;
+}
+
+function dStatusPills(st){
+  const ins = dInPlayers(st).length;
+  const total = dTotalBanked(st);
+  return '<div class="dpill">Manche <strong>'+st.round+'/'+st.maxRounds+'</strong></div>'+
+         '<div class="dpill">Dans la grotte <strong>'+ins+'</strong></div>'+
+         '<div class="dpill">Sur le chemin <strong>'+st.pathTreasure+'</strong></div>'+
+         '<div class="dpill">Trésor sécurisé <strong>'+total+'</strong></div>';
+}
+
+function dPlayersList(st, highlightPseudo){
+  return Object.values(st.players).map(p=>{
+    const isIn = p.status==='in';
+    const voteBadge = (st.phase==='voting' && isIn)
+      ? (p.vote ? '<span class="dvote-badge dvote-done">✓ a voté</span>' : '<span class="dvote-badge dvote-wait">…réfléchit</span>')
+      : '';
+    const hl = (p.pseudo===highlightPseudo) ? 'style="outline:1px solid var(--amber-warm)"' : '';
+    return '<div class="dplayer-row '+(isIn?'':'out')+'" '+hl+'>'+
+      '<span class="dplayer-status '+(isIn?'dstatus-in':'dstatus-out')+'">'+(isIn?'⛏️ explore':'🏕️ au camp')+'</span>'+
+      '<span>'+escHtml(p.pseudo)+'</span>'+
+      '<span style="color:var(--amber-warm);font-size:.8rem">'+(isIn?('+'+p.held+' en jeu'):('🔒 '+p.banked))+'</span>'+
+      voteBadge+'</div>';
+  }).join('');
+}
+
+function renderDiamantAdmin(){
+  const panel = document.getElementById('diamant-panel');
+  if(!panel) return;
+  const inactive = document.getElementById('diamant-admin-inactive');
+  const active   = document.getElementById('diamant-admin-active');
+  if(!diamant || !diamant.active){ inactive.style.display='block'; active.style.display='none'; return; }
+  inactive.style.display='none'; active.style.display='block';
+
+  document.getElementById('da-status').innerHTML = dStatusPills(diamant);
+  document.getElementById('da-event').textContent = diamant.lastEvent||'';
+  dRenderPath(document.getElementById('da-path'), diamant.board);
+  document.getElementById('da-players').innerHTML = dPlayersList(diamant);
+
+  const ctrl = document.getElementById('da-controls');
+  const ph = diamant.phase;
+  if(ph==='exploring'){
+    ctrl.innerHTML = '<button class="btn-draw" onclick="diamantDraw()">🎴 Révéler une carte ('+diamant.deck.length+' restantes)</button>'+
+      '<button class="btn-deactivate" onclick="diamantCancel()" style="margin-top:.6rem">✕ Abandonner la partie</button>';
+  } else if(ph==='voting'){
+    const ins = dInPlayers(diamant); const voted = ins.filter(p=>p.vote).length;
+    ctrl.innerHTML = '<div class="diamant-voted">🗳️ Vote en cours… '+voted+'/'+ins.length+' ont voté</div>'+
+      '<button class="btn-draw" onclick="diamantForceResolve()">⏭️ Forcer la résolution (absents = continuent)</button>'+
+      '<button class="btn-deactivate" onclick="diamantCancel()" style="margin-top:.6rem">✕ Abandonner la partie</button>';
+  } else if(ph==='roundEnd'){
+    const last = diamant.round>=diamant.maxRounds;
+    ctrl.innerHTML = '<button class="btn-draw" onclick="diamantNextRound()">'+(last?'🏁 Voir le résultat final':'▶ Manche suivante ('+(diamant.round+1)+'/'+diamant.maxRounds+')')+'</button>'+
+      '<button class="btn-deactivate" onclick="diamantCancel()" style="margin-top:.6rem">✕ Abandonner la partie</button>';
+  } else if(ph==='gameEnd'){
+    const total = dTotalBanked(diamant);
+    ctrl.innerHTML = '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+total+'</div><div class="dbank-lbl">Trésor total</div></div></div>'+
+      '<button class="btn-draw" onclick="diamantEndToFire()">🔥 Ajouter '+total+' pts au feu + clôturer</button>'+
+      '<button class="btn-deactivate" onclick="diamantCancel()" style="margin-top:.6rem">✕ Clôturer sans ajouter au feu</button>';
+  }
+}
+
+function renderDiamantViewer(pseudo){
+  const wrap = document.getElementById('viewer-diamant');
+  if(!wrap) return;
+  if(!diamant || !diamant.active){ wrap.style.display='none'; return; }
+  wrap.style.display='block';
+
+  document.getElementById('dv-status').innerHTML = dStatusPills(diamant);
+  document.getElementById('dv-event').textContent = diamant.lastEvent||'';
+  dRenderPath(document.getElementById('dv-path'), diamant.board);
+  document.getElementById('dv-players').innerHTML = dPlayersList(diamant, pseudo);
+
+  const me = diamant.players[pseudo];
+  const zone = document.getElementById('dv-myzone');
+  if(!me){
+    zone.innerHTML = '<div class="diamant-voted">👀 Une partie est en cours. Tu pourras jouer à la prochaine !</div>';
+    return;
+  }
+  if(diamant.phase==='gameEnd'){
+    zone.innerHTML = '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+me.banked+'</div><div class="dbank-lbl">Ton trésor</div></div>'+
+      '<div class="dbank-item"><div class="dbank-val">'+dTotalBanked(diamant)+'</div><div class="dbank-lbl">Total du groupe</div></div></div>'+
+      '<div class="diamant-voted">🏁 Partie terminée ! Bravo aux explorateurs.</div>';
+    return;
+  }
+  if(me.status==='out'){
+    zone.innerHTML = '<div class="diamant-voted">🏕️ Tu es rentré au camp avec <strong style="color:var(--amber-bright)">'+me.banked+'</strong> de trésor sécurisé. Regarde les autres continuer…</div>';
+    return;
+  }
+  // me is 'in'
+  if(diamant.phase==='voting'){
+    if(me.vote){
+      zone.innerHTML = '<div class="diamant-voted">✓ Ton choix est enregistré ('+(me.vote==='leave'?'🎒 rentrer':'⛏️ continuer')+'). En attente des autres explorateurs…</div>';
+    } else {
+      zone.innerHTML = '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+me.held+'</div><div class="dbank-lbl">Ton butin en jeu</div></div></div>'+
+        '<div class="diamant-vote-btns">'+
+        '<button class="btn-continue" onclick="diamantVote(\''+escAttr(pseudo)+'\',\'continue\')">⛏️ Continuer</button>'+
+        '<button class="btn-leave" onclick="diamantVote(\''+escAttr(pseudo)+'\',\'leave\')">🎒 Rentrer</button>'+
+        '</div>';
+    }
+  } else {
+    zone.innerHTML = '<div class="diamant-voted">⛏️ Tu explores la grotte — butin en jeu : <strong style="color:var(--amber-bright)">'+me.held+'</strong>. En attente de la prochaine carte…</div>';
+  }
+}
+
+// ── FERME ENGINE + UI (étape 1 : squelette) ──────────────────────────────────
+const F_METIERS_BASE = ['Pêcheur','Bûcheron','Agriculteur','Mineur'];
+const F_LOCATIONS = ['Ferme','Magasin','Montagne','Lac','Plage','Forêt','Ranch'];
+const F_LOC_ICON = { Ferme:'🏡', Magasin:'🏪', Montagne:'⛰️', Lac:'🎣', Plage:'🏖️', Forêt:'🌲', Ranch:'🐄' };
+const F_METIER_ICON = { 'Pêcheur':'🎣', 'Bûcheron':'🪓', 'Agriculteur':'🌱', 'Mineur':'⛏️' };
+const F_MAXTURNS = 10;
+
+// ── Config Pêcheur (à ajuster) ──
+// Espèces de poisson : val = difficulté (le dé d6 doit être ≥ à cette valeur pour attraper)
+const F_FISH = [
+  { nom:'Sardine',   val:2 },
+  { nom:'Truite',    val:3 },
+  { nom:'Bar',       val:4 },
+  { nom:'Saumon',    val:5 },
+  { nom:'Esturgeon', val:6 },
+];
+// Valeurs de vente en or (⚠️ VALEURS PAR DÉFAUT — remplace-les par les tiennes)
+const F_SELL_VALUES = { 'poisson':3, 'poisson grillé':6 };
+// Graines cultivables : maxLevel = niveau de maturité (planté au niv.1), sell = prix de vente de la récolte
+// ⚠️ sell salade/tomate = VALEURS PROVISOIRES à ajuster
+const F_SEEDS = [
+  { type:'panais', maxLevel:2, sell:2 },
+  { type:'tomate', maxLevel:3, sell:3 },
+  { type:'salade', maxLevel:4, sell:2 },
+];
+const F_CROP_MAX = { panais:2, tomate:3, salade:4 };
+const F_SEED_PRICE = 1; // prix d'achat d'une graine (identique pour toutes)
+
+// ── Registre d'actions de métier (pattern réutilisable) ──
+// Chaque action : { id, label, desc, locations (null=partout), check(st)->{ok,why}, apply(st)->message }
+const F_ACTIONS = {
+  'Bûcheron': [
+    { id:'couper', label:'🪓 Couper du bois', desc:'+2 bois', locations:['Forêt'],
+      check:(st)=>({ok:true}),
+      apply:(st)=>{ st.inventory['bois']=(st.inventory['bois']||0)+2; return 'coupe du bois (+2 bois)'; } },
+    { id:'buche', label:'🪵 1 bois → 1 bûche', desc:null, locations:null,
+      check:(st)=>((st.inventory['bois']||0)>=1?{ok:true}:{ok:false,why:'besoin de 1 bois'}),
+      apply:(st)=>{ st.inventory['bois']-=1; if(st.inventory['bois']<=0)delete st.inventory['bois']; st.inventory['bûche']=(st.inventory['bûche']||0)+1; return 'transforme 1 bois en 1 bûche'; } },
+    { id:'brindille', label:'🌿 1 bois → 2 brindilles', desc:null, locations:null,
+      check:(st)=>((st.inventory['bois']||0)>=1?{ok:true}:{ok:false,why:'besoin de 1 bois'}),
+      apply:(st)=>{ st.inventory['bois']-=1; if(st.inventory['bois']<=0)delete st.inventory['bois']; st.inventory['brindille']=(st.inventory['brindille']||0)+2; return 'transforme 1 bois en 2 brindilles'; } },
+  ],
+  'Mineur': [
+    { id:'explorer', label:'⛏️ Explorer la mine', locations:['Montagne'],
+      desc:(st)=>{ const lvl=st.mineLevel||1; return 'niv. '+lvl+'/5 · risque crâne '+(5+(lvl-1)*5)+'%'; },
+      check:(st)=>({ok:true}),
+      apply:(st)=>{
+        const lvl = st.mineLevel||1;
+        const skull = 5 + (lvl-1)*5;
+        const stairs = 15, coal = 30;
+        const rock = 100 - skull - stairs - coal;
+        const r = Math.random()*100;
+        if(r < rock){ st.inventory['pierre brute']=(st.inventory['pierre brute']||0)+1; return 'explore la mine (niv. '+lvl+') et trouve 1 pierre brute'; }
+        if(r < rock+coal){ st.inventory['minerai de charbon']=(st.inventory['minerai de charbon']||0)+1; return 'explore la mine (niv. '+lvl+') et trouve 1 minerai de charbon'; }
+        if(r < rock+coal+stairs){
+          if(lvl<5){ st.mineLevel=lvl+1; return 'découvre un escalier 🪜 et le groupe descend au niveau '+(lvl+1)+' de la mine'; }
+          return 'découvre un escalier, mais la mine est déjà au plus profond (niv. 5)';
+        }
+        const keys = Object.keys(st.inventory);
+        if(keys.length===0){ return 'réveille un crâne de monstre 💀… mais le groupe n\'a aucun objet à perdre !'; }
+        const k = keys[Math.floor(Math.random()*keys.length)];
+        st.inventory[k]-=1; if(st.inventory[k]<=0) delete st.inventory[k];
+        return 'réveille un crâne de monstre 💀 et le groupe perd 1 '+k+' !';
+      } },
+    { id:'pierre', label:'🪨 Pierre brute → pierre', desc:null, locations:null,
+      check:(st)=>((st.inventory['pierre brute']||0)>=1?{ok:true}:{ok:false,why:'besoin de 1 pierre brute'}),
+      apply:(st)=>{ st.inventory['pierre brute']-=1; if(st.inventory['pierre brute']<=0)delete st.inventory['pierre brute']; st.inventory['pierre']=(st.inventory['pierre']||0)+1; return 'transforme 1 pierre brute en 1 pierre'; } },
+    { id:'charbon', label:'⚫ Minerai de charbon → charbon', desc:null, locations:null,
+      check:(st)=>((st.inventory['minerai de charbon']||0)>=1?{ok:true}:{ok:false,why:'besoin de 1 minerai de charbon'}),
+      apply:(st)=>{ st.inventory['minerai de charbon']-=1; if(st.inventory['minerai de charbon']<=0)delete st.inventory['minerai de charbon']; st.inventory['charbon']=(st.inventory['charbon']||0)+1; return 'transforme 1 minerai de charbon en 1 charbon'; } },
+  ],
+  'Pêcheur': [
+    { id:'pecher', label:'🎣 Pêcher', locations:['Lac','Plage'],
+      desc:'carte poisson + dé',
+      check:(st)=>({ok:true}),
+      apply:(st)=>{
+        const fish = F_FISH[Math.floor(Math.random()*F_FISH.length)];
+        const roll = 1 + Math.floor(Math.random()*6);
+        if(roll >= fish.val){
+          st.inventory['poisson']=(st.inventory['poisson']||0)+1;
+          return 'pêche un(e) '+fish.nom+' (difficulté '+fish.val+') · dé 🎲 '+roll+' ✓ attrapé ! (+1 poisson)';
+        }
+        return 'pêche un(e) '+fish.nom+' (difficulté '+fish.val+') · dé 🎲 '+roll+' ✗ le poisson s\'échappe';
+      } },
+    { id:'griller', label:'🔥 Griller un poisson', desc:'1 poisson + 1 bois → 1 poisson grillé', locations:null,
+      check:(st)=>{ if((st.inventory['poisson']||0)<1) return {ok:false,why:'besoin de 1 poisson'}; if((st.inventory['bois']||0)<1) return {ok:false,why:'besoin de 1 bois'}; return {ok:true}; },
+      apply:(st)=>{ st.inventory['poisson']-=1; if(st.inventory['poisson']<=0)delete st.inventory['poisson']; st.inventory['bois']-=1; if(st.inventory['bois']<=0)delete st.inventory['bois']; st.inventory['poisson grillé']=(st.inventory['poisson grillé']||0)+1; return 'grille un poisson (1 poisson + 1 bois → 1 poisson grillé)'; } },
+    { id:'vendre_poisson', label:'🪙 Vendre un poisson', locations:null,
+      desc:(st)=>'+'+(F_SELL_VALUES['poisson']||0)+' or',
+      check:(st)=>((st.inventory['poisson']||0)>=1?{ok:true}:{ok:false,why:'aucun poisson'}),
+      apply:(st)=>{ st.inventory['poisson']-=1; if(st.inventory['poisson']<=0)delete st.inventory['poisson']; const v=F_SELL_VALUES['poisson']||0; st.gold=(st.gold||0)+v; return 'vend 1 poisson (+'+v+' or)'; } },
+  ],
+  // Agriculteur : forme fonction (actions dynamiques — vente uniquement des récoltes en stock)
+  'Agriculteur': (st)=>{
+    // Achat : une action d'achat par type de graine (choix au Magasin)
+    const buys = F_SEEDS.map(seed=>({
+      id:'acheter_'+seed.type, label:'🌰 Acheter graine '+seed.type, desc:'-'+F_SEED_PRICE+' or · mûrit niv.'+seed.maxLevel, locations:['Magasin'],
+      check:(st)=>((st.gold||0)>=F_SEED_PRICE?{ok:true}:{ok:false,why:'besoin de '+F_SEED_PRICE+' or'}),
+      apply:(st)=>{ st.gold=(st.gold||0)-F_SEED_PRICE; if(!Array.isArray(st.crops))st.crops=[]; st.crops.push({ id:'crop'+Date.now()+'_'+Math.floor(Math.random()*1000), type:seed.type, level:1 }); return 'achète une graine de '+seed.type+' (-'+F_SEED_PRICE+' or) et la plante (niv. 1/'+seed.maxLevel+')'; }
+    }));
+    // Arroser : monte TOUT le champ d'un niveau ; chaque plante à maturité est récoltée
+    const water = { id:'arroser', label:'💧 Arroser le champ', desc:'toutes les plantes +1 niveau', locations:null,
+      check:(st)=>((st.crops||[]).length>0?{ok:true}:{ok:false,why:'aucune plante à arroser'}),
+      apply:(st)=>{
+        (st.crops||[]).forEach(c=>{ c.level=(c.level||1)+1; });
+        const harvested=[]; const remaining=[];
+        (st.crops||[]).forEach(c=>{
+          const max = F_CROP_MAX[c.type];
+          if(!c.type || !max){ return; } // culture invalide : on l'ignore (sécurité)
+          if(c.level>=max){ st.inventory[c.type]=(st.inventory[c.type]||0)+1; harvested.push(c.type); }
+          else remaining.push(c);
+        });
+        st.crops = remaining;
+        if(harvested.length) return 'arrose tout le champ — récolte : '+harvested.join(', ')+' 🌾 !';
+        return 'arrose tout le champ (chaque plante +1 niveau)';
+      } };
+    // Cuisiner : plat de veillée (Ferme) à partir de panais + tomate + salade + poisson grillé
+    const cook = { id:'cuisiner', label:'🍲 Cuisiner un plat de veillée', desc:'1 panais + 1 tomate + 1 salade + 1 poisson grillé', locations:['Ferme'],
+      check:(st)=>{ const need=['panais','tomate','salade','poisson grillé']; const miss=need.filter(k=>(st.inventory[k]||0)<1); return miss.length===0?{ok:true}:{ok:false,why:'manque '+miss.join(', ')}; },
+      apply:(st)=>{ ['panais','tomate','salade','poisson grillé'].forEach(k=>{ st.inventory[k]-=1; if(st.inventory[k]<=0)delete st.inventory[k]; }); st.inventory['plat de veillée']=(st.inventory['plat de veillée']||0)+1; return 'cuisine un plat de veillée 🍲 !'; } };
+    // Vente des récoltes (dynamique — seulement celles en stock)
+    const sells = F_SEEDS.filter(s=>(st.inventory[s.type]||0)>0).map(s=>({
+      id:'vendre_'+s.type, label:'🪙 Vendre 1 '+s.type, desc:'+'+s.sell+' or', locations:null,
+      check:(st)=>((st.inventory[s.type]||0)>=1?{ok:true}:{ok:false,why:'aucun '+s.type}),
+      apply:(st)=>{ st.inventory[s.type]-=1; if(st.inventory[s.type]<=0)delete st.inventory[s.type]; st.gold=(st.gold||0)+s.sell; return 'vend 1 '+s.type+' (+'+s.sell+' or)'; }
+    }));
+    return buys.concat([water, cook]).concat(sells);
+  },
+};
+
+// Affichage du champ commun (cultures en cours)
+function fCrops(st){
+  const crops = st.crops||[];
+  if(!crops.length) return '<div style="font-size:.82rem;color:var(--amber-mid);font-style:italic;margin-bottom:.6rem">🌱 Champ commun : vide</div>';
+  const cropIcon={ panais:'🥕', tomate:'🍅', salade:'🥬' };
+  const badges = crops.slice().sort((a,b)=>b.level-a.level).map(c=>{
+    const max = F_CROP_MAX[c.type] || 4;
+    const ic = cropIcon[c.type] || '🌱';
+    const ready = c.level>=max;
+    return '<span class="finv-item"'+(ready?' style="border-color:#9dcf7a;color:#c5f09a"':'')+'>'+ic+' '+(c.type||'?')+' niv. '+c.level+'/'+max+'</span>';
+  }).join('');
+  return '<div style="margin-bottom:.6rem"><div style="font-family:\'Cinzel\',serif;font-size:.68rem;letter-spacing:.12em;color:var(--amber-warm);text-transform:uppercase;margin-bottom:.3rem">🌱 Champ commun ('+crops.length+' plante'+(crops.length>1?'s':'')+')</div><div class="finv">'+badges+'</div></div>';
+}
+
+function fMetierActions(metier, st){ const def = F_ACTIONS[metier]; if(typeof def==='function') return def(st||ferme||{inventory:{},crops:[],gold:0}) || []; return def || []; }
+function fHasValidAction(st, pseudo){
+  const p = st.players[pseudo]; if(!p) return false;
+  return fMetierActions(p.metier, st).some(a => (!a.locations || a.locations.indexOf(p.location)>=0) && a.check(st).ok);
+}
+function fShuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function fNormalize(st){
+  if(!st) return st;
+  st.players   = (st.players && typeof st.players==='object') ? st.players : {};
+  st.turnOrder = Array.isArray(st.turnOrder) ? st.turnOrder : (st.turnOrder ? Object.values(st.turnOrder) : []);
+  st.inventory = (st.inventory && typeof st.inventory==='object') ? st.inventory : {};
+  st.locations = Array.isArray(st.locations) ? st.locations : F_LOCATIONS.slice();
+  st.gold      = (typeof st.gold==='number') ? st.gold : 0;
+  st.turn      = (typeof st.turn==='number') ? st.turn : 1;
+  st.currentIdx= (typeof st.currentIdx==='number') ? st.currentIdx : 0;
+  st.mineLevel = (typeof st.mineLevel==='number') ? st.mineLevel : 1;
+  st.crops = Array.isArray(st.crops) ? st.crops : (st.crops ? Object.values(st.crops) : []);
+  // Répare/purge les cultures héritées d'anciennes parties (sans type valide) pour éviter les récoltes "undefined"
+  const _validTypes = (typeof F_CROP_MAX!=='undefined') ? Object.keys(F_CROP_MAX) : ['panais','tomate','salade'];
+  st.crops = st.crops
+    .filter(c => c && typeof c==='object')
+    .map(c => ({ id: c.id || ('crop'+Math.random().toString(36).slice(2)), type: c.type, level: (typeof c.level==='number' && c.level>=1) ? c.level : 1 }))
+    .filter(c => _validTypes.indexOf(c.type) >= 0);
+  if(st.lastAction && typeof st.lastAction!=='object') st.lastAction = null;
+  return st;
+}
+function fPlayers(st){ return Object.values(st.players); }
+function fCurrent(st){ return st.turnOrder[st.currentIdx] || null; }
+
+// ── Control handlers ──
+function startFerme(){
+  const target = Math.max(1, parseInt(document.getElementById('ferme-target').value)||4);
+  fbSetFerme({
+    active:true, phase:'lobby', targetPlayers:target, turn:1, maxTurns:F_MAXTURNS,
+    players:{}, turnOrder:[], currentIdx:0, inventory:{}, gold:0, mineLevel:1, crops:[], locations:F_LOCATIONS.slice(),
+    lastEvent:'Lobby ouvert — en attente des joueurs (0/'+target+').'
+  });
+  toast('🌾 Lobby de la Ferme ouvert !');
+}
+
+function fermeCancel(){
+  if(!confirm('Abandonner la partie de la Ferme en cours ?')) return;
+  fbSetFerme(null);
+  toast('Partie de la Ferme annulée.');
+}
+
+function fermeJoin(pseudo){
+  if(!ferme || ferme.phase!=='lobby') return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  if(!st.players[pseudo]) st.players[pseudo] = { pseudo, metier:null, location:null, done:false };
+  const n = fPlayers(st).length;
+  st.lastEvent = 'En attente des joueurs… ('+n+'/'+st.targetPlayers+')';
+  if(n >= st.targetPlayers){ fStartPlanning(st); }
+  fbSetFerme(st);
+}
+
+function fermeLeave(pseudo){
+  if(!ferme || ferme.phase!=='lobby') return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  delete st.players[pseudo];
+  st.lastEvent = 'En attente des joueurs… ('+fPlayers(st).length+'/'+st.targetPlayers+')';
+  fbSetFerme(st);
+}
+
+function fermeForceStart(){
+  if(!ferme || ferme.phase!=='lobby') return;
+  if(fPlayers(ferme).length===0){ toast('Aucun joueur dans le lobby !'); return; }
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  fStartPlanning(st);
+  fbSetFerme(st);
+}
+
+function fStartPlanning(st){
+  const players = fPlayers(st);
+  const metiers = fShuffle(F_METIERS_BASE.slice());
+  const order = fShuffle(players.map(p=>p.pseudo));
+  order.forEach((pseudo,i)=>{ st.players[pseudo].metier = i<metiers.length?metiers[i]:null; st.players[pseudo].location=null; st.players[pseudo].done=false; st.players[pseudo].actionsDone=0; st.players[pseudo].hasMoved=false; });
+  st.turnOrder = order; st.currentIdx=0; st.phase='planning';
+  st.lastEvent = 'Tour '+st.turn+' — Planification : métiers distribués, chacun choisit son lieu de départ.';
+  return st;
+}
+
+function fermeSetLocation(pseudo, loc){
+  if(!ferme || ferme.phase!=='planning') return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  if(st.players[pseudo] && st.locations.indexOf(loc)>=0) st.players[pseudo].location=loc;
+  fbSetFerme(st);
+}
+
+function fermeStartAction(){
+  if(!ferme || ferme.phase!=='planning') return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  fPlayers(st).forEach(p=>{ if(!p.location) p.location='Ferme'; });
+  st.phase='action'; st.currentIdx=0;
+  st.lastEvent = 'Tour '+st.turn+' — Phase d\'action. Au tour de '+(st.turnOrder[0]||'—')+'.';
+  fbSetFerme(st);
+}
+
+function fermeMove(pseudo, loc){
+  if(!ferme || ferme.phase!=='action') return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  if(st.players[pseudo] && st.locations.indexOf(loc)>=0){ st.players[pseudo].location=loc; st.lastEvent=pseudo+' se déplace vers '+F_LOC_ICON[loc]+' '+loc+'.'; }
+  fbSetFerme(st);
+}
+
+function fAdvance(st){
+  const cur = fCurrent(st);
+  if(cur){ st.players[cur].done=true; st.players[cur].location='Ferme'; }
+  st.currentIdx += 1;
+  if(st.currentIdx >= st.turnOrder.length){ fEndTurn(st); }
+  else { st.lastEvent = (cur?cur+' a terminé son tour. ':'')+'Au tour de '+fCurrent(st)+'.'; }
+  return st;
+}
+function fermeEndPlayerTurn(){
+  if(!ferme || ferme.phase!=='action') return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  fAdvance(st);
+  fbSetFerme(st);
+}
+
+function fermeDoAction(pseudo, actionId){
+  if(!ferme || ferme.phase!=='action') return;
+  if(fCurrent(ferme)!==pseudo) return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  const p = st.players[pseudo];
+  if(!p || (p.actionsDone||0)>=2) return;
+  const act = fMetierActions(p.metier, st).find(a=>a.id===actionId);
+  if(!act) return;
+  if(act.locations && act.locations.indexOf(p.location)<0){ toast('Action impossible à '+p.location); return; }
+  const chk = act.check(st);
+  if(!chk.ok){ toast(chk.why||'Action impossible'); return; }
+  const msg = act.apply(st);
+  p.actionsDone = (p.actionsDone||0)+1;
+  st.lastEvent = pseudo+' '+msg+'.';
+  // résultat persistant de la dernière action (ne se fait pas écraser par le passage au joueur suivant)
+  st.lastAction = { pseudo, msg, metier:p.metier, at:Date.now() };
+  if(p.actionsDone>=2){ fAdvance(st); }
+  fbSetFerme(st);
+}
+
+function fermePlayerMove(pseudo, loc){
+  if(!ferme || ferme.phase!=='action') return;
+  if(fCurrent(ferme)!==pseudo) return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  const p = st.players[pseudo];
+  if(!p || p.hasMoved || (p.actionsDone||0)>=2){ toast('Déplacement impossible'); return; }
+  if(st.locations.indexOf(loc)<0) return;
+  const done = p.actionsDone||0;
+  if(done<1){
+    // move-first only allowed if stuck (no valid action here); it consumes the first action slot
+    if(fHasValidAction(st, pseudo)){ toast('Fais d\'abord une action, puis déplace-toi'); return; }
+    p.actionsDone = 1;
+  }
+  p.location = loc; p.hasMoved = true;
+  st.lastEvent = pseudo+' se déplace vers '+F_LOC_ICON[loc]+' '+loc+'.';
+  fbSetFerme(st);
+}
+
+// Boutons d'action pour le joueur courant (utilisés côté joueur ET côté meneur)
+function fActionButtons(st, pseudo){
+  const p = st.players[pseudo]; if(!p) return '';
+  const done = p.actionsDone||0;
+  let html = '<div style="font-size:.8rem;color:var(--amber-warm);margin:.5rem 0 .3rem">Actions '+done+'/2 — '+(p.metier?(F_METIER_ICON[p.metier]+' '+p.metier):'sans métier')+' à '+F_LOC_ICON[p.location]+' '+p.location+'</div>';
+  if(done>=2){ return html+'<div class="diamant-voted">Les 2 actions sont faites, le tour se termine.</div>'; }
+  const avail = fMetierActions(p.metier, st).filter(a=>!a.locations || a.locations.indexOf(p.location)>=0);
+  if(!p.metier){
+    html += '<div style="font-size:.85rem;color:var(--amber-mid);font-style:italic;margin-bottom:.4rem">Pas de métier ce tour — tu peux te déplacer ou passer.</div>';
+  } else if(avail.length===0){
+    html += '<div style="font-size:.85rem;color:var(--amber-mid);font-style:italic;margin-bottom:.4rem">Aucune action de '+p.metier+' possible ici. Déplace-toi vers le bon lieu.</div>';
+  } else {
+    html += '<div style="display:flex;flex-direction:column;gap:.4rem">';
+    avail.forEach(a=>{
+      const chk = a.check(st);
+      const dis = chk.ok ? '' : 'disabled';
+      const why = chk.ok ? '' : ' <span style="opacity:.7">('+(chk.why||'indispo')+')</span>';
+      const dtxt = (typeof a.desc==='function') ? a.desc(st) : a.desc;
+      html += '<button class="btn-continue" '+dis+' onclick="fermeDoAction(\''+escAttr(pseudo)+'\',\''+a.id+'\')" style="text-align:left">'+a.label+(dtxt?(' — '+dtxt):'')+why+'</button>';
+    });
+    html += '</div>';
+  }
+  const canMove = !p.hasMoved && done<2 && (done>=1 || !fHasValidAction(st,pseudo));
+  if(canMove){
+    html += '<div style="font-size:.8rem;color:var(--amber-warm);margin:.6rem 0 .3rem">'+(done>=1?'Se déplacer, puis 1 dernière action :':'Se déplacer (aucune action possible ici) :')+'</div>'+
+      '<div style="display:flex;gap:.3rem;flex-wrap:wrap">'+
+      st.locations.filter(l=>l!==p.location).map(l=>'<button class="btn-small" onclick="fermePlayerMove(\''+escAttr(pseudo)+'\',\''+escAttr(l)+'\')">'+F_LOC_ICON[l]+' '+l+'</button>').join('')+'</div>';
+  }
+  return html;
+}
+
+function fEndTurn(st){
+  if(st.turn >= st.maxTurns){ st.phase='gameEnd'; st.result=null; st.lastEvent='🏁 Fin du 10e tour ! Déclare victoire ou défaite.'; return st; }
+  st.turn += 1; return fStartPlanning(st);
+}
+
+function fermeDeclare(victory){
+  if(!ferme) return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  st.phase='gameEnd'; st.result = victory?'victory':'defeat';
+  st.lastEvent = victory ? '🎉 Victoire ! Les objectifs de grand-père sont remplis.' : '😞 Défaite… objectifs non atteints.';
+  fbSetFerme(st);
+}
+
+function fermeEndToFire(){
+  if(!ferme) return;
+  const pts = parseInt(prompt('Combien de points ajouter au feu de camp ?', ferme.result==='victory'?'30':'0'));
+  if(isNaN(pts)) return;
+  if(pts>0) fbSetFire(Object.assign({}, fire, { points:(fire.points||0)+pts }));
+  fbSetFerme(null);
+  toast(pts>0?('🔥 +'+pts+' pts au feu ! Partie clôturée.'):'Partie clôturée.');
+}
+
+// Inventory adjust
+function fermeAddResource(){
+  if(!ferme) return;
+  const sel = document.getElementById('fa-res-select');
+  const qty = parseInt(document.getElementById('fa-res-qty').value)||1;
+  const key = sel.value;
+  if(!key) return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  st.inventory[key] = (st.inventory[key]||0) + qty;
+  if(st.inventory[key]<=0) delete st.inventory[key];
+  fbSetFerme(st);
+}
+function fermeAdjustGold(delta){
+  if(!ferme) return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  st.gold = Math.max(0, (st.gold||0)+delta);
+  fbSetFerme(st);
+}
+
+const F_RESOURCES = ['bois','bûche','brindille','pierre brute','pierre','minerai de charbon','charbon','minerai de cuivre','cuivre','minerai de fer','fer','poisson','poisson grillé','panais','tomate','salade','plat de veillée','oeuf','lait','graine'];
+
+// ── Rendering ──
+function fLastActionBanner(st, opts){
+  opts = opts||{};
+  if(!st.lastAction || !st.lastAction.msg) return '';
+  const skull = /crâne/.test(st.lastAction.msg);
+  const border = skull ? 'var(--ember)' : '#9dcf7a';
+  const icon = skull ? '💀' : '✅';
+  const body = escHtml(st.lastAction.msg.replace(st.lastAction.pseudo+' ',''));
+  const dismiss = opts.dismiss
+    ? '<button onclick="fermeClearLastAction()" style="margin-left:auto;flex-shrink:0;background:transparent;border:1px solid rgba(122,61,0,.4);border-radius:4px;color:var(--amber-mid);font-size:.7rem;padding:.2rem .5rem;cursor:pointer">✕</button>'
+    : '';
+  return '<div class="ferme-lastaction" style="border-left:3px solid '+border+'">'+
+    '<span style="font-size:1.1rem;flex-shrink:0">'+icon+'</span>'+
+    '<span style="min-width:0">Dernière action — <strong style="color:var(--amber-bright)">'+escHtml(st.lastAction.pseudo)+'</strong> '+body+'</span>'+
+    dismiss+'</div>';
+}
+function fermeClearLastAction(){
+  if(!ferme) return;
+  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  st.lastAction = null;
+  fbSetFerme(st);
+}
+
+function fStatusPills(st){
+  const phaseLabel = { lobby:'Lobby', planning:'Planification', action:'Action', gameEnd:'Fin' }[st.phase]||st.phase;
+  return '<div class="fturn-pill">Tour <strong>'+st.turn+'/'+st.maxTurns+'</strong></div>'+
+         '<span class="fphase-badge fphase-'+st.phase+'">'+phaseLabel+'</span>'+
+         '<div class="fturn-pill">⛏️ Mine <strong>niv. '+(st.mineLevel||1)+'/5</strong></div>'+
+         '<div class="fgold">🪙 '+st.gold+' or</div>';
+}
+
+function fBoard(st, opts){
+  opts = opts||{};
+  const cur = fCurrent(st);
+  return '<div class="ferme-board">'+ st.locations.map(loc=>{
+    const here = fPlayers(st).filter(p=>p.location===loc);
+    const pawns = here.map(p=>'<span class="fpawn'+(p.pseudo===cur?' current':'')+'">'+escHtml(p.pseudo)+'</span>').join('');
+    const clickable = opts.onPick ? ' floc-btn" onclick="'+opts.onPick+'(\''+escAttr(loc)+'\')"' : '"';
+    const sel = (opts.selected===loc)?' selected':'';
+    return '<div class="floc'+sel+(opts.onPick?' floc-btn':'')+'" '+(opts.onPick?('onclick="'+opts.onPick+'(\''+escAttr(loc)+'\')"'):'')+'>'+
+      '<div class="floc-header">'+F_LOC_ICON[loc]+' '+loc+'</div>'+
+      '<div class="floc-pawns">'+pawns+'</div></div>';
+  }).join('') + '</div>';
+}
+
+function fPlayersList(st, highlight){
+  const cur = fCurrent(st);
+  return fPlayers(st).map(p=>{
+    const isCur = (st.phase==='action' && p.pseudo===cur);
+    const metier = p.metier ? '<span class="fmetier">'+(F_METIER_ICON[p.metier]||'')+' '+p.metier+'</span>' : '<span class="fmetier none">sans métier</span>';
+    const loc = p.location ? '<span class="floc-tag">'+F_LOC_ICON[p.location]+' '+p.location+'</span>' : '<span class="floc-tag" style="opacity:.5">non placé</span>';
+    const hl = (p.pseudo===highlight)?'style="outline:1px solid var(--amber-warm)"':'';
+    return '<div class="fplayer-row'+(isCur?' current':'')+(p.done?' done':'')+'" '+hl+'>'+
+      '<span>'+(isCur?'▶ ':'')+escHtml(p.pseudo)+'</span>'+metier+loc+
+      (p.done?'<span style="margin-left:auto;font-size:.75rem;color:#9dcf7a">✓ fini</span>':'')+'</div>';
+  }).join('');
+}
+
+function fInventory(st){
+  const items = Object.keys(st.inventory);
+  if(!items.length) return '<div class="finv"><span style="color:var(--amber-mid);font-style:italic;font-size:.85rem">Inventaire vide</span></div>';
+  return '<div class="finv">'+items.map(k=>'<span class="finv-item">'+escHtml(k)+' <strong>×'+st.inventory[k]+'</strong></span>').join('')+'</div>';
+}
+
+function renderFermeAdmin(){
+  const panel = document.getElementById('ferme-panel');
+  if(!panel) return;
+  const inactive = document.getElementById('ferme-admin-inactive');
+  const active = document.getElementById('ferme-admin-active');
+  if(!ferme || !ferme.active){ inactive.style.display='block'; active.style.display='none'; return; }
+  inactive.style.display='none'; active.style.display='block';
+
+  document.getElementById('fa-status').innerHTML = fStatusPills(ferme);
+  document.getElementById('fa-lastaction').innerHTML = fLastActionBanner(ferme, {dismiss:true});
+  document.getElementById('fa-event').textContent = ferme.lastEvent||'';
+  document.getElementById('fa-board').innerHTML = fBoard(ferme);
+  document.getElementById('fa-players').innerHTML = fPlayersList(ferme);
+
+  // inventory + meneur adjust
+  const resOpts = F_RESOURCES.map(r=>'<option value="'+r+'">'+r+'</option>').join('');
+  document.getElementById('fa-inventory').innerHTML =
+    '<div style="font-family:\'Cinzel\',serif;font-size:.7rem;letter-spacing:.15em;color:var(--amber-warm);text-transform:uppercase;margin-bottom:.5rem">Inventaire partagé</div>'+
+    fInventory(ferme)+
+    fCrops(ferme)+
+    '<div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;margin-top:.5rem">'+
+      '<select id="fa-res-select" style="flex:1;min-width:130px">'+resOpts+'</select>'+
+      '<input type="number" id="fa-res-qty" value="1" style="width:70px" class="fire-mini-input">'+
+      '<button class="btn-small" onclick="fermeAddResource()">± Ressource</button>'+
+      '<span style="margin-left:auto;display:flex;gap:.3rem;align-items:center">🪙'+
+        '<button class="btn-icon" onclick="fermeAdjustGold(-5)">−5</button>'+
+        '<button class="btn-icon" onclick="fermeAdjustGold(-1)">−</button>'+
+        '<button class="btn-icon" onclick="fermeAdjustGold(1)">+</button>'+
+        '<button class="btn-icon" onclick="fermeAdjustGold(5)">+5</button>'+
+      '</span>'+
+    '</div>';
+
+  const ctrl = document.getElementById('fa-controls');
+  const ph = ferme.phase;
+  const cancelBtn = '<button class="btn-deactivate" onclick="fermeCancel()" style="margin-top:.6rem">✕ Abandonner la partie</button>';
+  if(ph==='lobby'){
+    ctrl.innerHTML = '<div class="diamant-voted">🚪 '+fPlayers(ferme).length+'/'+ferme.targetPlayers+' joueurs ont rejoint. La partie démarrera automatiquement, ou force le départ :</div>'+
+      '<button class="btn-draw" onclick="fermeForceStart()">▶ Démarrer maintenant</button>'+cancelBtn;
+  } else if(ph==='planning'){
+    const placed = fPlayers(ferme).filter(p=>p.location).length;
+    ctrl.innerHTML = '<div class="diamant-voted">📍 Placement : '+placed+'/'+fPlayers(ferme).length+' joueurs placés. Tu peux aussi les placer toi-même en cliquant sur les lieux ci-dessus (à venir), ou lancer directement.</div>'+
+      '<button class="btn-draw" onclick="fermeStartAction()">▶ Lancer la phase d\'action</button>'+cancelBtn;
+  } else if(ph==='action'){
+    const cur = fCurrent(ferme);
+    const acts = cur ? fActionButtons(ferme, cur) : '';
+    ctrl.innerHTML = '<div class="diamant-voted">▶ Au tour de <strong style="color:var(--amber-bright)">'+(cur||'—')+'</strong>. Tu peux jouer à sa place (en cas d\'absence) :</div>'+
+      acts +
+      '<button class="btn-draw" onclick="fermeEndPlayerTurn()" style="margin-top:.8rem">⏭️ Terminer le tour de ce joueur</button>'+cancelBtn;
+  } else if(ph==='gameEnd'){
+    let head = '';
+    if(ferme.result==='victory') head='<div class="diamant-voted" style="color:#9dcf7a">🎉 Victoire déclarée !</div>';
+    else if(ferme.result==='defeat') head='<div class="diamant-voted" style="color:#f08060">😞 Défaite déclarée.</div>';
+    else head='<div class="diamant-voted">🏁 Fin des 10 tours. Les objectifs de grand-père sont-ils remplis ?</div>';
+    ctrl.innerHTML = head +
+      '<div style="display:flex;gap:.8rem;margin-top:.6rem">'+
+        '<button class="btn-continue" onclick="fermeDeclare(true)">🎉 Victoire</button>'+
+        '<button class="btn-leave" onclick="fermeDeclare(false)">😞 Défaite</button>'+
+      '</div>'+
+      '<button class="btn-draw" onclick="fermeEndToFire()" style="margin-top:.8rem">🔥 Clôturer (+ points au feu)</button>';
+  }
+}
+
+function renderFermeViewer(pseudo){
+  const wrap = document.getElementById('viewer-ferme');
+  if(!wrap) return;
+  if(!ferme || !ferme.active){ wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  document.getElementById('fv-status').innerHTML = fStatusPills(ferme);
+  document.getElementById('fv-lastaction').innerHTML = fLastActionBanner(ferme);
+  document.getElementById('fv-event').textContent = ferme.lastEvent||'';
+
+  const zone = document.getElementById('fv-myzone');
+  const me = ferme.players[pseudo];
+  const ph = ferme.phase;
+
+  if(ph==='lobby'){
+    if(me){
+      zone.innerHTML = '<div class="diamant-voted">✓ Tu as rejoint la partie ! En attente des autres ('+fPlayers(ferme).length+'/'+ferme.targetPlayers+')…</div>'+
+        '<button class="btn-small" onclick="fermeLeave(\''+escAttr(pseudo)+'\')" style="width:100%">↩ Quitter le lobby</button>';
+    } else {
+      zone.innerHTML = '<div class="diamant-voted">🚪 Une partie de la Ferme se prépare ! Rejoins avant le départ.</div>'+
+        '<button class="btn-continue" onclick="fermeJoin(\''+escAttr(pseudo)+'\')" style="width:100%">🌾 Rejoindre la partie</button>';
+    }
+    return;
+  }
+
+  // in-game board is useful for everyone
+  let board = fBoard(ferme, {});
+  let inv = fInventory(ferme) + fCrops(ferme);
+
+  if(!me){
+    zone.innerHTML = board + inv + '<div class="diamant-voted">👀 Tu n\'es pas dans cette partie. Tu pourras jouer à la prochaine !</div>';
+    return;
+  }
+
+  if(ph==='planning'){
+    const myLoc = me.location;
+    zone.innerHTML =
+      '<div class="diamant-voted">Ton métier ce tour : <strong style="color:#a89ef0">'+(me.metier?(F_METIER_ICON[me.metier]+' '+me.metier):'sans métier')+'</strong>. Choisis ton lieu de départ :</div>'+
+      inv +
+      '<div class="ferme-board">'+ ferme.locations.map(loc=>{
+        const here = fPlayers(ferme).filter(p=>p.location===loc);
+        const pawns = here.map(p=>'<span class="fpawn">'+escHtml(p.pseudo)+'</span>').join('');
+        const sel = (myLoc===loc)?' selected':'';
+        return '<div class="floc floc-btn'+sel+'" onclick="fermeSetLocation(\''+escAttr(pseudo)+'\',\''+escAttr(loc)+'\')">'+
+          '<div class="floc-header">'+F_LOC_ICON[loc]+' '+loc+'</div><div class="floc-pawns">'+pawns+'</div></div>';
+      }).join('') +'</div>'+ inv;
+    return;
+  }
+
+  if(ph==='action'){
+    const cur = fCurrent(ferme);
+    const isMe = (cur===pseudo);
+    zone.innerHTML = board + inv +
+      (isMe
+        ? '<div class="diamant-voted" style="color:#9dcf7a">▶ C\'est ton tour !</div>' + fActionButtons(ferme, pseudo) + '<button class="btn-draw" onclick="fermeEndPlayerTurn()" style="margin-top:.8rem">Terminer mon tour</button>'
+        : '<div class="diamant-voted">Au tour de <strong style="color:var(--amber-bright)">'+(cur||'—')+'</strong>. Ton métier ce tour : '+(me.metier||'—')+', ton lieu : '+(me.location||'—')+'.</div>');
+    return;
+  }
+
+  if(ph==='gameEnd'){
+    let msg = ferme.result==='victory' ? '🎉 Victoire ! Grand-père est fier de vous.' : ferme.result==='defeat' ? '😞 Défaite… ce sera pour la prochaine fois.' : '🏁 Fin de la partie.';
+    zone.innerHTML = board + inv + '<div class="diamant-voted">'+msg+'</div>';
+    return;
+  }
+}
+
+// ── STATS ─────────────────────────────────────────────────────────────────
+function updateStats(){
+  document.getElementById('stat-viewers').textContent  = Object.keys(viewers).length;
+  document.getElementById('stat-assigns').textContent  = assignments.length;
+  const pts = fire.points||0;
+  const tier = fireTier(pts);
+  const lbl  = { petit:'Petit', grand:'Grand 🔥', legendaire:'Légendaire ✨' }[tier];
+  document.getElementById('stat-fire').textContent = lbl + ' ('+pts+' pts)';
+}
+
+updateStats();
+renderFireMeter();
+renderAdminFire();
+renderLibrary();
+renderDiamantAdmin();
+renderFermeAdmin();
+// Handle case where fb-ready fired before this script parsed
+if (window.FB) initSync();
+</script>
+</body>
+</html>
