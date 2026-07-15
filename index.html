@@ -275,7 +275,7 @@
   // ╔══════════════════════════════════════════════════════════════════╗
   // ║  COLLE TA CONFIG FIREBASE ICI (voir le guide en haut de la page)  ║
   // ╚══════════════════════════════════════════════════════════════════╝
- // Your web app's Firebase configuration
+  // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBD8G35KMNAc6W-HTPqjGpi8fgQuBuh48w",
   authDomain: "veillee-village.firebaseapp.com",
@@ -1639,14 +1639,15 @@ const F_FISH = [
 ];
 // Valeurs de vente en or (⚠️ VALEURS PAR DÉFAUT — remplace-les par les tiennes)
 const F_SELL_VALUES = { 'poisson':3, 'poisson grillé':6 };
-// Plantes cultivables : val = prix de vente de la récolte
-const F_PLANTS = [
-  { nom:'panais',  val:2 },
-  { nom:'fraise',  val:4 },
-  { nom:'haricot', val:3 },
-  { nom:'patate',  val:3 },
+// Graines cultivables : maxLevel = niveau de maturité (planté au niv.1), sell = prix de vente de la récolte
+// ⚠️ sell salade/tomate = VALEURS PROVISOIRES à ajuster
+const F_SEEDS = [
+  { type:'panais', maxLevel:2, sell:2 },
+  { type:'tomate', maxLevel:3, sell:3 },
+  { type:'salade', maxLevel:4, sell:2 },
 ];
-const F_SEED_PRICE = 1; // prix d'achat d'une graine
+const F_CROP_MAX = { panais:2, tomate:3, salade:4 };
+const F_SEED_PRICE = 1; // prix d'achat d'une graine (identique pour toutes)
 
 // ── Registre d'actions de métier (pattern réutilisable) ──
 // Chaque action : { id, label, desc, locations (null=partout), check(st)->{ok,why}, apply(st)->message }
@@ -1714,32 +1715,38 @@ const F_ACTIONS = {
   ],
   // Agriculteur : forme fonction (actions dynamiques — vente uniquement des récoltes en stock)
   'Agriculteur': (st)=>{
-    const base = [
-      { id:'acheter', label:'🌰 Acheter une graine', desc:'-'+F_SEED_PRICE+' or · plantée niv.1', locations:['Magasin'],
-        check:(st)=>((st.gold||0)>=F_SEED_PRICE?{ok:true}:{ok:false,why:'besoin de '+F_SEED_PRICE+' or'}),
-        apply:(st)=>{ st.gold=(st.gold||0)-F_SEED_PRICE; if(!Array.isArray(st.crops))st.crops=[]; st.crops.push({ id:'crop'+Date.now()+'_'+Math.floor(Math.random()*1000), level:1 }); return 'achète une graine (-'+F_SEED_PRICE+' or) et la plante (niveau 1/4)'; } },
-      { id:'arroser', label:'💧 Arroser une plante', desc:'niv. +1 · récolte auto à 4', locations:null,
-        check:(st)=>((st.crops||[]).some(c=>c.level<4)?{ok:true}:{ok:false,why:'aucune plante à arroser'}),
-        apply:(st)=>{
-          const growing=(st.crops||[]).filter(c=>c.level<4);
-          if(!growing.length) return 'arrose… mais le champ est vide';
-          growing.sort((a,b)=>b.level-a.level);
-          const crop=growing[0]; crop.level+=1;
-          if(crop.level>=4){
-            st.crops=st.crops.filter(c=>c.id!==crop.id);
-            const plant=F_PLANTS[Math.floor(Math.random()*F_PLANTS.length)];
-            st.inventory[plant.nom]=(st.inventory[plant.nom]||0)+1;
-            return 'arrose une plante à maturité et récolte 1 '+plant.nom+' 🌾 !';
-          }
-          return 'arrose une plante (niveau '+crop.level+'/4)';
-        } },
-    ];
-    const sells = F_PLANTS.filter(pl=>(st.inventory[pl.nom]||0)>0).map(pl=>({
-      id:'vendre_'+pl.nom, label:'🪙 Vendre 1 '+pl.nom, desc:'+'+pl.val+' or', locations:null,
-      check:(st)=>((st.inventory[pl.nom]||0)>=1?{ok:true}:{ok:false,why:'aucun '+pl.nom}),
-      apply:(st)=>{ st.inventory[pl.nom]-=1; if(st.inventory[pl.nom]<=0)delete st.inventory[pl.nom]; st.gold=(st.gold||0)+pl.val; return 'vend 1 '+pl.nom+' (+'+pl.val+' or)'; }
+    // Achat : une action d'achat par type de graine (choix au Magasin)
+    const buys = F_SEEDS.map(seed=>({
+      id:'acheter_'+seed.type, label:'🌰 Acheter graine '+seed.type, desc:'-'+F_SEED_PRICE+' or · mûrit niv.'+seed.maxLevel, locations:['Magasin'],
+      check:(st)=>((st.gold||0)>=F_SEED_PRICE?{ok:true}:{ok:false,why:'besoin de '+F_SEED_PRICE+' or'}),
+      apply:(st)=>{ st.gold=(st.gold||0)-F_SEED_PRICE; if(!Array.isArray(st.crops))st.crops=[]; st.crops.push({ id:'crop'+Date.now()+'_'+Math.floor(Math.random()*1000), type:seed.type, level:1 }); return 'achète une graine de '+seed.type+' (-'+F_SEED_PRICE+' or) et la plante (niv. 1/'+seed.maxLevel+')'; }
     }));
-    return base.concat(sells);
+    // Arroser : monte TOUT le champ d'un niveau ; chaque plante à maturité est récoltée
+    const water = { id:'arroser', label:'💧 Arroser le champ', desc:'toutes les plantes +1 niveau', locations:null,
+      check:(st)=>((st.crops||[]).length>0?{ok:true}:{ok:false,why:'aucune plante à arroser'}),
+      apply:(st)=>{
+        (st.crops||[]).forEach(c=>{ c.level=(c.level||1)+1; });
+        const harvested=[]; const remaining=[];
+        (st.crops||[]).forEach(c=>{
+          const max = F_CROP_MAX[c.type] || 4;
+          if(c.level>=max){ st.inventory[c.type]=(st.inventory[c.type]||0)+1; harvested.push(c.type); }
+          else remaining.push(c);
+        });
+        st.crops = remaining;
+        if(harvested.length) return 'arrose tout le champ — récolte : '+harvested.join(', ')+' 🌾 !';
+        return 'arrose tout le champ (chaque plante +1 niveau)';
+      } };
+    // Cuisiner : plat de veillée (Ferme) à partir de panais + tomate + salade + poisson grillé
+    const cook = { id:'cuisiner', label:'🍲 Cuisiner un plat de veillée', desc:'1 panais + 1 tomate + 1 salade + 1 poisson grillé', locations:['Ferme'],
+      check:(st)=>{ const need=['panais','tomate','salade','poisson grillé']; const miss=need.filter(k=>(st.inventory[k]||0)<1); return miss.length===0?{ok:true}:{ok:false,why:'manque '+miss.join(', ')}; },
+      apply:(st)=>{ ['panais','tomate','salade','poisson grillé'].forEach(k=>{ st.inventory[k]-=1; if(st.inventory[k]<=0)delete st.inventory[k]; }); st.inventory['plat de veillée']=(st.inventory['plat de veillée']||0)+1; return 'cuisine un plat de veillée 🍲 !'; } };
+    // Vente des récoltes (dynamique — seulement celles en stock)
+    const sells = F_SEEDS.filter(s=>(st.inventory[s.type]||0)>0).map(s=>({
+      id:'vendre_'+s.type, label:'🪙 Vendre 1 '+s.type, desc:'+'+s.sell+' or', locations:null,
+      check:(st)=>((st.inventory[s.type]||0)>=1?{ok:true}:{ok:false,why:'aucun '+s.type}),
+      apply:(st)=>{ st.inventory[s.type]-=1; if(st.inventory[s.type]<=0)delete st.inventory[s.type]; st.gold=(st.gold||0)+s.sell; return 'vend 1 '+s.type+' (+'+s.sell+' or)'; }
+    }));
+    return buys.concat([water, cook]).concat(sells);
   },
 };
 
@@ -1747,10 +1754,12 @@ const F_ACTIONS = {
 function fCrops(st){
   const crops = st.crops||[];
   if(!crops.length) return '<div style="font-size:.82rem;color:var(--amber-mid);font-style:italic;margin-bottom:.6rem">🌱 Champ commun : vide</div>';
-  const icons=['🌱','🌿','🌾','🌻'];
+  const cropIcon={ panais:'🥕', tomate:'🍅', salade:'🥬' };
   const badges = crops.slice().sort((a,b)=>b.level-a.level).map(c=>{
-    const ic = icons[Math.min(3,(c.level||1)-1)];
-    return '<span class="finv-item">'+ic+' niv. '+c.level+'/4</span>';
+    const max = F_CROP_MAX[c.type] || 4;
+    const ic = cropIcon[c.type] || '🌱';
+    const ready = c.level>=max;
+    return '<span class="finv-item"'+(ready?' style="border-color:#9dcf7a;color:#c5f09a"':'')+'>'+ic+' '+(c.type||'?')+' niv. '+c.level+'/'+max+'</span>';
   }).join('');
   return '<div style="margin-bottom:.6rem"><div style="font-family:\'Cinzel\',serif;font-size:.68rem;letter-spacing:.12em;color:var(--amber-warm);text-transform:uppercase;margin-bottom:.3rem">🌱 Champ commun ('+crops.length+' plante'+(crops.length>1?'s':'')+')</div><div class="finv">'+badges+'</div></div>';
 }
@@ -1980,7 +1989,7 @@ function fermeAdjustGold(delta){
   fbSetFerme(st);
 }
 
-const F_RESOURCES = ['bois','bûche','brindille','pierre brute','pierre','minerai de charbon','charbon','minerai de cuivre','cuivre','minerai de fer','fer','poisson','poisson grillé','panais','fraise','haricot','patate','oeuf','lait','graine'];
+const F_RESOURCES = ['bois','bûche','brindille','pierre brute','pierre','minerai de charbon','charbon','minerai de cuivre','cuivre','minerai de fer','fer','poisson','poisson grillé','panais','tomate','salade','plat de veillée','oeuf','lait','graine'];
 
 // ── Rendering ──
 function fLastActionBanner(st, opts){
