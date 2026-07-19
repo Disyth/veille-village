@@ -195,11 +195,11 @@ function dPlayersList(st, highlightPseudo){
     const voteBadge = (st.phase==='voting' && isIn)
       ? (p.vote ? '<span class="dvote-badge dvote-done">✓ a voté</span>' : '<span class="dvote-badge dvote-wait">…réfléchit</span>')
       : '';
-    const hl = (p.pseudo===highlightPseudo) ? 'style="outline:1px solid var(--amber-warm)"' : '';
+    const hl = (p.pseudo===highlightPseudo) ? 'class="u-outline"' : '';
     return '<div class="dplayer-row '+(isIn?'':'out')+'" '+hl+'>'+
       '<span class="dplayer-status '+(isIn?'dstatus-in':'dstatus-out')+'">'+(isIn?'⛏️ explore':'🏕️ au camp')+'</span>'+
       '<span>'+escHtml(p.pseudo)+'</span>'+
-      '<span style="color:var(--amber-warm);font-size:.8rem">'+(isIn?('+'+p.held+' en jeu'):('🔒 '+p.banked))+'</span>'+
+      '<span class="t-warm-sm">'+(isIn?('+'+p.held+' en jeu'):('🔒 '+p.banked))+'</span>'+
       voteBadge+'</div>';
   }).join('');
 }
@@ -228,24 +228,24 @@ function renderDiamantAdmin(){
   if(ph==='lobby'){
     ctrl.innerHTML = '<div class="diamant-voted">🚪 '+nPlayers+' explorateur(s) ont rejoint. Lance quand tu veux — la partie démarrera avec les joueurs présents.</div>'+
       '<button class="btn-draw" onclick="diamantLaunch()">💎 Lancer la partie'+(nPlayers?(' ('+nPlayers+' joueur'+(nPlayers>1?'s':'')+')'):'')+'</button>'+
-      '<button class="btn-deactivate" onclick="diamantCancel()" style="margin-top:.6rem">✕ Fermer le lobby</button>';
+      '<button class="btn-deactivate" onclick="diamantCancel()" class="u-mt-sm">✕ Fermer le lobby</button>';
   } else if(ph==='exploring'){
     ctrl.innerHTML = '<button class="btn-draw" onclick="diamantDraw()">🎴 Révéler une carte ('+diamant.deck.length+' restantes)</button>'+
-      '<button class="btn-deactivate" onclick="diamantCancel()" style="margin-top:.6rem">✕ Abandonner la partie</button>';
+      '<button class="btn-deactivate" onclick="diamantCancel()" class="u-mt-sm">✕ Abandonner la partie</button>';
   } else if(ph==='voting'){
     const ins = dInPlayers(diamant); const voted = ins.filter(p=>p.vote).length;
     ctrl.innerHTML = '<div class="diamant-voted">🗳️ Vote en cours… '+voted+'/'+ins.length+' ont voté</div>'+
       '<button class="btn-draw" onclick="diamantForceResolve()">⏭️ Forcer la résolution (absents = continuent)</button>'+
-      '<button class="btn-deactivate" onclick="diamantCancel()" style="margin-top:.6rem">✕ Abandonner la partie</button>';
+      '<button class="btn-deactivate" onclick="diamantCancel()" class="u-mt-sm">✕ Abandonner la partie</button>';
   } else if(ph==='roundEnd'){
     const last = diamant.round>=diamant.maxRounds;
     ctrl.innerHTML = '<button class="btn-draw" onclick="diamantNextRound()">'+(last?'🏁 Voir le résultat final':'▶ Manche suivante ('+(diamant.round+1)+'/'+diamant.maxRounds+')')+'</button>'+
-      '<button class="btn-deactivate" onclick="diamantCancel()" style="margin-top:.6rem">✕ Abandonner la partie</button>';
+      '<button class="btn-deactivate" onclick="diamantCancel()" class="u-mt-sm">✕ Abandonner la partie</button>';
   } else if(ph==='gameEnd'){
     const total = dTotalBanked(diamant);
     ctrl.innerHTML = '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+total+'</div><div class="dbank-lbl">Trésor total</div></div></div>'+
       '<button class="btn-draw" onclick="diamantEndToFire()">🔥 Ajouter '+total+' pts au feu + clôturer</button>'+
-      '<button class="btn-deactivate" onclick="diamantCancel()" style="margin-top:.6rem">✕ Clôturer sans ajouter au feu</button>';
+      '<button class="btn-deactivate" onclick="diamantCancel()" class="u-mt-sm">✕ Clôturer sans ajouter au feu</button>';
   }
 }
 
@@ -266,10 +266,10 @@ function renderDiamantViewer(pseudo){
   if(diamant.phase==='lobby'){
     if(me){
       zone.innerHTML = '<div class="diamant-voted">✓ Tu as rejoint le lobby ! En attente du lancement par le meneur…</div>'+
-        '<button class="btn-small" onclick="diamantLeave(\''+escAttr(pseudo)+'\')" style="width:100%">↩ Quitter le lobby</button>';
+        '<button class="btn-small" onclick="diamantLeave(\''+escAttr(pseudo)+'\')" class="u-full">↩ Quitter le lobby</button>';
     } else {
       zone.innerHTML = '<div class="diamant-voted">🚪 Une partie de Diamant se prépare ! Rejoins avant le lancement.</div>'+
-        '<button class="btn-continue" onclick="diamantJoin(\''+escAttr(pseudo)+'\')" style="width:100%">💎 Rejoindre la partie</button>';
+        '<button class="btn-continue" onclick="diamantJoin(\''+escAttr(pseudo)+'\')" class="u-full">💎 Rejoindre la partie</button>';
     }
     return;
   }
@@ -285,7 +285,7 @@ function renderDiamantViewer(pseudo){
     return;
   }
   if(me.status==='out'){
-    zone.innerHTML = '<div class="diamant-voted">🏕️ Tu es rentré au camp avec <strong style="color:var(--amber-bright)">'+me.banked+'</strong> de trésor sécurisé. Regarde les autres continuer…</div>';
+    zone.innerHTML = '<div class="diamant-voted">🏕️ Tu es rentré au camp avec <strong class="t-bright">'+me.banked+'</strong> de trésor sécurisé. Regarde les autres continuer…</div>';
     return;
   }
   // me is 'in'
@@ -300,6 +300,6 @@ function renderDiamantViewer(pseudo){
         '</div>';
     }
   } else {
-    zone.innerHTML = '<div class="diamant-voted">⛏️ Tu explores la grotte — butin en jeu : <strong style="color:var(--amber-bright)">'+me.held+'</strong>. En attente de la prochaine carte…</div>';
+    zone.innerHTML = '<div class="diamant-voted">⛏️ Tu explores la grotte — butin en jeu : <strong class="t-bright">'+me.held+'</strong>. En attente de la prochaine carte…</div>';
   }
 }

@@ -131,15 +131,15 @@ const F_ACTIONS = {
 // Affichage du champ commun (cultures en cours)
 function fCrops(st){
   const crops = st.crops||[];
-  if(!crops.length) return '<div style="font-size:.82rem;color:var(--amber-mid);font-style:italic;margin-bottom:.6rem">🌱 Champ commun : vide</div>';
+  if(!crops.length) return '<div class="f-empty-mb">🌱 Champ commun : vide</div>';
   const cropIcon={ panais:'🥕', tomate:'🍅', salade:'🥬' };
   const badges = crops.slice().sort((a,b)=>b.level-a.level).map(c=>{
     const max = F_CROP_MAX[c.type] || 4;
     const ic = cropIcon[c.type] || '🌱';
     const ready = c.level>=max;
-    return '<span class="finv-item"'+(ready?' style="border-color:#9dcf7a;color:#c5f09a"':'')+'>'+ic+' '+(c.type||'?')+' niv. '+c.level+'/'+max+'</span>';
+    return '<span class="finv-item"'+(ready?' class="badge-ready"':'')+'>'+ic+' '+(c.type||'?')+' niv. '+c.level+'/'+max+'</span>';
   }).join('');
-  return '<div style="margin-bottom:.6rem"><div style="font-family:\'Cinzel\',serif;font-size:.68rem;letter-spacing:.12em;color:var(--amber-warm);text-transform:uppercase;margin-bottom:.3rem">🌱 Champ commun ('+crops.length+' plante'+(crops.length>1?'s':'')+')</div><div class="finv">'+badges+'</div></div>';
+  return '<div class="u-mb-sm"><div class="f-caption-warm">🌱 Champ commun ('+crops.length+' plante'+(crops.length>1?'s':'')+')</div><div class="finv">'+badges+'</div></div>';
 }
 
 function fMetierActions(metier, st){ const def = F_ACTIONS[metier]; if(typeof def==='function') return def(st||ferme||{inventory:{},crops:[],gold:0}) || []; return def || []; }
@@ -331,28 +331,28 @@ function fermePlayerMove(pseudo, loc){
 function fActionButtons(st, pseudo){
   const p = st.players[pseudo]; if(!p) return '';
   const done = p.actionsDone||0;
-  let html = '<div style="font-size:.8rem;color:var(--amber-warm);margin:.5rem 0 .3rem">Actions '+done+'/2 — '+(p.metier?(F_METIER_ICON[p.metier]+' '+p.metier):'sans métier')+' à '+F_LOC_ICON[p.location]+' '+p.location+'</div>';
+  let html = '<div class="f-label-lg">Actions '+done+'/2 — '+(p.metier?(F_METIER_ICON[p.metier]+' '+p.metier):'sans métier')+' à '+F_LOC_ICON[p.location]+' '+p.location+'</div>';
   if(done>=2){ return html+'<div class="diamant-voted">Les 2 actions sont faites, le tour se termine.</div>'; }
   const avail = fMetierActions(p.metier, st).filter(a=>!a.locations || a.locations.indexOf(p.location)>=0);
   if(!p.metier){
-    html += '<div style="font-size:.85rem;color:var(--amber-mid);font-style:italic;margin-bottom:.4rem">Pas de métier ce tour — tu peux te déplacer ou passer.</div>';
+    html += '<div class="f-empty">Pas de métier ce tour — tu peux te déplacer ou passer.</div>';
   } else if(avail.length===0){
-    html += '<div style="font-size:.85rem;color:var(--amber-mid);font-style:italic;margin-bottom:.4rem">Aucune action de '+p.metier+' possible ici. Déplace-toi vers le bon lieu.</div>';
+    html += '<div class="f-empty">Aucune action de '+p.metier+' possible ici. Déplace-toi vers le bon lieu.</div>';
   } else {
-    html += '<div style="display:flex;flex-direction:column;gap:.4rem">';
+    html += '<div class="f-actions-col">';
     avail.forEach(a=>{
       const chk = a.check(st);
       const dis = chk.ok ? '' : 'disabled';
-      const why = chk.ok ? '' : ' <span style="opacity:.7">('+(chk.why||'indispo')+')</span>';
+      const why = chk.ok ? '' : ' <span class="u-dim">('+(chk.why||'indispo')+')</span>';
       const dtxt = (typeof a.desc==='function') ? a.desc(st) : a.desc;
-      html += '<button class="btn-continue" '+dis+' onclick="fermeDoAction(\''+escAttr(pseudo)+'\',\''+a.id+'\')" style="text-align:left">'+a.label+(dtxt?(' — '+dtxt):'')+why+'</button>';
+      html += '<button class="btn-continue" '+dis+' onclick="fermeDoAction(\''+escAttr(pseudo)+'\',\''+a.id+'\')" class="u-textleft">'+a.label+(dtxt?(' — '+dtxt):'')+why+'</button>';
     });
     html += '</div>';
   }
   const canMove = !p.hasMoved && done<2 && (done>=1 || !fHasValidAction(st,pseudo));
   if(canMove){
-    html += '<div style="font-size:.8rem;color:var(--amber-warm);margin:.6rem 0 .3rem">'+(done>=1?'Se déplacer, puis 1 dernière action :':'Se déplacer (aucune action possible ici) :')+'</div>'+
-      '<div style="display:flex;gap:.3rem;flex-wrap:wrap">'+
+    html += '<div class="f-label-mv">'+(done>=1?'Se déplacer, puis 1 dernière action :':'Se déplacer (aucune action possible ici) :')+'</div>'+
+      '<div class="f-move-row">'+
       st.locations.filter(l=>l!==p.location).map(l=>'<button class="btn-small" onclick="fermePlayerMove(\''+escAttr(pseudo)+'\',\''+escAttr(l)+'\')">'+F_LOC_ICON[l]+' '+l+'</button>').join('')+'</div>';
   }
   return html;
@@ -406,15 +406,15 @@ function fLastActionBanner(st, opts){
   opts = opts||{};
   if(!st.lastAction || !st.lastAction.msg) return '';
   const skull = /crâne/.test(st.lastAction.msg);
-  const border = skull ? 'var(--ember)' : '#9dcf7a';
+  const border = skull ? 'var(--ember)' : 'var(--success)';
   const icon = skull ? '💀' : '✅';
   const body = escHtml(st.lastAction.msg.replace(st.lastAction.pseudo+' ',''));
   const dismiss = opts.dismiss
-    ? '<button onclick="fermeClearLastAction()" style="margin-left:auto;flex-shrink:0;background:transparent;border:1px solid rgba(122,61,0,.4);border-radius:4px;color:var(--amber-mid);font-size:.7rem;padding:.2rem .5rem;cursor:pointer">✕</button>'
+    ? '<button onclick="fermeClearLastAction()" class="dismiss-btn">✕</button>'
     : '';
   return '<div class="ferme-lastaction" style="border-left:3px solid '+border+'">'+
-    '<span style="font-size:1.1rem;flex-shrink:0">'+icon+'</span>'+
-    '<span style="min-width:0">Dernière action — <strong style="color:var(--amber-bright)">'+escHtml(st.lastAction.pseudo)+'</strong> '+body+'</span>'+
+    '<span class="u-shrink0-lg">'+icon+'</span>'+
+    '<span class="u-minw0">Dernière action — <strong class="t-bright">'+escHtml(st.lastAction.pseudo)+'</strong> '+body+'</span>'+
     dismiss+'</div>';
 }
 function fermeClearLastAction(){
@@ -451,17 +451,17 @@ function fPlayersList(st, highlight){
   return fPlayers(st).map(p=>{
     const isCur = (st.phase==='action' && p.pseudo===cur);
     const metier = p.metier ? '<span class="fmetier">'+(F_METIER_ICON[p.metier]||'')+' '+p.metier+'</span>' : '<span class="fmetier none">sans métier</span>';
-    const loc = p.location ? '<span class="floc-tag">'+F_LOC_ICON[p.location]+' '+p.location+'</span>' : '<span class="floc-tag" style="opacity:.5">non placé</span>';
-    const hl = (p.pseudo===highlight)?'style="outline:1px solid var(--amber-warm)"':'';
+    const loc = p.location ? '<span class="floc-tag">'+F_LOC_ICON[p.location]+' '+p.location+'</span>' : '<span class="floc-tag u-dimmer">non placé</span>';
+    const hl = (p.pseudo===highlight)?'class="u-outline"':'';
     return '<div class="fplayer-row'+(isCur?' current':'')+(p.done?' done':'')+'" '+hl+'>'+
       '<span>'+(isCur?'▶ ':'')+escHtml(p.pseudo)+'</span>'+metier+loc+
-      (p.done?'<span style="margin-left:auto;font-size:.75rem;color:#9dcf7a">✓ fini</span>':'')+'</div>';
+      (p.done?'<span class="u-mla t-success">✓ fini</span>':'')+'</div>';
   }).join('');
 }
 
 function fInventory(st){
   const items = Object.keys(st.inventory);
-  if(!items.length) return '<div class="finv"><span style="color:var(--amber-mid);font-style:italic;font-size:.85rem">Inventaire vide</span></div>';
+  if(!items.length) return '<div class="finv"><span class="t-muted-it">Inventaire vide</span></div>';
   return '<div class="finv">'+items.map(k=>'<span class="finv-item">'+escHtml(k)+' <strong>×'+st.inventory[k]+'</strong></span>').join('')+'</div>';
 }
 
@@ -482,14 +482,14 @@ function renderFermeAdmin(){
   // inventory + meneur adjust
   const resOpts = F_RESOURCES.map(r=>'<option value="'+r+'">'+r+'</option>').join('');
   document.getElementById('fa-inventory').innerHTML =
-    '<div style="font-family:\'Cinzel\',serif;font-size:.7rem;letter-spacing:.15em;color:var(--amber-warm);text-transform:uppercase;margin-bottom:.5rem">Inventaire partagé</div>'+
+    '<div class="f-caption-warm-lg">Inventaire partagé</div>'+
     fInventory(ferme)+
     fCrops(ferme)+
-    '<div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;margin-top:.5rem">'+
-      '<select id="fa-res-select" style="flex:1;min-width:130px">'+resOpts+'</select>'+
-      '<input type="number" id="fa-res-qty" value="1" style="width:70px" class="fire-mini-input">'+
+    '<div class="f-row-center-mt">'+
+      '<select id="fa-res-select" class="f-select-grow">'+resOpts+'</select>'+
+      '<input type="number" id="fa-res-qty" value="1" class="fire-mini-input f-input-qty">'+
       '<button class="btn-small" onclick="fermeAddResource()">± Ressource</button>'+
-      '<span style="margin-left:auto;display:flex;gap:.3rem;align-items:center">🪙'+
+      '<span class="u-mla-row">🪙'+
         '<button class="btn-icon" onclick="fermeAdjustGold(-5)">−5</button>'+
         '<button class="btn-icon" onclick="fermeAdjustGold(-1)">−</button>'+
         '<button class="btn-icon" onclick="fermeAdjustGold(1)">+</button>'+
@@ -499,7 +499,7 @@ function renderFermeAdmin(){
 
   const ctrl = document.getElementById('fa-controls');
   const ph = ferme.phase;
-  const cancelBtn = '<button class="btn-deactivate" onclick="fermeCancel()" style="margin-top:.6rem">✕ Abandonner la partie</button>';
+  const cancelBtn = '<button class="btn-deactivate" onclick="fermeCancel()" class="u-mt-sm">✕ Abandonner la partie</button>';
   if(ph==='lobby'){
     ctrl.innerHTML = '<div class="diamant-voted">🚪 '+fPlayers(ferme).length+'/'+ferme.targetPlayers+' joueurs ont rejoint. La partie démarrera automatiquement, ou force le départ :</div>'+
       '<button class="btn-draw" onclick="fermeForceStart()">▶ Démarrer maintenant</button>'+cancelBtn;
@@ -509,26 +509,26 @@ function renderFermeAdmin(){
     const placed = fPlayers(ferme).filter(p=>p.location).length;
     const allReady = withMetier===total;
     ctrl.innerHTML = '<div class="diamant-voted">📋 Planification — métiers choisis : <strong>'+withMetier+'/'+total+'</strong> · lieux choisis : <strong>'+placed+'/'+total+'</strong>.'+
-      (allReady?'':' <span style="color:var(--amber-warm)">En attente des choix de métier.</span>')+
-      '<br><span style="font-size:.8rem;opacity:.8">Les joueurs non placés seront mis automatiquement au lancement.</span></div>'+
-      '<button class="btn-draw" onclick="fermeStartAction()"'+(allReady?'':' disabled style="opacity:.4;cursor:not-allowed"')+'>▶ Lancer la phase d\'action</button>'+cancelBtn;
+      (allReady?'':' <span class="t-warm">En attente des choix de métier.</span>')+
+      '<br><span class="u-dim8">Les joueurs non placés seront mis automatiquement au lancement.</span></div>'+
+      '<button class="btn-draw" onclick="fermeStartAction()"'+(allReady?'':' disabled class="u-disabled"')+'>▶ Lancer la phase d\'action</button>'+cancelBtn;
   } else if(ph==='action'){
     const cur = fCurrent(ferme);
     const acts = cur ? fActionButtons(ferme, cur) : '';
-    ctrl.innerHTML = '<div class="diamant-voted">▶ Au tour de <strong style="color:var(--amber-bright)">'+(cur||'—')+'</strong>. Tu peux jouer à sa place (en cas d\'absence) :</div>'+
+    ctrl.innerHTML = '<div class="diamant-voted">▶ Au tour de <strong class="t-bright">'+(cur||'—')+'</strong>. Tu peux jouer à sa place (en cas d\'absence) :</div>'+
       acts +
-      '<button class="btn-draw" onclick="fermeEndPlayerTurn()" style="margin-top:.8rem">⏭️ Terminer le tour de ce joueur</button>'+cancelBtn;
+      '<button class="btn-draw" onclick="fermeEndPlayerTurn()" class="u-mt-md">⏭️ Terminer le tour de ce joueur</button>'+cancelBtn;
   } else if(ph==='gameEnd'){
     let head = '';
-    if(ferme.result==='victory') head='<div class="diamant-voted" style="color:#9dcf7a">🎉 Victoire déclarée !</div>';
-    else if(ferme.result==='defeat') head='<div class="diamant-voted" style="color:#f08060">😞 Défaite déclarée.</div>';
+    if(ferme.result==='victory') head='<div class="diamant-voted t-success">🎉 Victoire déclarée !</div>';
+    else if(ferme.result==='defeat') head='<div class="diamant-voted t-danger">😞 Défaite déclarée.</div>';
     else head='<div class="diamant-voted">🏁 Fin des 10 tours. Les objectifs de grand-père sont-ils remplis ?</div>';
     ctrl.innerHTML = head +
-      '<div style="display:flex;gap:.8rem;margin-top:.6rem">'+
+      '<div class="u-mt-sm-flex">'+
         '<button class="btn-continue" onclick="fermeDeclare(true)">🎉 Victoire</button>'+
         '<button class="btn-leave" onclick="fermeDeclare(false)">😞 Défaite</button>'+
       '</div>'+
-      '<button class="btn-draw" onclick="fermeEndToFire()" style="margin-top:.8rem">🔥 Clôturer (+ points au feu)</button>';
+      '<button class="btn-draw" onclick="fermeEndToFire()" class="u-mt-md">🔥 Clôturer (+ points au feu)</button>';
   }
 }
 
@@ -548,10 +548,10 @@ function renderFermeViewer(pseudo){
   if(ph==='lobby'){
     if(me){
       zone.innerHTML = '<div class="diamant-voted">✓ Tu as rejoint la partie ! En attente des autres ('+fPlayers(ferme).length+'/'+ferme.targetPlayers+')…</div>'+
-        '<button class="btn-small" onclick="fermeLeave(\''+escAttr(pseudo)+'\')" style="width:100%">↩ Quitter le lobby</button>';
+        '<button class="btn-small" onclick="fermeLeave(\''+escAttr(pseudo)+'\')" class="u-full">↩ Quitter le lobby</button>';
     } else {
       zone.innerHTML = '<div class="diamant-voted">🚪 Une partie de la Ferme se prépare ! Rejoins avant le départ.</div>'+
-        '<button class="btn-continue" onclick="fermeJoin(\''+escAttr(pseudo)+'\')" style="width:100%">🌾 Rejoindre la partie</button>';
+        '<button class="btn-continue" onclick="fermeJoin(\''+escAttr(pseudo)+'\')" class="u-full">🌾 Rejoindre la partie</button>';
     }
     return;
   }
@@ -570,7 +570,7 @@ function renderFermeViewer(pseudo){
     // Choix du métier
     const metierBtns = F_METIERS_BASE.map(m=>{
       const chosen = (me.metier===m);
-      return '<button class="btn-small" onclick="fermeSetMetier(\''+escAttr(pseudo)+'\',\''+escAttr(m)+'\')" style="'+(chosen?'background:rgba(83,74,183,.35);border-color:#a89ef0;color:#c5bdf7':'')+'">'+(F_METIER_ICON[m]||'')+' '+m+(chosen?' ✓':'')+'</button>';
+      return '<button class="btn-small" onclick="fermeSetMetier(\''+escAttr(pseudo)+'\',\''+escAttr(m)+'\')" style="'+(chosen?'background:rgba(83,74,183,.35);border-color:var(--metier);color:var(--metier-bright)':'')+'">'+(F_METIER_ICON[m]||'')+' '+m+(chosen?' ✓':'')+'</button>';
     }).join('');
     // Choix du lieu (avec occupation X/2, lieux complets désactivés)
     const board = '<div class="ferme-board">'+ ferme.locations.map(loc=>{
@@ -578,16 +578,16 @@ function renderFermeViewer(pseudo){
       const pawns = here.map(p=>'<span class="fpawn'+(p.pseudo===pseudo?' current':'')+'">'+escHtml(p.pseudo)+'</span>').join('');
       const sel = (myLoc===loc)?' selected':'';
       const full = here.length>=F_LOC_CAP && myLoc!==loc;
-      const cnt = '<span style="font-size:.7rem;color:'+(full?'var(--ember)':'var(--amber-warm)')+'">'+here.length+'/'+F_LOC_CAP+'</span>';
+      const cnt = '<span style="font-size:.875rem;color:'+(full?'var(--ember)':'var(--amber-warm)')+'">'+here.length+'/'+F_LOC_CAP+'</span>';
       const click = full ? '' : ' onclick="fermeSetLocation(\''+escAttr(pseudo)+'\',\''+escAttr(loc)+'\')"';
       return '<div class="floc'+(full?'':' floc-btn')+sel+'"'+click+' style="'+(full?'opacity:.45;cursor:not-allowed':'')+'">'+
         '<div class="floc-header">'+F_LOC_ICON[loc]+' '+loc+' '+cnt+'</div><div class="floc-pawns">'+pawns+'</div></div>';
     }).join('') +'</div>';
     zone.innerHTML =
-      '<div class="diamant-voted">Choisis ton <strong style="color:#a89ef0">métier</strong> et ton <strong style="color:var(--amber-bright)">lieu de départ</strong> (dans l\'ordre que tu veux) :</div>'+
-      '<div style="font-size:.78rem;color:var(--amber-warm);margin:.2rem 0 .3rem">Métier '+(me.metier?'✓':'—')+' :</div>'+
-      '<div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem">'+metierBtns+'</div>'+
-      '<div style="font-size:.78rem;color:var(--amber-warm);margin:.2rem 0 .3rem">Lieu '+(myLoc?'✓':'—')+' (max '+F_LOC_CAP+' par lieu) :</div>'+
+      '<div class="diamant-voted">Choisis ton <strong class="t-metier">métier</strong> et ton <strong class="t-bright">lieu de départ</strong> (dans l\'ordre que tu veux) :</div>'+
+      '<div class="f-label">Métier '+(me.metier?'✓':'—')+' :</div>'+
+      '<div class="f-row-mb">'+metierBtns+'</div>'+
+      '<div class="f-label">Lieu '+(myLoc?'✓':'—')+' (max '+F_LOC_CAP+' par lieu) :</div>'+
       board + inv;
     return;
   }
@@ -597,8 +597,8 @@ function renderFermeViewer(pseudo){
     const isMe = (cur===pseudo);
     zone.innerHTML = board + inv +
       (isMe
-        ? '<div class="diamant-voted" style="color:#9dcf7a">▶ C\'est ton tour !</div>' + fActionButtons(ferme, pseudo) + '<button class="btn-draw" onclick="fermeEndPlayerTurn()" style="margin-top:.8rem">Terminer mon tour</button>'
-        : '<div class="diamant-voted">Au tour de <strong style="color:var(--amber-bright)">'+(cur||'—')+'</strong>. Ton métier ce tour : '+(me.metier||'—')+', ton lieu : '+(me.location||'—')+'.</div>');
+        ? '<div class="diamant-voted t-success">▶ C\'est ton tour !</div>' + fActionButtons(ferme, pseudo) + '<button class="btn-draw" onclick="fermeEndPlayerTurn()" class="u-mt-md">Terminer mon tour</button>'
+        : '<div class="diamant-voted">Au tour de <strong class="t-bright">'+(cur||'—')+'</strong>. Ton métier ce tour : '+(me.metier||'—')+', ton lieu : '+(me.location||'—')+'.</div>');
     return;
   }
 

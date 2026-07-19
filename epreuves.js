@@ -34,7 +34,7 @@ function renderViewerInfo(pseudo){
   const labels= {objet:'Objet',role:'Rôle',info:'Information',secret:'Secret'};
   list.innerHTML = myItems.map(a => {
     const qtyBadge = (a.type==='objet' && (a.qty??1)>1)
-      ? `<span style="margin-left:.5rem;font-family:'Cinzel',serif;font-size:.85rem;color:var(--amber-glow);font-weight:600">×${a.qty}</span>` : '';
+      ? `<span class="t-glow-mini">×${a.qty}</span>` : '';
     return `<div class="info-item">
       <span class="item-icon">${icons[a.type]||'📦'}</span>
       <div class="info-type">${labels[a.type]||a.type}</div>
@@ -71,7 +71,7 @@ function renderCraftSection(pseudo){
   const recipesEl = document.getElementById('viewer-recipes-list');
 
   if(matchedRole.recipes.length===0){
-    recipesEl.innerHTML='<div style="color:var(--amber-mid);font-style:italic;font-size:.9rem">Aucune recette pour ce rôle.</div>';
+    recipesEl.innerHTML='<div class="t-muted-it9">Aucune recette pour ce rôle.</div>';
     return;
   }
 
@@ -190,22 +190,22 @@ function renderPanel(){
   const typeClass={objet:'type-objet',role:'type-role',info:'type-info',secret:'type-secret'};
   const typeIcon ={objet:'🪵',role:'🎭',info:'📜',secret:'🔮'};
   const listEl=document.getElementById('panel-items-list');
-  if(!myItems.length){ listEl.innerHTML='<div class="empty-state" style="padding:1rem 0;font-size:.9rem">Rien attribué pour l\'instant</div>'; return; }
+  if(!myItems.length){ listEl.innerHTML='<div class="empty-state u-pad-v">Rien attribué pour l\'instant</div>'; return; }
 
   listEl.innerHTML = myItems.map(a => {
     const isObjet = a.type==='objet';
     const qty = a.qty??1;
     const stepper = isObjet ? `
-      <div style="display:flex;align-items:center;gap:0;margin-top:6px">
-        <button onclick="changeQty('${escAttr(a.id)}',-1)" style="width:26px;height:26px;background:rgba(26,13,0,.6);border:1px solid var(--amber-mid);border-radius:4px 0 0 4px;color:var(--amber-warm);font-size:1rem;cursor:pointer;line-height:1;transition:all .15s" onmouseover="this.style.background='rgba(122,61,0,.3)'" onmouseout="this.style.background='rgba(26,13,0,.6)'">−</button>
-        <div style="min-width:36px;height:26px;background:rgba(26,13,0,.4);border-top:1px solid var(--amber-mid);border-bottom:1px solid var(--amber-mid);display:flex;align-items:center;justify-content:center;font-family:'Cinzel',serif;font-size:.85rem;color:var(--amber-bright);font-weight:600">×${qty}</div>
-        <button onclick="changeQty('${escAttr(a.id)}',+1)" style="width:26px;height:26px;background:rgba(26,13,0,.6);border:1px solid var(--amber-mid);border-radius:0 4px 4px 0;color:var(--amber-warm);font-size:1rem;cursor:pointer;line-height:1;transition:all .15s" onmouseover="this.style.background='rgba(122,61,0,.3)'" onmouseout="this.style.background='rgba(26,13,0,.6)'">+</button>
+      <div class="stepper">
+        <button onclick="changeQty('${escAttr(a.id)}',-1)" class="stepper-btn left" onmouseover="this.style.background='rgba(122,61,0,.3)'" onmouseout="this.style.background='rgba(26,13,0,.6)'">−</button>
+        <div class="stepper-val">×${qty}</div>
+        <button onclick="changeQty('${escAttr(a.id)}',+1)" class="stepper-btn right" onmouseover="this.style.background='rgba(122,61,0,.3)'" onmouseout="this.style.background='rgba(26,13,0,.6)'">+</button>
       </div>` : '';
-    return `<div style="display:flex;align-items:flex-start;gap:.7rem;padding:.65rem .4rem;border-bottom:1px solid rgba(122,61,0,.2)">
-      <span style="font-size:1.2rem;flex-shrink:0;margin-top:2px">${typeIcon[a.type]||'📦'}</span>
-      <div style="flex:1">
-        <div style="margin-bottom:3px"><span class="type-badge ${typeClass[a.type]||''}">${typeLabel[a.type]||a.type}</span></div>
-        <div style="font-size:.97rem;color:var(--amber-pale);line-height:1.45">${escHtml(a.content)}</div>
+    return `<div class="f-list-row-top">
+      <span class="u-icon-top">${typeIcon[a.type]||'📦'}</span>
+      <div class="u-flex1">
+        <div class="u-mb3"><span class="type-badge ${typeClass[a.type]||''}">${typeLabel[a.type]||a.type}</span></div>
+        <div class="f-list-body">${escHtml(a.content)}</div>
         ${stepper}
       </div>
       <button class="btn-delete" onclick="deleteAssignment('${escAttr(a.id)}')" title="Retirer">✕</button>
@@ -318,13 +318,13 @@ function renderLibrary(){
   el.innerHTML = list.map(ep => {
     const roleCount = (ep.craftRoles||[]).length;
     const isActive = activeGame && String(activeGame.id)===String(ep.id);
-    return `<div style="display:flex;align-items:center;gap:.7rem;padding:.7rem .6rem;border-bottom:1px solid rgba(122,61,0,.2)">
-      <div style="flex:1;min-width:0">
-        <div style="font-family:'Cinzel',serif;font-size:.95rem;color:var(--amber-bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(ep.title)}${isActive?' <span style=\'color:#9dcf7a;font-size:.7rem\'>● en cours</span>':''}</div>
-        <div style="font-size:.78rem;color:var(--amber-warm)">🔥 +${ep.reward??0} pts${roleCount?' · ⚗️ '+roleCount+' rôle'+(roleCount>1?'s':''):''}</div>
+    return `<div class="f-list-row">
+      <div class="u-flex1-minw0">
+        <div class="f-list-title">${escHtml(ep.title)}${isActive?' <span style=\'color:var(--success);font-size:.875rem\'>● en cours</span>':''}</div>
+        <div class="t-warm">🔥 +${ep.reward??0} pts${roleCount?' · ⚗️ '+roleCount+' rôle'+(roleCount>1?'s':''):''}</div>
       </div>
-      <button class="btn-small" onclick="launchFromLibrary('${escAttr(String(ep.id))}')" style="border-color:rgba(97,174,27,.4);color:#9dcf7a">▶ Lancer</button>
-      <button class="btn-small" onclick="editFromLibrary('${escAttr(String(ep.id))}')" style="border-color:rgba(168,158,240,.4);color:#a89ef0">✎</button>
+      <button class="btn-small" onclick="launchFromLibrary('${escAttr(String(ep.id))}')" class="badge-success">▶ Lancer</button>
+      <button class="btn-small" onclick="editFromLibrary('${escAttr(String(ep.id))}')" class="badge-metier">✎</button>
       <button class="btn-delete" onclick="deleteFromLibrary('${escAttr(String(ep.id))}')" title="Supprimer">✕</button>
     </div>`;
   }).join('');
@@ -439,14 +439,14 @@ function renderCraftRoles(){
   el.innerHTML = craftRolesDraft.map(role=>`
     <div class="craft-role-builder">
       <div class="craft-role-header">
-        <span style="font-size:1.1rem">🎭</span>
+        <span class="u-icon">🎭</span>
         <input class="craft-role-name-input" placeholder="Nom du rôle (ex: Forgeron)" value="${escHtml(role.name)}" oninput="syncCraftField(${role.id},'name',this.value)">
         <button class="btn-icon" onclick="removeCraftRole(${role.id})">✕</button>
       </div>
-      <div style="font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.12em;color:rgba(168,158,240,.6);text-transform:uppercase;margin-bottom:.5rem">Recettes — Ressources consommées → Objet fabriqué</div>
+      <div class="f-caption-metier">Recettes — Ressources consommées → Objet fabriqué</div>
       ${role.recipes.map(rc=>`
         <div class="craft-recipe-block">
-          <div style="font-size:.75rem;color:var(--amber-mid);font-style:italic;margin-bottom:.4rem">Coûts :</div>
+          <div class="f-empty">Coûts :</div>
           ${rc.cost.map((c,ci)=>`
             <div class="craft-recipe-row">
               <input class="craft-input" placeholder="Ressource (ex: Bois)" value="${escHtml(c.name)}" oninput="syncCostField(${role.id},${rc.id},${ci},'name',this.value)">
@@ -454,9 +454,9 @@ function renderCraftRoles(){
               <button class="btn-icon" onclick="removeCraftCost(${role.id},${rc.id},${ci})" ${rc.cost.length<=1?'disabled':''}>−</button>
             </div>`).join('')}
           <button class="btn-add-recipe" onclick="addCraftCost(${role.id},${rc.id})">+ ajouter une ressource</button>
-          <div class="craft-output-row" style="margin-top:.6rem">
+          <div class="craft-output-row u-mt-sm">
             <span class="craft-arrow">→ Fabrique :</span>
-            <input class="craft-input" style="flex:1" placeholder="Nom de l'objet fabriqué" value="${escHtml(rc.output)}" oninput="syncRecipeField(${role.id},${rc.id},'output',this.value)">
+            <input class="craft-input u-flex1" placeholder="Nom de l'objet fabriqué" value="${escHtml(rc.output)}" oninput="syncRecipeField(${role.id},${rc.id},'output',this.value)">
             <button class="btn-icon" onclick="removeCraftRecipe(${role.id},${rc.id})">✕</button>
           </div>
         </div>`).join('')}
@@ -496,7 +496,7 @@ function renderAdminFire(){
   const visuals = { petit:'🔥', grand:'🔥🔥', legendaire:'🔥🔥🔥' };
   const labels  = { petit:'Petit feu', grand:'Grand feu', legendaire:'Légendaire ✨' };
   const v=document.getElementById('admin-fire-visual'); if(v) v.textContent=visuals[tier];
-  const t=document.getElementById('admin-fire-tier'); if(t){ t.textContent=labels[tier]; t.className=''; t.style.color = tier==='legendaire'?'#f5b832':tier==='grand'?'var(--amber-bright)':'#9dcf7a'; }
+  const t=document.getElementById('admin-fire-tier'); if(t){ t.textContent=labels[tier]; t.className=''; t.style.color = tier==='legendaire'?'var(--amber-bright)':tier==='grand'?'var(--amber-bright)':'var(--success)'; }
   const p=document.getElementById('admin-fire-points'); if(p) p.textContent=pts;
   const bar=document.getElementById('admin-fire-bar'); if(bar) bar.style.width = Math.min(100, Math.round(pts/(fire.legendaire||120)*100))+'%';
   // sync threshold inputs if not focused
