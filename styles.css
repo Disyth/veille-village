@@ -1,7 +1,8 @@
 :root {
     --amber-deep: #1a0d00; --amber-dark: #2e1a00; --amber-mid: #b87a35;  /* éclairci pour la lisibilité (ratio ~5.4 sur fond sombre) */
   --amber-border: #7a3d00;  /* ancien ton conservé pour les bordures uniquement */
-    --amber-warm: #c46a00; --amber-glow: #e8920a; --amber-bright: #f5b832;
+    --amber-warm: #c46a00; --amber-glow: #e8920a; --amber-bright: #fff3cc;  /* blanc cassé ambré (ex-doré vif) — texte/accents */
+    --gold-flame: #f5b832;  /* doré vif conservé pour la flamme du feu */
     --amber-light: #ffd97a; --amber-pale: #fff3cc; --ember: #e84a0a;
     --ember-dim: #8b2800; --parchment: #fdf5e0; --ink: #2a1a00;
     --success: #9dcf7a; --success-bright: #c5f09a; --metier: #e0dbfb; --metier-bright: #f0edfd; --danger-text: #f08060;
@@ -161,7 +162,7 @@
   .fire-tier-legendaire { color:var(--amber-bright); text-shadow:0 0 20px rgba(245,184,50,.6); }
   .fire-count { font-size:.9rem; color:var(--amber-warm); font-style:italic; }
   .fire-progress { height:8px; background:rgba(26,13,0,.6); border-radius:4px; margin:.9rem 0 .5rem; overflow:hidden; border:1px solid rgba(122,61,0,.4); }
-  .fire-progress-bar { height:100%; background:linear-gradient(to right,var(--ember),var(--amber-bright)); border-radius:4px; transition:width .5s ease; }
+  .fire-progress-bar { height:100%; background:linear-gradient(to right,var(--ember),var(--gold-flame)); border-radius:4px; transition:width .5s ease; }
   .fire-thresholds { display:flex; justify-content:space-between; font-size: .875rem; color:var(--amber-mid); font-family:'Cinzel',serif; letter-spacing:.05em; }
   .fire-config-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem; }
   .fire-mini-input { width:100%; background:rgba(26,13,0,.6); border:1px solid var(--amber-border); border-radius:4px; padding:.5rem .8rem; font-family:'Cinzel',serif; font-size:.95rem; color:var(--amber-bright); outline:none; text-align:center; }
