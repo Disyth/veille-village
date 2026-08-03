@@ -1,6 +1,6 @@
-// Identifiant Google du meneur. Laisse vide à la 1re connexion : l'app te l'affichera
-// dans la console (F12) — colle-le ici ET dans les règles Firebase, puis redéploie.
-const MENEUR_UID = 'Hf1tC7vTr8V90WzHpIiruFVYlo42';
+// Code d'accès meneur — change-le pour ce que tu veux. Il protège l'AFFICHAGE de l'admin ;
+// la base, elle, reste protégée par l'authentification anonyme + les règles Firebase.
+const MENEUR_CODE = 'veillée';
 
 // ── STATE ──────────────────────────────────────────────────────────────────
 let viewers   = {};    // { key: {pseudo,joined} }

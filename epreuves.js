@@ -35,25 +35,14 @@ function renderViewerIdle(){
 }
 
 // ── CONNEXION MENEUR ─────────────────────────────────────────────────────────
-async function adminLogin(){
-  // Mode hors-ligne (démo locale, pas de Firebase) : accès direct
-  if(!window.FB || !window.FB.ready || !window.FB.signInWithGoogle){
-    showPage('admin'); renderViewerList(); updateStats(); return;
-  }
-  const user = window.FB.currentUser && window.FB.currentUser();
-  // Déjà connecté avec Google : on ouvre directement (le retour de redirection passe aussi par ici via 'fb-auth')
-  if(user && !user.isAnonymous){
-    if(MENEUR_UID && user.uid !== MENEUR_UID){ toast('Ce compte Google n\'est pas autorisé comme meneur.'); return; }
-    if(!MENEUR_UID){
-      console.log('Ton identifiant meneur (MENEUR_UID) à copier dans core.js :', user.uid);
-      toast('Identifiant meneur affiché dans la console (F12).');
-    }
+function adminLogin(){
+  const input = document.getElementById('admin-pass-input');
+  if(input && input.value === MENEUR_CODE){
+    input.value = '';
     showPage('admin'); renderViewerList(); updateStats();
-    return;
+  } else {
+    toast('Code incorrect');
   }
-  // Sinon : redirection vers Google. La page quitte, revient déjà connectée, et l'admin s'ouvre tout seul.
-  try { await window.FB.signInWithGoogle(); }
-  catch(e){ console.error(e); toast('Impossible de lancer la connexion Google. Vérifie les domaines autorisés (Firebase → Authentication → Settings).'); }
 }
 
 // ── VILLAGEOIS (liste de la base : 5 max, recherche sur toute la liste, suppression) ──
