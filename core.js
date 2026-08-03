@@ -1,6 +1,6 @@
 // Identifiant Google du meneur. Laisse vide à la 1re connexion : l'app te l'affichera
 // dans la console (F12) — colle-le ici ET dans les règles Firebase, puis redéploie.
-const MENEUR_UID = 'KDhuNyIdj9UHPoxGMFU6l76PkJo1';
+const MENEUR_UID = 'Hf1tC7vTr8V90WzHpIiruFVYlo42';
 
 // ── STATE ──────────────────────────────────────────────────────────────────
 let viewers   = {};    // { key: {pseudo,joined} }
