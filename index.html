@@ -62,8 +62,6 @@
     const app  = initializeApp(firebaseConfig);
     const db   = getDatabase(app);
     const auth = getAuth(app);
-    // Termine une éventuelle connexion Google par redirection (au retour sur la page)
-    getRedirectResult(auth).catch((e) => console.warn('Retour connexion Google :', e && e.code));
     // Expose une API minimale au reste du script (non-module)
     window.FB = {
       ready: true,
@@ -73,20 +71,27 @@
       signOutAdmin:     () => signOut(auth),
       currentUser:      () => auth.currentUser
     };
-    // Chaque visiteur reçoit un badge ANONYME (invisible). Le meneur l'écrase via Google.
     let dispatched = false;
-    onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        signInAnonymously(auth).catch((e) => {
-          console.error('Auth anonyme echouee — active-la dans Firebase Console (Authentication).', e);
-          if (!dispatched) { dispatched = true; window.dispatchEvent(new Event('fb-ready')); }
-        });
-        return;
-      }
-      window.FB.user = user;
-      window.dispatchEvent(new Event('fb-auth'));
-      if (!dispatched) { dispatched = true; window.dispatchEvent(new Event('fb-ready')); }
-    });
+    const startAuthWatch = () => {
+      // Chaque visiteur reçoit un badge ANONYME (invisible). Le meneur l'écrase via Google.
+      onAuthStateChanged(auth, (user) => {
+        if (!user) {
+          signInAnonymously(auth).catch((e) => {
+            console.error('Auth anonyme echouee — active-la dans Firebase Console (Authentication).', e);
+            if (!dispatched) { dispatched = true; window.dispatchEvent(new Event('fb-ready')); }
+          });
+          return;
+        }
+        window.FB.user = user;
+        window.dispatchEvent(new Event('fb-auth'));
+        if (!dispatched) { dispatched = true; window.dispatchEvent(new Event('fb-ready')); }
+      });
+    };
+    // On traite D'ABORD un éventuel retour de connexion Google (redirection), PUIS on surveille
+    // l'état d'auth — sinon un badge anonyme se crée par-dessus la connexion Google (course).
+    getRedirectResult(auth)
+      .catch((e) => console.warn('Retour connexion Google :', e && e.code))
+      .finally(startAuthWatch);
   } else {
     window.FB = { ready: false };
     window.dispatchEvent(new Event('fb-ready'));

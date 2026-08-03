@@ -18,8 +18,11 @@ window.addEventListener('hashchange', () => showPage(isAdminUrl() ? 'admin-gate'
 window.addEventListener('fb-auth', () => {
   if(!isAdminUrl()) return;
   const u = window.FB && window.FB.currentUser && window.FB.currentUser();
-  if(u && !u.isAnonymous && (!MENEUR_UID || u.uid === MENEUR_UID)){
+  if(!u || u.isAnonymous) return;
+  if(!MENEUR_UID || u.uid === MENEUR_UID){
     showPage('admin'); renderViewerList(); updateStats();
+  } else {
+    console.warn('Connecté en Google, mais UID (' + u.uid + ') != MENEUR_UID. Colle cet UID dans core.js.');
   }
 });
 
