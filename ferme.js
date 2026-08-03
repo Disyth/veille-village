@@ -1,19 +1,59 @@
 // ── FERME ENGINE + UI (étape 1 : squelette) ──────────────────────────────────
 const F_METIERS_BASE = ['Pêcheur','Bûcheron','Agriculteur','Mineur'];
-const F_LOCATIONS = ['Ferme','Magasin','Montagne','Lac','Plage','Forêt','Ranch'];
-const F_LOC_ICON = { Ferme:'🏡', Magasin:'🏪', Montagne:'⛰️', Lac:'🎣', Plage:'🏖️', Forêt:'🌲', Ranch:'🐄' };
+const F_LOCATIONS = ['Ferme','Magasin','Montagne','Rivière','Plage','Forêt'];
+const F_LOC_ICON = { Ferme:'🏡', Magasin:'🏪', Montagne:'⛰️', 'Rivière':'🎣', Plage:'🏖️', Forêt:'🌲' };
+// Visuels des lieux (à déposer dans un dossier « images » à côté de index.html)
+const F_LOC_IMG = { 'Ferme':'images/ferme.png', 'Magasin':'images/magasin.png', 'Montagne':'images/montagne.png', 'Rivière':'images/riviere.png', 'Plage':'images/plage.png', 'Forêt':'images/foret.png' };
 const F_METIER_ICON = { 'Pêcheur':'🎣', 'Bûcheron':'🪓', 'Agriculteur':'🌱', 'Mineur':'⛏️' };
-const F_MAXTURNS = 10;
+const F_MAXTURNS = 20;
 
 // ── Config Pêcheur (à ajuster) ──
-// Espèces de poisson : val = difficulté (le dé d6 doit être ≥ à cette valeur pour attraper)
-const F_FISH = [
-  { nom:'Sardine',   val:2 },
-  { nom:'Truite',    val:3 },
-  { nom:'Bar',       val:4 },
-  { nom:'Saumon',    val:5 },
-  { nom:'Esturgeon', val:6 },
+// Reliques recherchées par le musée : val = difficulté (dé d6 ≥ val pour la ramener)
+// Chaque relique a la MÊME chance d'être trouvée ; seule la difficulté de capture varie.
+// Une relique déjà au musée ne peut plus être trouvée.
+// 10 reliques, deux par niveau de difficulté (2 à 6) — couvre les parties jusqu'à 10 joueurs
+const F_RELICS = [
+  { nom:'Parchemin des Nains', val:2 },
+  { nom:'Cuillère rouillée',   val:2 },
+  { nom:'Éventail décoratif',  val:3 },
+  { nom:'Flûte en os',         val:3 },
+  { nom:'Outil préhistorique', val:4 },
+  { nom:'Gadget de Nain',      val:4 },
+  { nom:'Masque doré',         val:5 },
+  { nom:'Relique dorée',       val:5 },
+  { nom:'Poupée étrange',      val:6 },
+  { nom:'Fossile de palmier',  val:6 },
 ];
+
+// Poissons par lieu de pêche : val = difficulté (dé d6 ≥ val pour attraper), poids = chance d'apparition (%)
+// (les poids de chaque lieu totalisent 100 ; un poisson légendaire par lieu, difficulté 6 / 5%)
+const F_FISH_BY_LOC = {
+  'Plage': [
+    { nom:'Sardine',          val:1, poids:20 },
+    { nom:'Concombre de mer', val:2, poids:20 },
+    { nom:'Anguille',         val:3, poids:20 },
+    { nom:'Poisson-globe',    val:4, poids:20 },
+    { nom:'Poulpe',           val:5, poids:15 },
+    { nom:'Poisson écarlate', val:6, poids:5, legendaire:true },
+  ],
+  'Rivière': [
+    { nom:'Carpe',              val:1, poids:25 },
+    { nom:'Perche',             val:2, poids:20 },
+    { nom:'Truite arc-en-ciel', val:3, poids:20 },
+    { nom:'Carpe de minuit',    val:4, poids:20 },
+    { nom:'Esturgeon',          val:5, poids:10 },
+    { nom:'Légende',            val:6, poids:5, legendaire:true },
+  ],
+};
+// Tirage pondéré d'un poisson selon les chances d'apparition du lieu
+function fPickFish(loc){
+  const table = F_FISH_BY_LOC[loc] || [];
+  if(!table.length) return null;
+  const total = table.reduce((s,f)=>s+(f.poids||0),0);
+  let r = Math.random()*total;
+  for(const f of table){ r -= (f.poids||0); if(r < 0) return f; }
+  return table[table.length-1];
+}
 // Valeurs de vente en or (⚠️ VALEURS PAR DÉFAUT — remplace-les par les tiennes)
 const F_SELL_VALUES = { 'poisson':3, 'poisson grillé':6 };
 // Graines cultivables : maxLevel = niveau de maturité (planté au niv.1), sell = prix de vente de la récolte
@@ -25,6 +65,9 @@ const F_SEEDS = [
 ];
 const F_CROP_MAX = { panais:2, tomate:3, salade:4 };
 const F_SEED_PRICE = 1; // prix d'achat d'une graine (identique pour toutes)
+const F_FIELD_BASE = 4;   // nombre de graines plantables au départ
+const F_FIELD_BONUS = 2;  // gain de capacité par amélioration de la ferme
+function fFieldCapacity(st){ return (typeof st.fieldCapacity==='number') ? st.fieldCapacity : F_FIELD_BASE; }
 
 // ── Registre d'actions de métier (pattern réutilisable) ──
 // Chaque action : { id, label, desc, locations (null=partout), check(st)->{ok,why}, apply(st)->message }
@@ -39,6 +82,18 @@ const F_ACTIONS = {
     { id:'brindille', label:'🌿 1 bois → 2 brindilles', desc:null, locations:null,
       check:(st)=>((st.inventory['bois']||0)>=1?{ok:true}:{ok:false,why:'besoin de 1 bois'}),
       apply:(st)=>{ st.inventory['bois']-=1; if(st.inventory['bois']<=0)delete st.inventory['bois']; st.inventory['brindille']=(st.inventory['brindille']||0)+2; return 'transforme 1 bois en 2 brindilles'; } },
+    { id:'couper_dur', label:'🪵 Couper du bois dur', desc:'+1 bois dur', locations:['Montagne'],
+      check:(st)=>({ok:true}),
+      apply:(st)=>{ st.inventory['bois dur']=(st.inventory['bois dur']||0)+1; return 'coupe du bois dur en montagne (+1 bois dur)'; } },
+    { id:'ameliorer', label:'🏡 Améliorer la ferme', locations:['Ferme'],
+      desc:(st)=>'2 bois + 1 bois dur → champ '+fFieldCapacity(st)+' → '+(fFieldCapacity(st)+F_FIELD_BONUS),
+      check:(st)=>{ const miss=[]; if((st.inventory['bois']||0)<2) miss.push('2 bois'); if((st.inventory['bois dur']||0)<1) miss.push('1 bois dur'); return miss.length?{ok:false,why:'besoin de '+miss.join(' + ')}:{ok:true}; },
+      apply:(st)=>{
+        st.inventory['bois']-=2; if(st.inventory['bois']<=0)delete st.inventory['bois'];
+        st.inventory['bois dur']-=1; if(st.inventory['bois dur']<=0)delete st.inventory['bois dur'];
+        st.fieldCapacity = fFieldCapacity(st) + F_FIELD_BONUS;
+        return 'améliore la ferme 🏡 : le champ peut désormais accueillir '+st.fieldCapacity+' cultures (+'+F_FIELD_BONUS+')';
+      } },
   ],
   'Mineur': [
     { id:'explorer', label:'⛏️ Explorer la mine', locations:['Montagne'],
@@ -50,8 +105,8 @@ const F_ACTIONS = {
         const stairs = 15, coal = 30;
         const rock = 100 - skull - stairs - coal;
         const r = Math.random()*100;
-        if(r < rock){ st.inventory['pierre brute']=(st.inventory['pierre brute']||0)+1; return 'explore la mine (niv. '+lvl+') et trouve 1 pierre brute'; }
-        if(r < rock+coal){ st.inventory['minerai de charbon']=(st.inventory['minerai de charbon']||0)+1; return 'explore la mine (niv. '+lvl+') et trouve 1 minerai de charbon'; }
+        if(r < rock){ st.inventory['pierre']=(st.inventory['pierre']||0)+1; return 'explore la mine (niv. '+lvl+') et trouve 1 pierre'; }
+        if(r < rock+coal){ st.inventory['charbon']=(st.inventory['charbon']||0)+1; return 'explore la mine (niv. '+lvl+') et trouve 1 charbon'; }
         if(r < rock+coal+stairs){
           if(lvl<5){ st.mineLevel=lvl+1; return 'découvre un escalier 🪜 et le groupe descend au niveau '+(lvl+1)+' de la mine'; }
           return 'découvre un escalier, mais la mine est déjà au plus profond (niv. 5)';
@@ -62,25 +117,40 @@ const F_ACTIONS = {
         st.inventory[k]-=1; if(st.inventory[k]<=0) delete st.inventory[k];
         return 'réveille un crâne de monstre 💀 et le groupe perd 1 '+k+' !';
       } },
-    { id:'pierre', label:'🪨 Pierre brute → pierre', desc:null, locations:null,
-      check:(st)=>((st.inventory['pierre brute']||0)>=1?{ok:true}:{ok:false,why:'besoin de 1 pierre brute'}),
-      apply:(st)=>{ st.inventory['pierre brute']-=1; if(st.inventory['pierre brute']<=0)delete st.inventory['pierre brute']; st.inventory['pierre']=(st.inventory['pierre']||0)+1; return 'transforme 1 pierre brute en 1 pierre'; } },
-    { id:'charbon', label:'⚫ Minerai de charbon → charbon', desc:null, locations:null,
-      check:(st)=>((st.inventory['minerai de charbon']||0)>=1?{ok:true}:{ok:false,why:'besoin de 1 minerai de charbon'}),
-      apply:(st)=>{ st.inventory['minerai de charbon']-=1; if(st.inventory['minerai de charbon']<=0)delete st.inventory['minerai de charbon']; st.inventory['charbon']=(st.inventory['charbon']||0)+1; return 'transforme 1 minerai de charbon en 1 charbon'; } },
+    { id:'relique', label:'🏺 Chercher une relique', locations:['Montagne'],
+      desc:(st)=>{ const rest=fRelicsLeft(st).length; return rest+' relique'+(rest>1?'s':'')+' encore \u00e0 d\u00e9couvrir'; },
+      check:(st)=>(fRelicsLeft(st).length>0?{ok:true}:{ok:false,why:'toutes les reliques sont au mus\u00e9e'}),
+      apply:(st)=>{
+        const left = fRelicsLeft(st);
+        if(!left.length) return 'fouille les galeries, mais le mus\u00e9e a d\u00e9j\u00e0 toutes les reliques';
+        // Toutes les reliques restantes ont la m\u00eame chance d'\u00eatre trouv\u00e9es
+        const relic = left[Math.floor(Math.random()*left.length)];
+        const roll = 1 + Math.floor(Math.random()*6);
+        if(roll >= relic.val){
+          if(!Array.isArray(st.museum)) st.museum=[];
+          st.museum.push(relic.nom);
+          return 'd\u00e9couvre \u00ab '+relic.nom+' \u00bb (difficult\u00e9 '+relic.val+') \u00b7 d\u00e9 \ud83c\udfb2 '+roll+' \u2713 ramen\u00e9e au mus\u00e9e \ud83c\udffa !';
+        }
+        return 'd\u00e9couvre \u00ab '+relic.nom+' \u00bb (difficult\u00e9 '+relic.val+') \u00b7 d\u00e9 \ud83c\udfb2 '+roll+' \u2717 la relique se brise en la d\u00e9gageant\u2026';
+      } },
   ],
   'Pêcheur': [
-    { id:'pecher', label:'🎣 Pêcher', locations:['Lac','Plage'],
+    { id:'pecher', label:'🎣 Pêcher', locations:['Rivière','Plage'],
       desc:'carte poisson + dé',
       check:(st)=>({ok:true}),
-      apply:(st)=>{
-        const fish = F_FISH[Math.floor(Math.random()*F_FISH.length)];
+      apply:(st, ctx)=>{
+        const loc = (ctx && ctx.location) || 'Rivière';
+        const fish = fPickFish(loc);
+        if(!fish){ return 'lance sa ligne, mais il n\'y a rien à pêcher ici'; }
         const roll = 1 + Math.floor(Math.random()*6);
+        const nm = fish.legendaire ? ('✨ '+fish.nom+' (LÉGENDAIRE)') : fish.nom;
         if(roll >= fish.val){
-          st.inventory['poisson']=(st.inventory['poisson']||0)+1;
-          return 'pêche un(e) '+fish.nom+' (difficulté '+fish.val+') · dé 🎲 '+roll+' ✓ attrapé ! (+1 poisson)';
+          const gain = fish.legendaire ? 2 : 1;   // bonus : +1 poisson supplémentaire pour un légendaire
+          st.inventory['poisson']=(st.inventory['poisson']||0)+gain;
+          if(fish.legendaire) st.legendaryCount=(st.legendaryCount||0)+1;
+          return 'pêche '+nm+' (difficulté '+fish.val+') · dé 🎲 '+roll+' ✓ attrapé ! (+'+gain+' poisson'+(gain>1?'s':'')+(fish.legendaire?' ✨ LÉGENDAIRE !':'')+')';
         }
-        return 'pêche un(e) '+fish.nom+' (difficulté '+fish.val+') · dé 🎲 '+roll+' ✗ le poisson s\'échappe';
+        return 'pêche '+nm+' (difficulté '+fish.val+') · dé 🎲 '+roll+' ✗ le poisson s\'échappe';
       } },
     { id:'griller', label:'🔥 Griller un poisson', desc:'1 poisson + 1 bois → 1 poisson grillé', locations:null,
       check:(st)=>{ if((st.inventory['poisson']||0)<1) return {ok:false,why:'besoin de 1 poisson'}; if((st.inventory['bois']||0)<1) return {ok:false,why:'besoin de 1 bois'}; return {ok:true}; },
@@ -95,7 +165,11 @@ const F_ACTIONS = {
     // Achat : une action d'achat par type de graine (choix au Magasin)
     const buys = F_SEEDS.map(seed=>({
       id:'acheter_'+seed.type, label:'🌰 Acheter graine '+seed.type, desc:'-'+F_SEED_PRICE+' or · mûrit niv.'+seed.maxLevel, locations:['Magasin'],
-      check:(st)=>((st.gold||0)>=F_SEED_PRICE?{ok:true}:{ok:false,why:'besoin de '+F_SEED_PRICE+' or'}),
+      check:(st)=>{
+        const cap=fFieldCapacity(st), n=(st.crops||[]).length;
+        if(n>=cap) return {ok:false,why:'champ plein ('+n+'/'+cap+') — fais améliorer la ferme'};
+        return (st.gold||0)>=F_SEED_PRICE ? {ok:true} : {ok:false,why:'besoin de '+F_SEED_PRICE+' or'};
+      },
       apply:(st)=>{ st.gold=(st.gold||0)-F_SEED_PRICE; if(!Array.isArray(st.crops))st.crops=[]; st.crops.push({ id:'crop'+Date.now()+'_'+Math.floor(Math.random()*1000), type:seed.type, level:1 }); return 'achète une graine de '+seed.type+' (-'+F_SEED_PRICE+' or) et la plante (niv. 1/'+seed.maxLevel+')'; }
     }));
     // Arroser : monte TOUT le champ d'un niveau ; chaque plante à maturité est récoltée
@@ -128,18 +202,73 @@ const F_ACTIONS = {
   },
 };
 
+// Affichage des objectifs de grand-père (cartes visuelles avec progression)
+// Libellé simplifié d'une ressource d'objectif (suit la maquette : « bûche » s'affiche « Bois »)
+function fPartLabel(key){
+  const map = {};
+  const l = map[key] || key;
+  return l.charAt(0).toUpperCase() + l.slice(1);
+}
+
+function fObjectivesCards(st){
+  const objs = fObjectivesState(st);
+  const N = Math.max(1, fPlayers(st).length);
+  const allDone = objs.every(o=>o.done);
+  const cards = objs.map(o=>{
+    const pct = o.target>0 ? Math.round(o.current/o.target*100) : 0;
+    const parts = o.def.parts;
+    // Plusieurs ressources de même quantité (ex. feu de camp) → une seule pastille « Nx A, B, C »
+    const simple = parts.length>1 && parts.every(p=>!String(p.key).startsWith('__') && p.per===parts[0].per);
+    let partsHtml;
+    if(simple){
+      partsHtml = '<span class="obj-part'+(o.done?' ok':'')+'">'+parts[0].per+'x '+parts.map(p=>fPartLabel(p.key)).join(', ')+'</span>';
+    } else {
+      partsHtml = parts.map(p=>{
+        let t = p.per*N;
+        if(p.key==='__museum__') t = Math.min(t, F_RELICS.length);
+        let have;
+        if(p.key==='__legendary__') have = st.legendaryCount||0;
+        else if(p.key==='__museum__') have = (Array.isArray(st.museum)?st.museum.length:0);
+        else have = st.inventory[p.key]||0;
+        const ok = have>=t;
+        const label = p.key==='__legendary__' ? 'légendaire' : (p.key==='__museum__' ? 'relique' : p.key);
+        return '<span class="obj-part'+(ok?' ok':'')+'">'+Math.min(have,t)+'/'+t+' '+escHtml(label)+'</span>';
+      }).join('');
+    }
+    return '<div class="obj-card'+(o.done?' done':'')+'">'+
+      '<div class="obj-head">'+
+        '<span class="obj-title">'+escHtml(o.def.titre)+'</span>'+
+        (o.done?'<span class="obj-check">✓</span>':'<span class="obj-count">'+o.current+'/'+o.target+'</span>')+'</div>'+
+      '<div class="obj-bar"><div class="obj-bar-fill" style="width:'+pct+'%"></div></div>'+
+      '<div class="obj-parts">'+partsHtml+'</div></div>';
+  }).join('');
+  return '<div class="obj-wrap">'+
+    '<div class="obj-caption">📜 Objectifs de grand-père'+(allDone?' — <span style="color:var(--success)">tous remplis ! 🎉</span>':'')+'</div>'+
+    '<div class="obj-grid">'+cards+'</div></div>';
+}
+
+// Affichage du musée (reliques rapportées)
+function fMuseum(st){
+  const mus = Array.isArray(st.museum)?st.museum:[];
+  const total = F_RELICS.length;
+  if(!mus.length) return '<div class="f-empty-mb">🏺 Musée : aucune relique rapportée ('+total+' à découvrir)</div>';
+  const badges = mus.map(n=>'<span class="finv-item badge-ready">🏺 '+escHtml(n)+'</span>').join('');
+  return '<div class="u-mb-sm"><div class="f-caption-sm">🏺 Musée ('+mus.length+'/'+total+' reliques)</div><div class="finv">'+badges+'</div></div>';
+}
+
 // Affichage du champ commun (cultures en cours)
 function fCrops(st){
   const crops = st.crops||[];
-  if(!crops.length) return '<div class="f-empty-mb">🌱 Champ commun : vide</div>';
+  const cap = fFieldCapacity(st);
+  if(!crops.length) return '<div class="f-empty-mb">🌱 Champ commun : vide (0/'+cap+')</div>';
   const cropIcon={ panais:'🥕', tomate:'🍅', salade:'🥬' };
   const badges = crops.slice().sort((a,b)=>b.level-a.level).map(c=>{
     const max = F_CROP_MAX[c.type] || 4;
     const ic = cropIcon[c.type] || '🌱';
     const ready = c.level>=max;
-    return '<span class="finv-item"'+(ready?' class="badge-ready"':'')+'>'+ic+' '+(c.type||'?')+' niv. '+c.level+'/'+max+'</span>';
+    return '<span class="finv-item'+(ready?' badge-ready':'')+'">'+ic+' '+(c.type||'?')+' niv. '+c.level+'/'+max+'</span>';
   }).join('');
-  return '<div class="u-mb-sm"><div class="f-caption-warm">🌱 Champ commun ('+crops.length+' plante'+(crops.length>1?'s':'')+')</div><div class="finv">'+badges+'</div></div>';
+  return '<div class="u-mb-sm"><div class="f-caption-warm">🌱 Champ commun ('+crops.length+'/'+cap+')</div><div class="finv">'+badges+'</div></div>';
 }
 
 function fMetierActions(metier, st){ const def = F_ACTIONS[metier]; if(typeof def==='function') return def(st||ferme||{inventory:{},crops:[],gold:0}) || []; return def || []; }
@@ -150,6 +279,64 @@ function fHasValidAction(st, pseudo){
 const F_LOC_CAP = 2; // nombre max de joueurs par lieu
 function fLocationCount(st, loc, exceptPseudo){ return fPlayers(st).filter(p=>p.location===loc && p.pseudo!==exceptPseudo).length; }
 function fCanEnter(st, loc, pseudo){ return fLocationCount(st, loc, pseudo) < F_LOC_CAP; }
+// Reliques pas encore ramenées au musée
+function fRelicsLeft(st){ const mus = Array.isArray(st.museum)?st.museum:[]; return F_RELICS.filter(r=>mus.indexOf(r.nom)<0); }
+
+// ── Objectifs de grand-père (suivi, sans consommation) ──
+// Chaque objectif : par joueur (× nombre de joueurs). progress(st, N) -> { current, target }
+const F_OBJECTIVES = [
+  {
+    id:'feu', icon:'🔥', titre:'Préparer le feu de camp',
+    desc:'Rassembler le bois, la pierre et le charbon pour un grand feu.',
+    // 4 ressources, chacune 2 par joueur
+    parts:[
+      { key:'bûche',     per:2, icon:'🪵' },
+      { key:'brindille', per:2, icon:'🌿' },
+      { key:'pierre',    per:2, icon:'🪨' },
+      { key:'charbon',   per:2, icon:'⚫' },
+    ],
+    progress:(st, N)=>{
+      let cur=0, tgt=0;
+      F_OBJECTIVES[0].parts.forEach(p=>{ const t=p.per*N; tgt+=t; cur+=Math.min(st.inventory[p.key]||0, t); });
+      return { current:cur, target:tgt };
+    },
+  },
+  {
+    id:'plats', icon:'🍲', titre:'Nourrir les villageois',
+    desc:'Cuisiner un plat de veillée pour chaque villageois.',
+    parts:[ { key:'plat de veillée', per:1, icon:'🍲' } ],
+    progress:(st, N)=>{
+      const t=N; return { current:Math.min(st.inventory['plat de veillée']||0, t), target:t };
+    },
+  },
+  {
+    id:'legende', icon:'🎣', titre:'Pêcher un poisson légendaire',
+    desc:'Décrocher un poisson légendaire pour chaque villageois.',
+    parts:[ { key:'__legendary__', per:1, icon:'✨' } ],
+    progress:(st, N)=>{
+      const t=N; return { current:Math.min(st.legendaryCount||0, t), target:t };
+    },
+  },
+  {
+    id:'musee', icon:'🏺', titre:'Faire un don au musée',
+    desc:'Rapporter une relique au musée de la ville pour chaque villageois.',
+    parts:[ { key:'__museum__', per:1, icon:'🏺' } ],
+    progress:(st, N)=>{
+      // plafonné au nombre de reliques existantes pour que l'objectif reste atteignable
+      const t = Math.min(N, F_RELICS.length);
+      const mus = Array.isArray(st.museum)?st.museum.length:0;
+      return { current:Math.min(mus, t), target:t };
+    },
+  },
+];
+
+function fObjectivesState(st){
+  const N = Math.max(1, fPlayers(st).length);
+  return F_OBJECTIVES.map(o=>{
+    const pr = o.progress(st, N);
+    return { def:o, current:pr.current, target:pr.target, done: pr.current>=pr.target };
+  });
+}
 function fShuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
 function fNormalize(st){
@@ -157,11 +344,15 @@ function fNormalize(st){
   st.players   = (st.players && typeof st.players==='object') ? st.players : {};
   st.turnOrder = Array.isArray(st.turnOrder) ? st.turnOrder : (st.turnOrder ? Object.values(st.turnOrder) : []);
   st.inventory = (st.inventory && typeof st.inventory==='object') ? st.inventory : {};
-  st.locations = Array.isArray(st.locations) ? st.locations : F_LOCATIONS.slice();
+  st.locations = F_LOCATIONS.slice();  // la carte est définie par le code (gère la suppression de lieux)
   st.gold      = (typeof st.gold==='number') ? st.gold : 0;
   st.turn      = (typeof st.turn==='number') ? st.turn : 1;
   st.currentIdx= (typeof st.currentIdx==='number') ? st.currentIdx : 0;
   st.mineLevel = (typeof st.mineLevel==='number') ? st.mineLevel : 1;
+  st.legendaryCount = (typeof st.legendaryCount==='number') ? st.legendaryCount : 0;
+  st.fieldCapacity = (typeof st.fieldCapacity==='number' && st.fieldCapacity>0) ? st.fieldCapacity : F_FIELD_BASE;
+  // Firebase supprime les tableaux vides : on reconstruit toujours le musée
+  st.museum = Array.isArray(st.museum) ? st.museum : (st.museum ? Object.values(st.museum) : []);
   st.crops = Array.isArray(st.crops) ? st.crops : (st.crops ? Object.values(st.crops) : []);
   // Répare/purge les cultures héritées d'anciennes parties (sans type valide) pour éviter les récoltes "undefined"
   const _validTypes = (typeof F_CROP_MAX!=='undefined') ? Object.keys(F_CROP_MAX) : ['panais','tomate','salade'];
@@ -170,18 +361,35 @@ function fNormalize(st){
     .map(c => ({ id: c.id || ('crop'+Math.random().toString(36).slice(2)), type: c.type, level: (typeof c.level==='number' && c.level>=1) ? c.level : 1 }))
     .filter(c => _validTypes.indexOf(c.type) >= 0);
   if(st.lastAction && typeof st.lastAction!=='object') st.lastAction = null;
+  fFixLocations(st);
   return st;
 }
 function fPlayers(st){ return Object.values(st.players); }
+// Un joueur situé sur un lieu qui n'existe plus est remis "non placé"
+function fFixLocations(st){ fPlayers(st).forEach(p=>{ if(p.location && F_LOCATIONS.indexOf(p.location)<0) p.location=null; }); return st; }
 function fCurrent(st){ return st.turnOrder[st.currentIdx] || null; }
+// Un joueur qui n'a pas choisi de métier est considéré absent : son tour est passé automatiquement
+function fIsAbsent(p){ return !p || !p.metier; }
+// Avance currentIdx jusqu'au prochain joueur actif (marque les absents comme terminés)
+function fSkipAbsent(st){
+  while(st.currentIdx < st.turnOrder.length){
+    const p = st.players[st.turnOrder[st.currentIdx]];
+    if(!fIsAbsent(p)) break;
+    if(p) p.done = true;
+    st.currentIdx += 1;
+  }
+  return st;
+}
 
 // ── Control handlers ──
+const F_START_GOLD = 5;  // or commun au début de la partie
+
 function startFerme(){
-  const target = Math.max(1, parseInt(document.getElementById('ferme-target').value)||4);
+  // Lobby ouvert : pas de nombre de joueurs à fixer, le meneur lance quand il est prêt
   fbSetFerme({
-    active:true, phase:'lobby', targetPlayers:target, turn:1, maxTurns:F_MAXTURNS,
-    players:{}, turnOrder:[], currentIdx:0, inventory:{}, gold:0, mineLevel:1, crops:[], locations:F_LOCATIONS.slice(),
-    lastEvent:'Lobby ouvert — en attente des joueurs (0/'+target+').'
+    active:true, phase:'lobby', turn:1, maxTurns:F_MAXTURNS,
+    players:{}, turnOrder:[], currentIdx:0, inventory:{}, gold:F_START_GOLD, mineLevel:1, crops:[], legendaryCount:0, museum:[], fieldCapacity:F_FIELD_BASE, locations:F_LOCATIONS.slice(),
+    lastEvent:'Lobby ouvert — les villageois peuvent rejoindre la partie.'
   });
   toast('🌾 Lobby de la Ferme ouvert !');
 }
@@ -197,8 +405,7 @@ function fermeJoin(pseudo){
   const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
   if(!st.players[pseudo]) st.players[pseudo] = { pseudo, metier:null, location:null, done:false };
   const n = fPlayers(st).length;
-  st.lastEvent = 'En attente des joueurs… ('+n+'/'+st.targetPlayers+')';
-  if(n >= st.targetPlayers){ fStartPlanning(st); }
+  st.lastEvent = n+' villageois dans le lobby.';
   fbSetFerme(st);
 }
 
@@ -206,13 +413,13 @@ function fermeLeave(pseudo){
   if(!ferme || ferme.phase!=='lobby') return;
   const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
   delete st.players[pseudo];
-  st.lastEvent = 'En attente des joueurs… ('+fPlayers(st).length+'/'+st.targetPlayers+')';
+  st.lastEvent = fPlayers(st).length+' villageois dans le lobby.';
   fbSetFerme(st);
 }
 
 function fermeForceStart(){
   if(!ferme || ferme.phase!=='lobby') return;
-  if(fPlayers(ferme).length===0){ toast('Aucun joueur dans le lobby !'); return; }
+  if(fPlayers(ferme).length===0){ toast('Aucun villageois n\'a rejoint le lobby !'); return; }
   const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
   fStartPlanning(st);
   fbSetFerme(st);
@@ -249,34 +456,43 @@ function fermeSetLocation(pseudo, loc){
 function fermeStartAction(){
   if(!ferme || ferme.phase!=='planning') return;
   const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
-  // Tous les joueurs doivent avoir choisi un métier
+  // Les joueurs sans métier sont considérés ABSENTS : on peut lancer sans les attendre
   const sansMetier = fPlayers(st).filter(p=>!p.metier).map(p=>p.pseudo);
-  if(sansMetier.length){ toast('En attente du choix de métier : '+sansMetier.join(', ')); return; }
-  // Placement auto des joueurs non placés, en respectant la limite de 2 par lieu
+  if(sansMetier.length){
+    if(!confirm(sansMetier.length+' joueur(s) sans métier : '+sansMetier.join(', ')+'.\n\nLancer quand même ? Ils seront marqués absents (sans métier, non placés) et leur tour sera passé automatiquement.')) return;
+  }
   fPlayers(st).forEach(p=>{
+    if(!p.metier){
+      // Absent : non placé, il n'occupe donc aucune place et ne gêne personne
+      p.location = null; p.done = true; p.actionsDone = 0; p.hasMoved = false;
+      return;
+    }
+    // Présent mais sans lieu choisi : placement auto en respectant la limite de 2 par lieu
     if(!p.location){
       const spot = st.locations.find(l=>fCanEnter(st, l, p.pseudo)) || 'Ferme';
       p.location = spot;
     }
   });
   st.phase='action'; st.currentIdx=0;
-  st.lastEvent = 'Tour '+st.turn+' — Phase d\'action. Au tour de '+(st.turnOrder[0]||'—')+'.';
+  fSkipAbsent(st);
+  if(st.currentIdx >= st.turnOrder.length){
+    // Aucun joueur actif ce tour : on enchaîne directement
+    st.lastEvent = 'Tour '+st.turn+' — aucun joueur actif, le tour passe.';
+    fEndTurn(st);
+    fbSetFerme(st);
+    return;
+  }
+  const nAbs = sansMetier.length;
+  st.lastEvent = 'Tour '+st.turn+' — Phase d\'action. Au tour de '+(fCurrent(st)||'—')+'.'+(nAbs?(' ('+nAbs+' absent'+(nAbs>1?'s':'')+')'):'');
   fbSetFerme(st);
 }
 
-function fermeMove(pseudo, loc){
-  if(!ferme || ferme.phase!=='action') return;
-  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
-  if(!st.players[pseudo] || st.locations.indexOf(loc)<0) return;
-  if(st.players[pseudo].location!==loc && !fCanEnter(st, loc, pseudo)){ toast('Ce lieu est déjà complet ('+F_LOC_CAP+' joueurs).'); return; }
-  st.players[pseudo].location=loc; st.lastEvent=pseudo+' se déplace vers '+F_LOC_ICON[loc]+' '+loc+'.';
-  fbSetFerme(st);
-}
 
 function fAdvance(st){
   const cur = fCurrent(st);
   if(cur){ st.players[cur].done=true; st.players[cur].location='Ferme'; }
   st.currentIdx += 1;
+  fSkipAbsent(st);   // les joueurs absents sont passés automatiquement
   if(st.currentIdx >= st.turnOrder.length){ fEndTurn(st); }
   else { st.lastEvent = (cur?cur+' a terminé son tour. ':'')+'Au tour de '+fCurrent(st)+'.'; }
   return st;
@@ -299,7 +515,7 @@ function fermeDoAction(pseudo, actionId){
   if(act.locations && act.locations.indexOf(p.location)<0){ toast('Action impossible à '+p.location); return; }
   const chk = act.check(st);
   if(!chk.ok){ toast(chk.why||'Action impossible'); return; }
-  const msg = act.apply(st);
+  const msg = act.apply(st, { location: p.location });
   p.actionsDone = (p.actionsDone||0)+1;
   st.lastEvent = pseudo+' '+msg+'.';
   // résultat persistant de la dernière action (ne se fait pas écraser par le passage au joueur suivant)
@@ -331,7 +547,8 @@ function fermePlayerMove(pseudo, loc){
 function fActionButtons(st, pseudo){
   const p = st.players[pseudo]; if(!p) return '';
   const done = p.actionsDone||0;
-  let html = '<div class="f-label-lg">Actions '+done+'/2 — '+(p.metier?(F_METIER_ICON[p.metier]+' '+p.metier):'sans métier')+' à '+F_LOC_ICON[p.location]+' '+p.location+'</div>';
+  const locTxt = p.location ? ((F_LOC_ICON[p.location]||'')+' '+p.location) : 'non placé';
+  let html = '<div class="f-label-lg">Actions '+done+'/2 — '+(p.metier?(F_METIER_ICON[p.metier]+' '+p.metier):'sans métier')+' à '+locTxt+'</div>';
   if(done>=2){ return html+'<div class="diamant-voted">Les 2 actions sont faites, le tour se termine.</div>'; }
   const avail = fMetierActions(p.metier, st).filter(a=>!a.locations || a.locations.indexOf(p.location)>=0);
   if(!p.metier){
@@ -339,13 +556,15 @@ function fActionButtons(st, pseudo){
   } else if(avail.length===0){
     html += '<div class="f-empty">Aucune action de '+p.metier+' possible ici. Déplace-toi vers le bon lieu.</div>';
   } else {
-    html += '<div class="f-actions-col">';
+    // Boutons d'action sur une seule ligne, sans les indications de règles
+    // (la raison d'un blocage reste accessible en infobulle)
+    html += '<div class="f-actions-row">';
     avail.forEach(a=>{
       const chk = a.check(st);
       const dis = chk.ok ? '' : 'disabled';
-      const why = chk.ok ? '' : ' <span class="u-dim">('+(chk.why||'indispo')+')</span>';
       const dtxt = (typeof a.desc==='function') ? a.desc(st) : a.desc;
-      html += '<button class="btn-continue" '+dis+' onclick="fermeDoAction(\''+escAttr(pseudo)+'\',\''+a.id+'\')" class="u-textleft">'+a.label+(dtxt?(' — '+dtxt):'')+why+'</button>';
+      const tip = chk.ok ? (dtxt||'') : (chk.why||'indisponible');
+      html += '<button class="btn-continue" '+dis+(tip?(' title="'+escAttr(tip)+'"'):'')+' onclick="fermeDoAction(\''+escAttr(pseudo)+'\',\''+a.id+'\')">'+a.label+'</button>';
     });
     html += '</div>';
   }
@@ -359,7 +578,7 @@ function fActionButtons(st, pseudo){
 }
 
 function fEndTurn(st){
-  if(st.turn >= st.maxTurns){ st.phase='gameEnd'; st.result=null; st.lastEvent='🏁 Fin du 10e tour ! Déclare victoire ou défaite.'; return st; }
+  if(st.turn >= st.maxTurns){ st.phase='gameEnd'; st.result=null; st.lastEvent='🏁 Fin du dernier tour ! Déclare victoire ou défaite.'; return st; }
   st.turn += 1; return fStartPlanning(st);
 }
 
@@ -399,7 +618,7 @@ function fermeAdjustGold(delta){
   fbSetFerme(st);
 }
 
-const F_RESOURCES = ['bois','bûche','brindille','pierre brute','pierre','minerai de charbon','charbon','minerai de cuivre','cuivre','minerai de fer','fer','poisson','poisson grillé','panais','tomate','salade','plat de veillée','oeuf','lait','graine'];
+const F_RESOURCES = ['bois','bois dur','bûche','brindille','pierre','charbon','minerai de cuivre','cuivre','minerai de fer','fer','poisson','poisson grillé','panais','tomate','salade','plat de veillée','oeuf','lait'];
 
 // ── Rendering ──
 function fLastActionBanner(st, opts){
@@ -424,25 +643,34 @@ function fermeClearLastAction(){
   fbSetFerme(st);
 }
 
-function fStatusPills(st){
+function fStatusPills(st, opts){
+  opts = opts||{};
   const phaseLabel = { lobby:'Lobby', planning:'Planification', action:'Action', gameEnd:'Fin' }[st.phase]||st.phase;
-  return '<div class="fturn-pill">Tour <strong>'+st.turn+'/'+st.maxTurns+'</strong></div>'+
+  let html = '<div class="fturn-pill">Tour <strong>'+st.turn+'/'+st.maxTurns+'</strong></div>'+
          '<span class="fphase-badge fphase-'+st.phase+'">'+phaseLabel+'</span>'+
-         '<div class="fturn-pill">⛏️ Mine <strong>niv. '+(st.mineLevel||1)+'/5</strong></div>'+
-         '<div class="fgold">🪙 '+st.gold+' or</div>';
+         '<div class="fturn-pill">⛏️ Mine <strong>niv. '+(st.mineLevel||1)+'/5</strong></div>';
+  if(opts.gold!==false) html += '<div class="fgold">🪙 '+st.gold+' or</div>';
+  return html;
 }
 
 function fBoard(st, opts){
   opts = opts||{};
-  const cur = fCurrent(st);
+  const cur   = fCurrent(st);
+  const me    = opts.pseudo || null;                                  // joueur qui peut cliquer (vue joueur)
+  const myLoc = me && st.players[me] ? st.players[me].location : null;
   return '<div class="ferme-board">'+ st.locations.map(loc=>{
     const here = fPlayers(st).filter(p=>p.location===loc);
-    const pawns = here.map(p=>'<span class="fpawn'+(p.pseudo===cur?' current':'')+'">'+escHtml(p.pseudo)+'</span>').join('');
-    const clickable = opts.onPick ? ' floc-btn" onclick="'+opts.onPick+'(\''+escAttr(loc)+'\')"' : '"';
-    const sel = (opts.selected===loc)?' selected':'';
-    return '<div class="floc'+sel+(opts.onPick?' floc-btn':'')+'" '+(opts.onPick?('onclick="'+opts.onPick+'(\''+escAttr(loc)+'\')"'):'')+'>'+
-      '<div class="floc-header">'+F_LOC_ICON[loc]+' '+loc+'</div>'+
-      '<div class="floc-pawns">'+pawns+'</div></div>';
+    // Noms des joueurs présents, affichés SOUS la carte du lieu
+    const names = here.map(p=>'<span class="fpawn'+(p.pseudo===cur?' current':'')+(p.pseudo===me?' mine':'')+'">'+escHtml(p.pseudo)+'</span>').join('');
+    const full      = here.length>=F_LOC_CAP && myLoc!==loc;
+    const clickable = !!opts.pick && !full;
+    const sel  = (myLoc===loc)?' selected':'';
+    const cls  = 'floc'+sel+(clickable?' floc-btn':'')+((opts.pick&&full)?' floc-full':'');
+    const click = clickable ? ' onclick="'+opts.pick+'(\''+escAttr(me)+'\',\''+escAttr(loc)+'\')"' : '';
+    const badge = (opts.pick && full) ? '<span class="floc-badge">complet</span>' : '';
+    return '<div class="'+cls+'"'+click+'>'+
+      '<div class="floc-visual"><img class="floc-img" src="'+F_LOC_IMG[loc]+'" alt="'+escAttr(loc)+'" draggable="false">'+badge+'</div>'+
+      '<div class="floc-pawns">'+names+'</div></div>';
   }).join('') + '</div>';
 }
 
@@ -450,86 +678,114 @@ function fPlayersList(st, highlight){
   const cur = fCurrent(st);
   return fPlayers(st).map(p=>{
     const isCur = (st.phase==='action' && p.pseudo===cur);
+    const absent = (st.phase==='action' && fIsAbsent(p));
     const metier = p.metier ? '<span class="fmetier">'+(F_METIER_ICON[p.metier]||'')+' '+p.metier+'</span>' : '<span class="fmetier none">sans métier</span>';
     const loc = p.location ? '<span class="floc-tag">'+F_LOC_ICON[p.location]+' '+p.location+'</span>' : '<span class="floc-tag u-dimmer">non placé</span>';
     const hl = (p.pseudo===highlight)?'class="u-outline"':'';
+    const statut = absent
+      ? '<span class="u-mla t-warm">💤 absent</span>'
+      : (p.done?'<span class="u-mla t-success">✓ fini</span>':'');
     return '<div class="fplayer-row'+(isCur?' current':'')+(p.done?' done':'')+'" '+hl+'>'+
       '<span>'+(isCur?'▶ ':'')+escHtml(p.pseudo)+'</span>'+metier+loc+
-      (p.done?'<span class="u-mla t-success">✓ fini</span>':'')+'</div>';
+      statut+'</div>';
   }).join('');
 }
 
 function fInventory(st){
   const items = Object.keys(st.inventory);
-  if(!items.length) return '<div class="finv"><span class="t-muted-it">Inventaire vide</span></div>';
-  return '<div class="finv">'+items.map(k=>'<span class="finv-item">'+escHtml(k)+' <strong>×'+st.inventory[k]+'</strong></span>').join('')+'</div>';
+  const gold = '<span class="finv-item">Or <strong>×'+(st.gold||0)+'</strong></span>';
+  const rest = items.map(k=>'<span class="finv-item">'+escHtml(k)+' <strong>×'+st.inventory[k]+'</strong></span>').join('');
+  return '<div class="finv">'+gold+rest+'</div>';
+}
+
+// Retire les emojis d'une chaîne d'affichage — vue meneur : emotes réservées à la vue joueur.
+// (préserve − U+2212, —, ·, «», … qui ne sont pas dans les plages emoji)
+function fNoEmoji(s){
+  return String(s).replace(/([\u{2190}-\u{21FF}\u{2300}-\u{27BF}\u{2B00}-\u{2BFF}\u{1F000}-\u{1FAFF}\u{FE00}-\u{FE0F}\u{200D}])\uFE0F?\s?/gu,'');
 }
 
 function renderFermeAdmin(){
   const panel = document.getElementById('ferme-panel');
   if(!panel) return;
-  const inactive = document.getElementById('ferme-admin-inactive');
   const active = document.getElementById('ferme-admin-active');
-  if(!ferme || !ferme.active){ inactive.style.display='block'; active.style.display='none'; return; }
-  inactive.style.display='none'; active.style.display='block';
+  // Le panneau n'apparaît dans la zone « jeu actif » que si une partie tourne
+  if(!ferme || !ferme.active){ panel.style.display='none'; renderGameLibrary(); return; }
+  panel.style.display='block';
+  if(active) active.style.display='block';
 
-  document.getElementById('fa-status').innerHTML = fStatusPills(ferme);
-  document.getElementById('fa-lastaction').innerHTML = fLastActionBanner(ferme, {dismiss:true});
-  document.getElementById('fa-event').textContent = ferme.lastEvent||'';
-  document.getElementById('fa-board').innerHTML = fBoard(ferme);
-  document.getElementById('fa-players').innerHTML = fPlayersList(ferme);
+  // Statut (Tour / phase / Mine / Or)
+  document.getElementById('fa-status').innerHTML = fNoEmoji(fStatusPills(ferme));
 
-  // inventory + meneur adjust
-  const resOpts = F_RESOURCES.map(r=>'<option value="'+r+'">'+r+'</option>').join('');
-  document.getElementById('fa-inventory').innerHTML =
-    '<div class="f-caption-warm-lg">Inventaire partagé</div>'+
-    fInventory(ferme)+
-    fCrops(ferme)+
-    '<div class="f-row-center-mt">'+
-      '<select id="fa-res-select" class="f-select-grow">'+resOpts+'</select>'+
-      '<input type="number" id="fa-res-qty" value="1" class="fire-mini-input f-input-qty">'+
-      '<button class="btn-small" onclick="fermeAddResource()">± Ressource</button>'+
-      '<span class="u-mla-row">🪙'+
-        '<button class="btn-icon" onclick="fermeAdjustGold(-5)">−5</button>'+
-        '<button class="btn-icon" onclick="fermeAdjustGold(-1)">−</button>'+
-        '<button class="btn-icon" onclick="fermeAdjustGold(1)">+</button>'+
-        '<button class="btn-icon" onclick="fermeAdjustGold(5)">+5</button>'+
-      '</span>'+
-    '</div>';
+  // Liste des joueurs (colonne principale) — affichage seul
+  document.getElementById('fa-players').innerHTML = fNoEmoji(fPlayersList(ferme));
 
+  // Ligne d'événement
+  document.getElementById('fa-event').textContent = fNoEmoji(ferme.lastEvent||'');
+
+  // Colonne de droite (contexte de phase / actions du joueur courant) + CTA
+  const prog = document.getElementById('fa-progress');
   const ctrl = document.getElementById('fa-controls');
   const ph = ferme.phase;
-  const cancelBtn = '<button class="btn-deactivate" onclick="fermeCancel()" class="u-mt-sm">✕ Abandonner la partie</button>';
+  const cancelBtn = '<button class="btn-deactivate" onclick="fermeCancel()">Abandonner la partie</button>';
+  const ctaRow = (main)=>'<div class="fa-cta-row">'+main+cancelBtn+'</div>';
+
   if(ph==='lobby'){
-    ctrl.innerHTML = '<div class="diamant-voted">🚪 '+fPlayers(ferme).length+'/'+ferme.targetPlayers+' joueurs ont rejoint. La partie démarrera automatiquement, ou force le départ :</div>'+
-      '<button class="btn-draw" onclick="fermeForceStart()">▶ Démarrer maintenant</button>'+cancelBtn;
+    const nJoin = fPlayers(ferme).length;
+    prog.innerHTML = '<div class="diamant-voted">'+nJoin+' villageois ont rejoint. Lance quand tu veux — la partie démarrera avec les joueurs présents.</div>';
+    ctrl.innerHTML = ctaRow('<button class="btn-draw" onclick="fermeForceStart()">Lancer la partie'+(nJoin?(' ('+nJoin+' joueur'+(nJoin>1?'s':'')+')'):'')+'</button>');
+
   } else if(ph==='planning'){
     const total = fPlayers(ferme).length;
     const withMetier = fPlayers(ferme).filter(p=>p.metier).length;
     const placed = fPlayers(ferme).filter(p=>p.location).length;
     const allReady = withMetier===total;
-    ctrl.innerHTML = '<div class="diamant-voted">📋 Planification — métiers choisis : <strong>'+withMetier+'/'+total+'</strong> · lieux choisis : <strong>'+placed+'/'+total+'</strong>.'+
-      (allReady?'':' <span class="t-warm">En attente des choix de métier.</span>')+
-      '<br><span class="u-dim8">Les joueurs non placés seront mis automatiquement au lancement.</span></div>'+
-      '<button class="btn-draw" onclick="fermeStartAction()"'+(allReady?'':' disabled class="u-disabled"')+'>▶ Lancer la phase d\'action</button>'+cancelBtn;
+    const nAbs = total - withMetier;
+    prog.innerHTML = '<div class="diamant-voted">Planification — métiers choisis : <strong>'+withMetier+'/'+total+'</strong> · lieux choisis : <strong>'+placed+'/'+total+'</strong>.'+
+      (allReady?'':' <span class="t-warm">'+nAbs+' joueur(s) sans métier seront marqués <strong>absents</strong> et passés automatiquement.</span>')+
+      '<br><span class="u-dim8">Les joueurs placés nulle part sont positionnés automatiquement au lancement.</span></div>';
+    ctrl.innerHTML = ctaRow('<button class="btn-draw" onclick="fermeStartAction()">Lancer la phase d\'action'+(allReady?'':' (forcer, '+nAbs+' absent'+(nAbs>1?'s':'')+')')+'</button>');
+
   } else if(ph==='action'){
     const cur = fCurrent(ferme);
-    const acts = cur ? fActionButtons(ferme, cur) : '';
-    ctrl.innerHTML = '<div class="diamant-voted">▶ Au tour de <strong class="t-bright">'+(cur||'—')+'</strong>. Tu peux jouer à sa place (en cas d\'absence) :</div>'+
-      acts +
-      '<button class="btn-draw" onclick="fermeEndPlayerTurn()" class="u-mt-md">⏭️ Terminer le tour de ce joueur</button>'+cancelBtn;
+    prog.innerHTML = cur ? fActionButtons(ferme, cur) : '';
+    ctrl.innerHTML = ctaRow('<button class="btn-draw" onclick="fermeEndPlayerTurn()">Terminer le tour de ce joueur</button>');
+
   } else if(ph==='gameEnd'){
     let head = '';
-    if(ferme.result==='victory') head='<div class="diamant-voted t-success">🎉 Victoire déclarée !</div>';
-    else if(ferme.result==='defeat') head='<div class="diamant-voted t-danger">😞 Défaite déclarée.</div>';
-    else head='<div class="diamant-voted">🏁 Fin des 10 tours. Les objectifs de grand-père sont-ils remplis ?</div>';
-    ctrl.innerHTML = head +
-      '<div class="u-mt-sm-flex">'+
-        '<button class="btn-continue" onclick="fermeDeclare(true)">🎉 Victoire</button>'+
-        '<button class="btn-leave" onclick="fermeDeclare(false)">😞 Défaite</button>'+
-      '</div>'+
-      '<button class="btn-draw" onclick="fermeEndToFire()" class="u-mt-md">🔥 Clôturer (+ points au feu)</button>';
+    if(ferme.result==='victory') head='<div class="diamant-voted t-success">Victoire déclarée !</div>';
+    else if(ferme.result==='defeat') head='<div class="diamant-voted t-danger">Défaite déclarée.</div>';
+    else head='<div class="diamant-voted">Fin de la partie. Les objectifs de grand-père sont-ils remplis ?</div>';
+    prog.innerHTML = head;
+    ctrl.innerHTML = '<div class="fa-cta-row">'+
+      '<button class="btn-continue" onclick="fermeDeclare(true)">Victoire</button>'+
+      '<button class="btn-leave" onclick="fermeDeclare(false)">Défaite</button>'+
+      '<button class="btn-draw" onclick="fermeEndToFire()">Clôturer</button>'+
+    '</div>';
   }
+
+  // Donner une ressource + ajuster l'or (toujours accessible, en bas)
+  const resOpts = F_RESOURCES.map(r=>'<option value="'+r+'">'+r+'</option>').join('');
+  document.getElementById('fa-give').innerHTML =
+    '<div class="fa-give-row">'+
+      '<span class="fa-give-label">Donner :</span>'+
+      '<select id="fa-res-select" class="f-select-grow">'+resOpts+'</select>'+
+      '<span class="fa-give-label">Quantité :</span>'+
+      '<input type="number" id="fa-res-qty" value="1" class="fire-mini-input f-input-qty">'+
+      '<button class="btn-small" onclick="fermeAddResource()">Donner</button>'+
+    '</div>'+
+    '<div class="fa-give-row">'+
+      '<span class="fa-give-label">Or commun</span>'+
+      '<button class="btn-icon" onclick="fermeAdjustGold(-5)">−5</button>'+
+      '<button class="btn-icon" onclick="fermeAdjustGold(-1)">−</button>'+
+      '<button class="btn-icon" onclick="fermeAdjustGold(1)">+</button>'+
+      '<button class="btn-icon" onclick="fermeAdjustGold(5)">+5</button>'+
+    '</div>';
+
+  // Vue meneur : pas d'emote (réservées à la vue joueur)
+  prog.innerHTML = fNoEmoji(prog.innerHTML);
+  ctrl.innerHTML = fNoEmoji(ctrl.innerHTML);
+
+  renderGameLibrary();
 }
 
 function renderFermeViewer(pseudo){
@@ -537,74 +793,203 @@ function renderFermeViewer(pseudo){
   if(!wrap) return;
   if(!ferme || !ferme.active){ wrap.style.display='none'; return; }
   wrap.style.display='block';
-  document.getElementById('fv-status').innerHTML = fStatusPills(ferme);
-  document.getElementById('fv-lastaction').innerHTML = fLastActionBanner(ferme);
-  document.getElementById('fv-event').textContent = ferme.lastEvent||'';
+
+  const ph = ferme.phase;
+  const inGame = (ph!=='lobby');
+  const me = ferme.players[pseudo];
+  const cur = fCurrent(ferme);
+
+  // Barre du haut : pastilles Tour / phase / Mine (l'or est dans l'inventaire)
+  document.getElementById('fv-status').innerHTML = fStatusPills(ferme, {gold:false});
+
+  // Instruction de phase, sous la barre, sans fond
+  const instr = document.getElementById('fv-instruction');
+  if(ph==='planning'){
+    instr.innerHTML = 'Phase Planification : Choisis ton métier et ton lieu de départ (dans l\'ordre que tu veux)';
+  } else if(ph==='action'){
+    instr.innerHTML = (cur===pseudo)
+      ? 'Phase Action : ▶ C\'est ton tour ! Réalise tes actions ou déplace toi'
+      : 'Phase Action : Au tour de ' + (cur||'—');
+  } else {
+    instr.innerHTML = '';
+  }
+
+  // Colonne de droite : inventaire + objectifs (seulement en jeu)
+  const side  = document.getElementById('fv-side');
+  const invEl = document.getElementById('fv-inventory');
+  const objEl = document.getElementById('fv-objectives');
+  if(side) side.style.display = inGame ? '' : 'none';
+  if(inGame){
+    if(invEl) invEl.innerHTML = fInventory(ferme) + fCrops(ferme) + fMuseum(ferme);
+    if(objEl) objEl.innerHTML = fObjectivesCards(ferme);
+  }
 
   const zone = document.getElementById('fv-myzone');
-  const me = ferme.players[pseudo];
-  const ph = ferme.phase;
 
   if(ph==='lobby'){
     if(me){
-      zone.innerHTML = '<div class="diamant-voted">✓ Tu as rejoint la partie ! En attente des autres ('+fPlayers(ferme).length+'/'+ferme.targetPlayers+')…</div>'+
-        '<button class="btn-small" onclick="fermeLeave(\''+escAttr(pseudo)+'\')" class="u-full">↩ Quitter le lobby</button>';
+      zone.innerHTML = '<div class="diamant-voted">✓ Tu as rejoint la partie ! En attente du lancement par le meneur ('+fPlayers(ferme).length+' villageois)…</div>'+
+        '<button class="btn-small u-full" onclick="fermeLeave(\''+escAttr(pseudo)+'\')">↩ Quitter le lobby</button>';
     } else {
-      zone.innerHTML = '<div class="diamant-voted">🚪 Une partie de la Ferme se prépare ! Rejoins avant le départ.</div>'+
-        '<button class="btn-continue" onclick="fermeJoin(\''+escAttr(pseudo)+'\')" class="u-full">🌾 Rejoindre la partie</button>';
+      zone.innerHTML = '<div class="diamant-voted">🚪 Une partie de la Ferme se prépare ! Rejoins avant le lancement.</div>'+
+        '<button class="btn-continue u-full" onclick="fermeJoin(\''+escAttr(pseudo)+'\')">🌾 Rejoindre la partie</button>';
     }
     return;
   }
 
-  // in-game board is useful for everyone
-  let board = fBoard(ferme, {});
-  let inv = fInventory(ferme) + fCrops(ferme);
+  const board = fBoard(ferme, {});
 
   if(!me){
-    zone.innerHTML = board + inv + '<div class="diamant-voted">👀 Tu n\'es pas dans cette partie. Tu pourras jouer à la prochaine !</div>';
+    zone.innerHTML = board + '<div class="diamant-voted">👀 Tu n\'es pas dans cette partie. Tu pourras jouer à la prochaine !</div>';
     return;
   }
 
   if(ph==='planning'){
-    const myLoc = me.location;
-    // Choix du métier
     const metierBtns = F_METIERS_BASE.map(m=>{
       const chosen = (me.metier===m);
-      return '<button class="btn-small" onclick="fermeSetMetier(\''+escAttr(pseudo)+'\',\''+escAttr(m)+'\')" style="'+(chosen?'background:rgba(83,74,183,.35);border-color:var(--metier);color:var(--metier-bright)':'')+'">'+(F_METIER_ICON[m]||'')+' '+m+(chosen?' ✓':'')+'</button>';
+      return '<button class="btn-small" onclick="fermeSetMetier(\''+escAttr(pseudo)+'\',\''+escAttr(m)+'\')" style="'+(chosen?'background:var(--metier-line);border-color:var(--metier);color:var(--metier-bright)':'')+'">'+(F_METIER_ICON[m]||'')+' '+m+(chosen?' ✓':'')+'</button>';
     }).join('');
-    // Choix du lieu (avec occupation X/2, lieux complets désactivés)
-    const board = '<div class="ferme-board">'+ ferme.locations.map(loc=>{
-      const here = fPlayers(ferme).filter(p=>p.location===loc);
-      const pawns = here.map(p=>'<span class="fpawn'+(p.pseudo===pseudo?' current':'')+'">'+escHtml(p.pseudo)+'</span>').join('');
-      const sel = (myLoc===loc)?' selected':'';
-      const full = here.length>=F_LOC_CAP && myLoc!==loc;
-      const cnt = '<span style="font-size:.875rem;color:'+(full?'var(--ember)':'var(--amber-warm)')+'">'+here.length+'/'+F_LOC_CAP+'</span>';
-      const click = full ? '' : ' onclick="fermeSetLocation(\''+escAttr(pseudo)+'\',\''+escAttr(loc)+'\')"';
-      return '<div class="floc'+(full?'':' floc-btn')+sel+'"'+click+' style="'+(full?'opacity:.45;cursor:not-allowed':'')+'">'+
-        '<div class="floc-header">'+F_LOC_ICON[loc]+' '+loc+' '+cnt+'</div><div class="floc-pawns">'+pawns+'</div></div>';
-    }).join('') +'</div>';
+    const boardPick = fBoard(ferme, { pseudo:pseudo, pick:'fermeSetLocation' });
     zone.innerHTML =
-      '<div class="diamant-voted">Choisis ton <strong class="t-metier">métier</strong> et ton <strong class="t-bright">lieu de départ</strong> (dans l\'ordre que tu veux) :</div>'+
-      '<div class="f-label">Métier '+(me.metier?'✓':'—')+' :</div>'+
+      '<div class="f-label">Les métiers</div>'+
       '<div class="f-row-mb">'+metierBtns+'</div>'+
-      '<div class="f-label">Lieu '+(myLoc?'✓':'—')+' (max '+F_LOC_CAP+' par lieu) :</div>'+
-      board + inv;
+      '<div class="f-label">Lieux (max '+F_LOC_CAP+' par lieu)</div>'+
+      boardPick;
     return;
   }
 
   if(ph==='action'){
-    const cur = fCurrent(ferme);
     const isMe = (cur===pseudo);
-    zone.innerHTML = board + inv +
-      (isMe
-        ? '<div class="diamant-voted t-success">▶ C\'est ton tour !</div>' + fActionButtons(ferme, pseudo) + '<button class="btn-draw" onclick="fermeEndPlayerTurn()" class="u-mt-md">Terminer mon tour</button>'
-        : '<div class="diamant-voted">Au tour de <strong class="t-bright">'+(cur||'—')+'</strong>. Ton métier ce tour : '+(me.metier||'—')+', ton lieu : '+(me.location||'—')+'.</div>');
+    const lastAct = fLastActionBanner(ferme);
+    if(isMe){
+      zone.innerHTML = board + fActionButtons(ferme, pseudo) + lastAct +
+        '<button class="btn-draw u-mt-md" onclick="fermeEndPlayerTurn()">Terminer mon tour</button>';
+    } else if(fIsAbsent(me)){
+      zone.innerHTML = board + '<div class="diamant-voted">💤 Tu es absent ce tour : tu n\'as pas choisi de métier à temps. Tu pourras rejouer au tour suivant en choisissant un métier pendant la planification.</div>' + lastAct;
+    } else {
+      zone.innerHTML = board + '<div class="diamant-voted">Ton métier ce tour : <strong class="t-metier">'+(me.metier||'—')+'</strong>, ton lieu : <strong class="t-bright">'+(me.location||'—')+'</strong>.</div>' + lastAct;
+    }
     return;
   }
 
   if(ph==='gameEnd'){
     let msg = ferme.result==='victory' ? '🎉 Victoire ! Grand-père est fier de vous.' : ferme.result==='defeat' ? '😞 Défaite… ce sera pour la prochaine fois.' : '🏁 Fin de la partie.';
-    zone.innerHTML = board + inv + '<div class="diamant-voted">'+msg+'</div>';
+    zone.innerHTML = board + '<div class="diamant-voted">'+msg+'</div>';
     return;
   }
+}
+
+// ── RÈGLES DU JEU (popin « Comment jouer ») ────────────────────────────────
+// Le contenu est généré depuis les constantes du jeu : si une valeur change,
+// les règles affichées restent automatiquement justes.
+function fRulesHtml(){
+  const loc = (l)=> (F_LOC_ICON[l]||'')+' '+l;
+
+  // Actions par métier, avec leur lieu
+  const neutre = { inventory:{}, crops:[], gold:99, museum:[], mineLevel:1, fieldCapacity:F_FIELD_BASE };
+  const metierBlocks = F_METIERS_BASE.map(m=>{
+    const acts = fMetierActions(m, neutre);
+    const lines = acts.map(a=>{
+      const where = a.locations ? a.locations.map(loc).join(' ou ') : 'partout';
+      let d = a.desc;
+      if(typeof d === 'function'){ try { d = d(neutre); } catch(e){ d = ''; } }
+      d = d || '';
+      return '<li><strong>'+escHtml(a.label)+'</strong> <span class="rules-where">'+escHtml(where)+'</span>'+(d?(' — '+escHtml(d)):'')+'</li>';
+    }).join('');
+    return '<div class="rules-metier"><h4>'+(F_METIER_ICON[m]||'')+' '+escHtml(m)+'</h4><ul>'+lines+'</ul></div>';
+  }).join('');
+
+  // Tableaux de pêche par lieu
+  const fishBlocks = Object.keys(F_FISH_BY_LOC).map(l=>{
+    const rows = F_FISH_BY_LOC[l].map(f=>
+      '<tr><td>'+escHtml(f.nom)+(f.legendaire?' <span class="rules-star">★ légendaire</span>':'')+'</td>'+
+      '<td>'+f.poids+'%</td><td>dé ≥ '+f.val+'</td></tr>'
+    ).join('');
+    return '<div class="rules-half"><h4>'+loc(l)+'</h4><table class="rules-table">'+
+      '<tr><th>Poisson</th><th>Apparition</th><th>Capture</th></tr>'+rows+'</table></div>';
+  }).join('');
+
+  // Reliques groupées par difficulté
+  const byVal = {};
+  F_RELICS.forEach(r=>{ (byVal[r.val]=byVal[r.val]||[]).push(r.nom); });
+  const relicRows = Object.keys(byVal).sort().map(v=>
+    '<tr><td>'+escHtml(byVal[v].join(', '))+'</td><td>dé ≥ '+v+'</td><td>'+Math.round((7-v)/6*100)+'%</td></tr>'
+  ).join('');
+
+  // Graines
+  const seedRows = F_SEEDS.map(s=>
+    '<tr><td>'+escHtml(s.type)+'</td><td>'+(s.maxLevel-1)+' arrosage'+((s.maxLevel-1)>1?'s':'')+'</td><td>'+s.sell+' or</td></tr>'
+  ).join('');
+
+  // Objectifs
+  const objRows = F_OBJECTIVES.map(o=>{
+    const need = o.parts.map(p=>{
+      const label = p.key==='__legendary__' ? 'poisson légendaire' : (p.key==='__museum__' ? 'relique' : p.key);
+      return p.per+'× '+label;
+    }).join(', ');
+    return '<tr><td>'+o.icon+' '+escHtml(o.titre)+'</td><td>'+escHtml(need)+' <em>par joueur</em></td></tr>';
+  }).join('');
+
+  return ''+
+  '<h2 class="rules-title">🌾 La Ferme du Village — Comment jouer</h2>'+
+
+  '<div class="rules-section"><h3>🎯 Le but</h3>'+
+  '<p>Une partie <strong>coopérative</strong> en <strong>'+F_MAXTURNS+' tours</strong>. Tout le village joue ensemble pour remplir les <strong>objectifs de grand-père</strong> avant la fin. Les ressources, l\'or et le champ sont <strong>communs</strong> : ce que tu récoltes profite à tout le monde.</p></div>'+
+
+  '<div class="rules-section"><h3>🔄 Le déroulé d\'un tour</h3>'+
+  '<p><strong>1. Planification</strong> — tu choisis ton <strong>métier</strong> pour ce tour et ton <strong>lieu de départ</strong>, dans l\'ordre que tu veux. Plusieurs joueurs peuvent prendre le même métier, mais un lieu n\'accueille que <strong>'+F_LOC_CAP+' joueurs maximum</strong>. Le métier se rechoisit à chaque tour.</p>'+
+  '<p><strong>2. Action</strong> — chacun joue à son tour, dans un ordre tiré au hasard. Tu disposes de <strong>2 actions</strong> :</p>'+
+  '<ul><li><strong>Action + Action</strong> — deux actions sur ton lieu actuel</li>'+
+  '<li><strong>Action + Déplacement + Action</strong> — une action, tu te déplaces, puis une dernière action</li></ul>'+
+  '<p class="rules-note">Si aucune action n\'est possible à ton emplacement, tu peux te déplacer d\'emblée — mais ça te coûte une de tes deux actions. Une fois tes 2 actions faites, ton pion rentre à la Ferme et le tour passe au joueur suivant.</p></div>'+
+
+  '<div class="rules-section"><h3>🗺️ Les lieux</h3>'+
+  '<p>'+F_LOCATIONS.map(loc).map(escHtml).join(' · ')+'</p>'+
+  '<p class="rules-note">Chaque lieu accueille au maximum '+F_LOC_CAP+' joueurs : anticipe, les bons spots partent vite !</p></div>'+
+
+  '<div class="rules-section"><h3>👷 Les métiers et leurs actions</h3>'+
+  '<div class="rules-metiers">'+metierBlocks+'</div></div>'+
+
+  '<div class="rules-section"><h3>🎣 La pêche</h3>'+
+  '<p>Un poisson est tiré au hasard selon les chances du lieu, puis tu lances un dé à 6 faces : si le résultat atteint la difficulté, le poisson est ferré. Un <strong>poisson légendaire</strong> rapporte <strong>2 poissons</strong> et compte pour l\'objectif de grand-père.</p>'+
+  '<div class="rules-cols">'+fishBlocks+'</div></div>'+
+
+  '<div class="rules-section"><h3>⛏️ La mine</h3>'+
+  '<p>Explorer la mine donne : <strong>pierre 50%</strong>, <strong>charbon 30%</strong>, <strong>escalier 15%</strong> (le groupe descend d\'un niveau), <strong>crâne de monstre 5%</strong> (le groupe perd un objet au hasard).</p>'+
+  '<p class="rules-note">La mine a 5 niveaux et sa profondeur est <strong>commune à tout le groupe</strong> : elle ne remonte jamais. À chaque niveau plus profond, le risque de crâne augmente de 5% (jusqu\'à 25% au niveau 5). Descendre, c\'est prendre un risque durable pour tout le village.</p></div>'+
+
+  '<div class="rules-section"><h3>🏺 Les reliques du musée</h3>'+
+  '<p>Chercher une relique en montagne en révèle une parmi celles <strong>encore à découvrir</strong> (toutes ont la même chance d\'apparaître). Un jet de dé décide si tu parviens à la dégager intacte. Une relique rapportée rejoint le <strong>musée</strong> et ne peut plus être retrouvée.</p>'+
+  '<table class="rules-table"><tr><th>Reliques</th><th>Difficulté</th><th>Réussite</th></tr>'+relicRows+'</table></div>'+
+
+  '<div class="rules-section"><h3>🌱 Le champ</h3>'+
+  '<p>Une graine achetée au Magasin ('+F_SEED_PRICE+' or) est plantée aussitôt au niveau 1. <strong>Arroser fait monter toutes les plantes du champ</strong> d\'un niveau d\'un coup ; celles qui atteignent leur maturité sont récoltées automatiquement.</p>'+
+  '<table class="rules-table"><tr><th>Graine</th><th>Arrosages nécessaires</th><th>Valeur à la vente</th></tr>'+seedRows+'</table>'+
+  '<p class="rules-note">Le champ accueille <strong>'+F_FIELD_BASE+' cultures</strong> au départ. Le Bûcheron peut l\'agrandir de '+F_FIELD_BONUS+' places en améliorant la ferme.</p></div>'+
+
+  '<div class="rules-section"><h3>📋 Les objectifs de grand-père</h3>'+
+  '<p>Ils se comptent <strong>par joueur</strong> : à 4 joueurs, il faut 4 plats de veillée, 4 reliques, etc. Ils se remplissent automatiquement avec l\'inventaire commun, <strong>sans rien consommer</strong>.</p>'+
+  '<table class="rules-table"><tr><th>Objectif</th><th>Nécessite</th></tr>'+objRows+'</table></div>'+
+
+  '<div class="rules-section"><h3>💡 Conseils</h3>'+
+  '<ul><li>Coordonnez-vous : les métiers se complètent (le Pêcheur a besoin du <strong>bois</strong> du Bûcheron pour griller, l\'Agriculteur a besoin d\'un <strong>poisson grillé</strong> pour cuisiner).</li>'+
+  '<li>Le village démarre avec <strong>'+F_START_GOLD+' or</strong> : de quoi lancer les premières cultures.</li>'+
+  '<li>Vendre rapporte de l\'or commun, mais attention à ne pas brader une ressource dont un objectif a besoin.</li>'+
+  '<li>Si tu ne choisis pas de métier pendant la planification, tu es marqué absent et ton tour est passé — pense à valider ton choix !</li></ul></div>';
+}
+
+function fermeShowRules(){
+  const box = document.getElementById('ferme-rules-content');
+  const modal = document.getElementById('ferme-rules-modal');
+  if(!box || !modal) return;
+  box.innerHTML = fRulesHtml();
+  modal.style.display = 'flex';
+}
+function fermeHideRules(){
+  const modal = document.getElementById('ferme-rules-modal');
+  if(modal) modal.style.display = 'none';
+}
+// Fermeture à la touche Échap
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') fermeHideRules(); });
 }

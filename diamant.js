@@ -189,6 +189,16 @@ function dStatusPills(st){
          '<div class="dpill">Trésor sécurisé <strong>'+total+'</strong></div>';
 }
 
+// Vue joueur : pastille de manche (barre du haut) + stats (sous la barre)
+function dManchePill(st){
+  return '<div class="dpill">Manche <strong>'+(st.round||1)+'/'+(st.maxRounds||5)+'</strong></div>';
+}
+function dStatsPills(st){
+  return '<div class="dpill">Explorateurs <strong>'+dInPlayers(st).length+'</strong></div>'+
+         '<div class="dpill">Sur le chemin <strong>'+st.pathTreasure+'</strong></div>'+
+         '<div class="dpill">Trésor sécurisé <strong>'+dTotalBanked(st)+'</strong></div>';
+}
+
 function dPlayersList(st, highlightPseudo){
   return Object.values(st.players).map(p=>{
     const isIn = p.status==='in';
@@ -198,7 +208,7 @@ function dPlayersList(st, highlightPseudo){
     const hl = (p.pseudo===highlightPseudo) ? 'class="u-outline"' : '';
     return '<div class="dplayer-row '+(isIn?'':'out')+'" '+hl+'>'+
       '<span class="dplayer-status '+(isIn?'dstatus-in':'dstatus-out')+'">'+(isIn?'⛏️ explore':'🏕️ au camp')+'</span>'+
-      '<span>'+escHtml(p.pseudo)+'</span>'+
+      '<span class="dplayer-name">'+escHtml(p.pseudo)+'</span>'+
       '<span class="t-warm-sm">'+(isIn?('+'+p.held+' en jeu'):('🔒 '+p.banked))+'</span>'+
       voteBadge+'</div>';
   }).join('');
@@ -207,46 +217,49 @@ function dPlayersList(st, highlightPseudo){
 function renderDiamantAdmin(){
   const panel = document.getElementById('diamant-panel');
   if(!panel) return;
-  const inactive = document.getElementById('diamant-admin-inactive');
-  const active   = document.getElementById('diamant-admin-active');
-  if(!diamant || !diamant.active){ inactive.style.display='block'; active.style.display='none'; return; }
-  inactive.style.display='none'; active.style.display='block';
+  const active = document.getElementById('diamant-admin-active');
+  // Le panneau n'apparaît dans la zone « module de jeu actif » que si une partie tourne
+  if(!diamant || !diamant.active){ panel.style.display='none'; renderGameLibrary(); return; }
+  panel.style.display='block';
+  if(active) active.style.display='block';
 
   const ph = diamant.phase;
   const nPlayers = Object.keys(diamant.players||{}).length;
 
   if(ph==='lobby'){
-    document.getElementById('da-status').innerHTML = '<div class="dpill">🚪 Lobby ouvert</div><div class="dpill">Explorateurs <strong>'+nPlayers+'</strong></div>';
+    document.getElementById('da-status').innerHTML = fNoEmoji('<div class="dpill">Lobby ouvert</div><div class="dpill">Explorateurs <strong>'+nPlayers+'</strong></div>');
   } else {
-    document.getElementById('da-status').innerHTML = dStatusPills(diamant);
+    document.getElementById('da-status').innerHTML = fNoEmoji(dStatusPills(diamant));
   }
-  document.getElementById('da-event').textContent = diamant.lastEvent||'';
-  dRenderPath(document.getElementById('da-path'), diamant.board);
-  document.getElementById('da-players').innerHTML = dPlayersList(diamant);
+  document.getElementById('da-event').textContent = fNoEmoji(diamant.lastEvent||'');
+  document.getElementById('da-players').innerHTML = fNoEmoji(dPlayersList(diamant));
 
   const ctrl = document.getElementById('da-controls');
   if(ph==='lobby'){
     ctrl.innerHTML = '<div class="diamant-voted">🚪 '+nPlayers+' explorateur(s) ont rejoint. Lance quand tu veux — la partie démarrera avec les joueurs présents.</div>'+
       '<button class="btn-draw" onclick="diamantLaunch()">💎 Lancer la partie'+(nPlayers?(' ('+nPlayers+' joueur'+(nPlayers>1?'s':'')+')'):'')+'</button>'+
-      '<button class="btn-deactivate" onclick="diamantCancel()" class="u-mt-sm">✕ Fermer le lobby</button>';
+      '<button class="btn-deactivate u-mt-sm" onclick="diamantCancel()">✕ Fermer le lobby</button>';
   } else if(ph==='exploring'){
     ctrl.innerHTML = '<button class="btn-draw" onclick="diamantDraw()">🎴 Révéler une carte ('+diamant.deck.length+' restantes)</button>'+
-      '<button class="btn-deactivate" onclick="diamantCancel()" class="u-mt-sm">✕ Abandonner la partie</button>';
+      '<button class="btn-deactivate u-mt-sm" onclick="diamantCancel()">✕ Abandonner la partie</button>';
   } else if(ph==='voting'){
     const ins = dInPlayers(diamant); const voted = ins.filter(p=>p.vote).length;
     ctrl.innerHTML = '<div class="diamant-voted">🗳️ Vote en cours… '+voted+'/'+ins.length+' ont voté</div>'+
       '<button class="btn-draw" onclick="diamantForceResolve()">⏭️ Forcer la résolution (absents = continuent)</button>'+
-      '<button class="btn-deactivate" onclick="diamantCancel()" class="u-mt-sm">✕ Abandonner la partie</button>';
+      '<button class="btn-deactivate u-mt-sm" onclick="diamantCancel()">✕ Abandonner la partie</button>';
   } else if(ph==='roundEnd'){
     const last = diamant.round>=diamant.maxRounds;
     ctrl.innerHTML = '<button class="btn-draw" onclick="diamantNextRound()">'+(last?'🏁 Voir le résultat final':'▶ Manche suivante ('+(diamant.round+1)+'/'+diamant.maxRounds+')')+'</button>'+
-      '<button class="btn-deactivate" onclick="diamantCancel()" class="u-mt-sm">✕ Abandonner la partie</button>';
+      '<button class="btn-deactivate u-mt-sm" onclick="diamantCancel()">✕ Abandonner la partie</button>';
   } else if(ph==='gameEnd'){
     const total = dTotalBanked(diamant);
     ctrl.innerHTML = '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+total+'</div><div class="dbank-lbl">Trésor total</div></div></div>'+
       '<button class="btn-draw" onclick="diamantEndToFire()">🔥 Ajouter '+total+' pts au feu + clôturer</button>'+
-      '<button class="btn-deactivate" onclick="diamantCancel()" class="u-mt-sm">✕ Clôturer sans ajouter au feu</button>';
+      '<button class="btn-deactivate u-mt-sm" onclick="diamantCancel()">✕ Clôturer sans ajouter au feu</button>';
   }
+  // Vue meneur : pas d'emote (réservées à la vue joueur)
+  ctrl.innerHTML = fNoEmoji(ctrl.innerHTML);
+  renderGameLibrary();
 }
 
 function renderDiamantViewer(pseudo){
@@ -255,7 +268,8 @@ function renderDiamantViewer(pseudo){
   if(!diamant || !diamant.active){ wrap.style.display='none'; return; }
   wrap.style.display='block';
 
-  document.getElementById('dv-status').innerHTML = dStatusPills(diamant);
+  document.getElementById('dv-manche').innerHTML = dManchePill(diamant);
+  document.getElementById('dv-stats').innerHTML = (diamant.phase==='lobby') ? '' : dStatsPills(diamant);
   document.getElementById('dv-event').textContent = diamant.lastEvent||'';
   dRenderPath(document.getElementById('dv-path'), diamant.board);
   document.getElementById('dv-players').innerHTML = dPlayersList(diamant, pseudo);
@@ -266,10 +280,10 @@ function renderDiamantViewer(pseudo){
   if(diamant.phase==='lobby'){
     if(me){
       zone.innerHTML = '<div class="diamant-voted">✓ Tu as rejoint le lobby ! En attente du lancement par le meneur…</div>'+
-        '<button class="btn-small" onclick="diamantLeave(\''+escAttr(pseudo)+'\')" class="u-full">↩ Quitter le lobby</button>';
+        '<button class="btn-small u-full" onclick="diamantLeave(\''+escAttr(pseudo)+'\')">↩ Quitter le lobby</button>';
     } else {
       zone.innerHTML = '<div class="diamant-voted">🚪 Une partie de Diamant se prépare ! Rejoins avant le lancement.</div>'+
-        '<button class="btn-continue" onclick="diamantJoin(\''+escAttr(pseudo)+'\')" class="u-full">💎 Rejoindre la partie</button>';
+        '<button class="btn-continue u-full" onclick="diamantJoin(\''+escAttr(pseudo)+'\')">💎 Rejoindre la partie</button>';
     }
     return;
   }
@@ -302,4 +316,30 @@ function renderDiamantViewer(pseudo){
   } else {
     zone.innerHTML = '<div class="diamant-voted">⛏️ Tu explores la grotte — butin en jeu : <strong class="t-bright">'+me.held+'</strong>. En attente de la prochaine carte…</div>';
   }
+}
+
+// ── RÈGLES DU JEU (popin) ──
+function dRulesHtml(){
+  return ''+
+  '<h2 class="rules-title">💎 Diamant — La Grotte aux Trésors — Comment jouer</h2>'+
+  '<div class="rules-section"><h3>🎯 Le but</h3><p>Explorer la grotte en groupe et ramener le plus de trésor possible au camp, sur 5 manches.</p></div>'+
+  '<div class="rules-section"><h3>🔄 Le déroulé d\'une manche</h3><p>À chaque carte révélée :</p><ul>'+
+    '<li><strong>Carte trésor</strong> : sa valeur est partagée à parts égales entre les explorateurs encore dans la grotte. Le reste non divisible est déposé <em>sur le chemin</em>.</li>'+
+    '<li><strong>Carte danger</strong> : la première d\'un type est un avertissement. Un <strong>deuxième danger du même type</strong> et la manche est perdue — tout le trésor non sécurisé s\'envole.</li>'+
+  '</ul></div>'+
+  '<div class="rules-section"><h3>🎒 Continuer ou rentrer ?</h3>'+
+    '<p>Après un danger, chacun choisit : <strong>continuer</strong> pour révéler la carte suivante (plus de trésor, mais plus de risque), ou <strong>rentrer</strong> au camp.</p>'+
+    '<p class="rules-note">Ceux qui rentrent ensemble se partagent le trésor <em>resté sur le chemin</em> en plus de leur butin, puis le sécurisent. Un trésor sécurisé ne peut plus être perdu.</p></div>'+
+  '<div class="rules-section"><h3>🏁 Fin de partie</h3><p>Après 5 manches, le groupe additionne tout le trésor sécurisé. Bonne exploration !</p></div>';
+}
+function diamantShowRules(){
+  const box = document.getElementById('diamant-rules-content');
+  const modal = document.getElementById('diamant-rules-modal');
+  if(!box || !modal) return;
+  box.innerHTML = dRulesHtml();
+  modal.style.display = 'flex';
+}
+function diamantHideRules(){
+  const modal = document.getElementById('diamant-rules-modal');
+  if(modal) modal.style.display = 'none';
 }

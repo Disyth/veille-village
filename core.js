@@ -1,27 +1,16 @@
-const ADMIN_PASSWORD = 'veillée';
-
-const TEMPLATES = {
-  objet: ['Une torche enchantée (éclaire le chemin)','Un fagot de bois sacré (+2 flammes)','Une outre d\'eau de source','Une braise magique (relance une épreuve)','Un sac de graines mystérieuses'],
-  role:  ['L\'Ancien du Village (peut donner un indice)','Le Forgeron (double la valeur du prochain bois)','La Sorcière des Bois (peut voler un objet)','Le Barde (booste le moral +1)','L\'Éclaireur (voit la prochaine épreuve)'],
-  info:  ['Le deuxième sentier mène à la forêt cachée.','La fontaine se tarira au 3e round.','L\'Ancien cache un trésor sous le grand chêne.','Le loup rôde côté Est cette nuit.'],
-  secret:['Tu es en réalité l\'esprit du feu. Ne le dis à personne.','Tu sais que la carte du trésor est fausse.','Tu peux sacrifier ton objet pour sauver un autre joueur.'],
-};
+// Identifiant Google du meneur. Laisse vide à la 1re connexion : l'app te l'affichera
+// dans la console (F12) — colle-le ici ET dans les règles Firebase, puis redéploie.
+const MENEUR_UID = 'KDhuNyIdj9UHPoxGMFU6l76PkJo1';
 
 // ── STATE ──────────────────────────────────────────────────────────────────
-let viewers     = {};   // { key: {pseudo,joined} }
-let assignments = [];    // [ {id,viewer,type,content,qty} ]
-let activeGame  = null;  // { id,title,rules,craftRoles,reward } — épreuve en cours
-let library     = {};    // { id: {id,title,rules,craftRoles,reward} } — bibliothèque
-let fire        = { points:0, grand:50, legendaire:120 };  // feu global permanent
-let diamant     = null;  // partie de Diamant en cours (null si aucune)
-let ferme       = null;  // partie de Ferme en cours (null si aucune)
-let selectedViewer   = null;
+let viewers   = {};    // { key: {pseudo,joined} }
+let fire      = { points:0, grand:50, legendaire:120 };  // feu global permanent
+let diamant   = null;  // partie de Diamant en cours (null si aucune)
+let ferme     = null;  // partie de Ferme en cours (null si aucune)
 let currentViewerPseudo = null;
-let craftRolesDraft  = [];
-let craftSectionOpen = false;
 
 // ── FIREBASE SYNC LAYER ─────────────────────────────────────────────────────
-let ONLINE = false;   // true once Firebase is configured & listeners attached
+let ONLINE = false;
 
 function initSync(){
   if (window.FB && window.FB.ready) {
@@ -46,27 +35,6 @@ function attachListeners(){
     updateStats();
   });
 
-  onValue(ref(db, 'assignments'), (snap) => {
-    const obj = snap.val() || {};
-    assignments = Object.values(obj);
-    renderViewerList();
-    updateStats();
-    if (selectedViewer) renderPanel();
-    if (currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
-  });
-
-  onValue(ref(db, 'activeGame'), (snap) => {
-    activeGame = snap.val() || null;
-    updateGameUI();
-    updateViewerGameCard();
-    if (currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
-  });
-
-  onValue(ref(db, 'library'), (snap) => {
-    library = snap.val() || {};
-    renderLibrary();
-  });
-
   onValue(ref(db, 'fire'), (snap) => {
     fire = snap.val() || { points:0, grand:50, legendaire:120 };
     renderFireMeter();
@@ -77,16 +45,18 @@ function attachListeners(){
     diamant = snap.val() ? dNormalize(snap.val()) : null;
     renderDiamantAdmin();
     if (currentViewerPseudo) renderDiamantViewer(currentViewerPseudo);
+    renderViewerIdle();
   });
 
   onValue(ref(db, 'ferme'), (snap) => {
     ferme = snap.val() ? fNormalize(snap.val()) : null;
     renderFermeAdmin();
     if (currentViewerPseudo) renderFermeViewer(currentViewerPseudo);
+    renderViewerIdle();
   });
 }
 
-// Write helpers — write to Firebase if online, else mutate local mirror + re-render
+// Write helpers — écrit dans Firebase si en ligne, sinon miroir local + re-render
 function fbSetViewer(pseudo){
   if (ONLINE){
     const { db, ref, set, serverTimestamp } = window.FB;
@@ -97,63 +67,13 @@ function fbSetViewer(pseudo){
   }
 }
 
-function fbPushAssignment(a){
-  if (ONLINE){
-    const { db, ref, set } = window.FB;
-    set(ref(db, 'assignments/' + a.id), a);
-  } else {
-    assignments.push(a);
-    localAfterAssignmentChange();
-  }
-}
-
-function fbUpdateAssignment(a){
-  if (ONLINE){
-    const { db, ref, set } = window.FB;
-    set(ref(db, 'assignments/' + a.id), a);
-  } else {
-    localAfterAssignmentChange();
-  }
-}
-
-function fbRemoveAssignment(id){
+function fbDeleteViewer(pseudo){
   if (ONLINE){
     const { db, ref, remove } = window.FB;
-    remove(ref(db, 'assignments/' + id));
+    remove(ref(db, 'viewers/' + fbKey(pseudo)));
   } else {
-    assignments = assignments.filter(a=>a.id!==id);
-    localAfterAssignmentChange();
-  }
-}
-
-function fbSetGame(game){
-  if (ONLINE){
-    const { db, ref, set } = window.FB;
-    set(ref(db, 'activeGame'), game);
-  } else {
-    activeGame = game;
-    updateGameUI(); updateViewerGameCard();
-    if(currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
-  }
-}
-
-function fbSaveEpreuve(ep){
-  if (ONLINE){
-    const { db, ref, set } = window.FB;
-    set(ref(db, 'library/' + ep.id), ep);
-  } else {
-    library[ep.id] = ep;
-    renderLibrary();
-  }
-}
-
-function fbDeleteEpreuve(id){
-  if (ONLINE){
-    const { db, ref, remove } = window.FB;
-    remove(ref(db, 'library/' + id));
-  } else {
-    delete library[id];
-    renderLibrary();
+    delete viewers[pseudo]; delete viewers[fbKey(pseudo)];
+    renderViewerList(); updateStats();
   }
 }
 
@@ -189,17 +109,65 @@ function fbSetFerme(f){
   }
 }
 
-function localAfterAssignmentChange(){
-  renderViewerList(); updateStats();
-  if(selectedViewer) renderPanel();
-  if(currentViewerPseudo) renderViewerInfo(currentViewerPseudo);
-}
-
 // Firebase keys can't contain . # $ [ ] / — sanitize pseudo
 function fbKey(s){ return String(s).replace(/[.#$\[\]/]/g,'_'); }
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
 function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function escAttr(s){ return String(s).replace(/'/g,"\\'"); }
+function escAttr(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
-function showPage(name){ document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById('page-'+name).classList.add('active'); document.getElementById('btn-viewer').classList.toggle('active',name==='viewer'); document.getElementById('btn-admin').classList.toggle('active',name==='admin'||name==='admin-gate'); }
+
+// L'admin est accessible par une URL dédiée : /admin (Netlify), ou #admin / ?admin en secours (ouverture locale)
+function isAdminUrl(){
+  const p = location.pathname.toLowerCase().replace(/\/+$/,'');
+  if (p.endsWith('/admin') || p.endsWith('/admin.html')) return true;
+  if (location.hash.toLowerCase() === '#admin') return true;
+  return /(?:^|[?&])admin(?:=|&|$)/.test(location.search.toLowerCase());
+}
+
+function showPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const el = document.getElementById('page-'+name);
+  if (el) el.classList.add('active');
+}
+
+// ── BIBLIOTHÈQUE DE JEUX (sélection + lancement) ───────────────────────────
+const F_GAMES = {
+  diamant: { nom:'Diamant',
+    desc:'Partie coopérative sur 5 manches. Les explorateurs révèlent les cartes de la grotte, votent pour continuer ou rentrer, et sécurisent leur trésor. Le total alimente le feu de camp.' },
+  ferme:   { nom:'La Ferme du Village',
+    desc:'Partie coopérative en 20 tours. Chaque villageois choisit son métier et son lieu à chaque tour, puis joue ses actions. Objectif : remplir les objectifs de grand-père.' },
+};
+
+function gameActive(){
+  if (typeof diamant !== 'undefined' && diamant && diamant.active) return 'diamant';
+  if (typeof ferme   !== 'undefined' && ferme   && ferme.active)   return 'ferme';
+  return null;
+}
+
+function renderGameLibrary(){
+  const lib    = document.getElementById('game-library');
+  const noGame = document.getElementById('no-game-card');
+  const active = gameActive();
+  if (noGame) noGame.style.display = active ? 'none' : 'block';
+  if (lib)    lib.style.display    = active ? 'none' : 'block';
+  if (active) return;
+  const sel  = document.getElementById('game-select');
+  const desc = document.getElementById('game-desc');
+  const btn  = document.getElementById('game-launch-btn');
+  const key  = sel ? sel.value : '';
+  if (desc) desc.textContent = (key && F_GAMES[key]) ? F_GAMES[key].desc : '';
+  if (btn){
+    btn.disabled = !key;
+    btn.textContent = (key && F_GAMES[key]) ? ('Lancer '+F_GAMES[key].nom) : 'Lancer le jeu';
+  }
+}
+
+function lancerJeu(){
+  const sel = document.getElementById('game-select');
+  const key = sel ? sel.value : '';
+  if (!key){ toast('Choisis un jeu dans la liste'); return; }
+  if (gameActive()){ toast('Un jeu est déjà en cours'); return; }
+  if (key === 'diamant') startDiamant();
+  else if (key === 'ferme') startFerme();
+}

@@ -4,17 +4,37 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>La Grande Veillée du Village</title>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Marcellus&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <!-- Firebase SDK (module) -->
 <!-- Config Firebase externe : à déposer UNE SEULE FOIS sur Netlify (voir le guide).
        Ce fichier n'est jamais écrasé par les mises à jour de l'app. -->
-  <script src="firebase-config.js"></script>
+  
+  <!-- ══ POPIN : RÈGLES DE LA FERME DU VILLAGE ══ -->
+  <div id="ferme-rules-modal" class="modal-overlay" style="display:none" onclick="fermeHideRules(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="fermeHideRules()" aria-label="Fermer">✕</button>
+      <div id="ferme-rules-content"></div>
+    </div>
+  </div>
+
+  <div id="diamant-rules-modal" class="modal-overlay" style="display:none" onclick="diamantHideRules(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="diamantHideRules()" aria-label="Fermer">✕</button>
+      <div id="diamant-rules-content"></div>
+    </div>
+  </div>
+
+<script src="firebase-config.js"></script>
 
   <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getDatabase, ref, onValue, set, update, remove, get, child, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { getAuth, signInAnonymously, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   // ╔══════════════════════════════════════════════════════════════════╗
   // ║  La config Firebase vit dans le fichier SÉPARÉ « firebase-config.js »  ║
@@ -39,14 +59,32 @@
   const isConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey !== "TON_API_KEY";
 
   if (isConfigured) {
-    const app = initializeApp(firebaseConfig);
-    const db  = getDatabase(app);
+    const app  = initializeApp(firebaseConfig);
+    const db   = getDatabase(app);
+    const auth = getAuth(app);
     // Expose une API minimale au reste du script (non-module)
     window.FB = {
       ready: true,
-      db, ref, onValue, set, update, remove, get, child, serverTimestamp
+      db, ref, onValue, set, update, remove, get, child, serverTimestamp,
+      auth, onAuthStateChanged,
+      signInWithGoogle: () => signInWithPopup(auth, new GoogleAuthProvider()),
+      signOutAdmin:     () => signOut(auth),
+      currentUser:      () => auth.currentUser
     };
-    window.dispatchEvent(new Event('fb-ready'));
+    // Chaque visiteur reçoit un badge ANONYME (invisible). Le meneur l'écrase via Google.
+    let dispatched = false;
+    onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        signInAnonymously(auth).catch((e) => {
+          console.error('Auth anonyme echouee — active-la dans Firebase Console (Authentication).', e);
+          if (!dispatched) { dispatched = true; window.dispatchEvent(new Event('fb-ready')); }
+        });
+        return;
+      }
+      window.FB.user = user;
+      window.dispatchEvent(new Event('fb-auth'));
+      if (!dispatched) { dispatched = true; window.dispatchEvent(new Event('fb-ready')); }
+    });
   } else {
     window.FB = { ready: false };
     window.dispatchEvent(new Event('fb-ready'));
@@ -57,194 +95,163 @@
 <div id="app">
 
   <!-- Bandeau de configuration (visible tant que Firebase n'est pas configuré) -->
-  <div id="setup-banner" style="display:none;max-width:760px;margin:1rem auto 0;padding:1rem 1.4rem;background:rgba(139,40,0,.15);border:1px solid rgba(232,74,10,.4);border-radius:8px;font-size:.9rem;line-height:1.6;color:var(--amber-light)">
-    <strong style="color:var(--amber-bright);font-family:'Cinzel',serif;letter-spacing:.05em">⚙️ Mode local (hors-ligne)</strong><br>
+  <div id="setup-banner" style="display:none;max-width:760px;margin:1rem auto 0;padding:1rem 1.4rem;background:var(--danger-soft);border:1px solid var(--danger-line);border-radius:8px;font-size:.9rem;line-height:1.6;color:var(--amber-light)">
+    <strong style="color:var(--amber-bright);font-family:'Marcellus',serif;letter-spacing:.05em">⚙️ Mode local (hors-ligne)</strong><br>
     La synchronisation temps réel entre appareils n'est pas encore active. Pour l'activer, ouvre ce fichier dans un éditeur, colle ta config Firebase dans le bloc <code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:3px">firebaseConfig</code> en haut, puis héberge le fichier (voir le guide fourni).
   </div>
 
   <!-- Indicateur de connexion (visible quand Firebase est actif) -->
-  <div id="conn-indicator" style="display:none;position:fixed;top:10px;right:12px;z-index:50;font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;padding:.25rem .7rem;border-radius:12px;background:rgba(61,109,17,.2);border:1px solid rgba(97,174,27,.4);color:#9dcf7a">
-    <span style="width:6px;height:6px;border-radius:50%;background:#9dcf7a;display:inline-block;margin-right:4px;animation:pulse-dot 1.8s ease-in-out infinite"></span>En ligne
+  <div id="conn-indicator" style="display:none;position:fixed;top:10px;right:12px;z-index:50;font-family:'Marcellus',serif;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;padding:.25rem .7rem;border-radius:12px;background:var(--success-soft);border:1px solid var(--success-line);color:var(--success)">
+    <span style="width:6px;height:6px;border-radius:50%;background:var(--success);display:inline-block;margin-right:4px;animation:pulse-dot 1.8s ease-in-out infinite"></span>En ligne
   </div>
-
-  <nav>
-    <button id="btn-viewer" class="active" onclick="showPage('viewer')">🌿 Je rejoins la veillée</button>
-    <button id="btn-admin" onclick="showPage('admin-gate')">🔥 Meneur de jeu</button>
-  </nav>
-
-  <header>
-    <span class="fire-icon">🔥</span>
-    <h1>La Grande Veillée du Village</h1>
-    <p class="subtitle">Rassemblez les ressources, préparez le grand feu…</p>
-  </header>
-  <div class="divider"><div class="divider-gem"></div></div>
 
   <!-- ══ VIEWER PAGE ══ -->
   <div id="page-viewer" class="page active">
     <div class="viewer-container">
 
-      <!-- Fire meter — global & permanent (always visible) -->
-      <div class="fire-meter" id="viewer-fire-meter">
-        <div class="fire-visual" id="fire-visual">🔥</div>
-        <div class="fire-tier-label" id="fire-tier-label">Petit feu</div>
-        <div class="fire-count" id="fire-count">0 point</div>
-        <div class="fire-progress"><div class="fire-progress-bar" id="fire-progress-bar" style="width:0%"></div></div>
-        <div class="fire-thresholds" id="fire-thresholds"></div>
+      <!-- ─── ACCUEIL (avant connexion) ─── -->
+      <div id="viewer-hero" class="viewer-hero">
+        <span class="hero-flame">🔥</span>
+        <h1 class="hero-title">La Grande Veillée du Village</h1>
+        <p class="hero-tagline">Êtes-vous prêt à relever les épreuves du feu de camp ?</p>
+        <div class="hero-rule"><span></span></div>
+        <p class="hero-intro">Collaborez avec les autres villageois pour construire la plus belle des veillées près du feu de camp.</p>
+
+        <div class="card login-card" id="login-card">
+          <div class="card-title">Rejoindre la veillée</div>
+          <div class="input-group">
+            <label>Ton pseudo Twitch</label>
+            <input type="text" id="viewer-pseudo" placeholder="ex : DruideDuChat" maxlength="25" autocomplete="off" onkeydown="if(event.key==='Enter')viewerConnect()">
+          </div>
+          <button class="btn-primary" onclick="viewerConnect()">Rejoindre la veillée</button>
+        </div>
       </div>
 
+      <!-- ─── BARRE DU HAUT + JAUGE DU FEU (après connexion) ─── -->
+      <div id="viewer-topframe" style="display:none">
+        <div class="topbar">
+          <div class="topbar-title">La Grande Veillée du Village</div>
+          <div class="topbar-user">
+            <div class="topbar-welcome">Bienvenue <strong id="topbar-pseudo"></strong> <span class="topbar-emblem">🦊</span></div>
+            <button class="topbar-logout" onclick="viewerDisconnect()">Se déconnecter</button>
+          </div>
+        </div>
+
+        <div class="fire-gauge" id="viewer-fire-meter">
+          <div class="fire-gauge-head">
+            <span class="fire-gauge-flame" id="fire-visual">🔥</span>
+            <div class="fire-gauge-labels">
+              <span class="fire-tier-label" id="fire-tier-label">Petit feu</span>
+              <span class="fire-gauge-pts" id="fire-count">0 pts</span>
+            </div>
+          </div>
+          <div class="fire-gauge-track-wrap">
+            <div class="fire-gauge-track"><div class="fire-gauge-bar" id="fire-progress-bar" style="width:0%"></div></div>
+            <div class="fire-gauge-marks" id="fire-thresholds"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── CONTENU DE JEU (après connexion) ─── -->
       <!-- Diamant board (shown when a Diamant game is active) -->
       <div id="viewer-diamant" style="display:none">
-        <div class="card">
-          <div class="card-title">💎 Diamant — La Grotte aux Trésors</div>
-          <div class="diamant-status" id="dv-status"></div>
-          <div class="diamant-event" id="dv-event"></div>
-          <div class="diamant-board"><div class="diamant-path" id="dv-path"></div></div>
-          <div id="dv-myzone"></div>
-          <div class="diamant-players" id="dv-players"></div>
+        <div class="fv-layout">
+          <div class="card fv-game">
+            <div class="fv-topbar">
+              <span class="fv-game-title">💎 Diamant — La Grotte aux Trésors</span>
+              <div class="fv-pills" id="dv-manche"></div>
+              <button class="btn-help" onclick="diamantShowRules()">❓ Comment jouer</button>
+            </div>
+            <div class="fv-pills dv-stats" id="dv-stats"></div>
+            <div class="diamant-board"><div class="diamant-path" id="dv-path"></div></div>
+            <div class="diamant-event" id="dv-event"></div>
+            <div id="dv-myzone"></div>
+          </div>
+          <div class="fv-side" id="dv-side">
+            <div class="card">
+              <div class="section-title">Explorateurs</div>
+              <div class="diamant-players" id="dv-players"></div>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- Ferme board (shown when a Ferme game is active) -->
       <div id="viewer-ferme" style="display:none">
-        <div class="card">
-          <div class="card-title">🌾 La Ferme du Village</div>
-          <div class="diamant-status" id="fv-status"></div>
-          <div id="fv-lastaction"></div>
-          <div class="diamant-event" id="fv-event"></div>
-          <div id="fv-myzone"></div>
+        <div class="fv-layout">
+          <!-- Colonne gauche : le jeu -->
+          <div class="card fv-game">
+            <div class="fv-topbar">
+              <span class="fv-game-title">🌾 La Ferme du Village</span>
+              <div class="fv-pills" id="fv-status"></div>
+              <button class="btn-help" onclick="fermeShowRules()">❓ Comment jouer</button>
+            </div>
+            <div class="fv-instruction" id="fv-instruction"></div>
+            <div id="fv-myzone"></div>
+          </div>
+          <!-- Colonne droite : inventaire + objectifs -->
+          <div class="fv-side" id="fv-side">
+            <div class="card">
+              <div class="section-title">Inventaire</div>
+              <div id="fv-inventory"></div>
+            </div>
+            <div id="fv-objectives"></div>
+          </div>
         </div>
       </div>
 
-      <!-- Active game card -->
-      <div class="game-card" id="viewer-game-card" style="display:none">
+      <!-- Aucun jeu en cours (état d'attente après connexion) -->
+      <div id="viewer-idle" class="game-card" style="display:none">
         <div class="game-card-header">
           <span class="game-card-icon">🏕️</span>
           <div>
-            <div class="game-card-title" id="viewer-game-title"></div>
+            <div class="game-card-title">Aucun jeu n'a démarré pour l'instant…</div>
             <div class="game-card-subtitle">Consignes du meneur</div>
           </div>
-          <div class="live-badge"><span style="width:6px;height:6px;border-radius:50%;background:#9dcf7a;display:inline-block;animation:pulse-dot 1.8s ease-in-out infinite"></span>&nbsp;EN JEU</div>
         </div>
-        <div class="game-card-divider"></div>
-        <div class="game-rules" id="viewer-game-rules"></div>
-      </div>
-
-      <!-- Login -->
-      <div class="card" id="login-card">
-        <div class="card-title">✦ Rejoindre la veillée</div>
-        <div class="input-group">
-          <label>Ton pseudo Twitch</label>
-          <input type="text" id="viewer-pseudo" placeholder="ex: DruideDuChat" maxlength="30" autocomplete="off" onkeydown="if(event.key==='Enter')viewerConnect()">
-        </div>
-        <button class="btn-primary" onclick="viewerConnect()">🪵 Entrer dans le cercle</button>
-      </div>
-
-      <!-- Info + craft -->
-      <div class="viewer-info" id="viewer-info">
-        <div class="card">
-          <div class="card-title">✦ Ton rôle dans la veillée</div>
-          <div class="info-greeting" id="greeting-name"></div>
-          <div style="font-size:.9rem;color:var(--amber-warm);font-style:italic;margin-bottom:1.2rem" id="greeting-status"></div>
-          <div id="info-items-list"></div>
-        </div>
-        <!-- Craft section -->
-        <div id="viewer-craft-section" style="display:none">
-          <div class="craft-viewer-card">
-            <div class="craft-viewer-title">⚗️ <span id="viewer-craft-role-name"></span></div>
-            <div id="viewer-recipes-list"></div>
-          </div>
-        </div>
-        <button class="btn-small" onclick="viewerDisconnect()" style="width:100%;margin-top:.5rem">↩ Changer de pseudo</button>
       </div>
 
     </div>
   </div>
 
-  <!-- ══ ADMIN GATE ══ -->
+  <!-- ══ ÉCRAN MENEUR : CONNEXION (/admin) ══ -->
   <div id="page-admin-gate" class="page">
-    <div class="viewer-container">
-      <div class="card lock-overlay">
-        <h2>⚔ Accès Meneur de Jeu</h2>
-        <div class="input-group">
-          <label>Mot de passe</label>
-          <input type="password" id="admin-pass-input" placeholder="••••••••" onkeydown="if(event.key==='Enter')adminLogin()">
-        </div>
-        <button class="btn-primary" onclick="adminLogin()">Entrer dans la salle du conseil</button>
-        <p class="admin-pass-hint">Défaut : <strong style="color:var(--amber-warm)">veillée</strong></p>
+    <div class="gate-hero">
+      <span class="hero-flame">🔥</span>
+      <h1 class="hero-title">La Grande Veillée du Village</h1>
+      <p class="hero-tagline">Espace du meneur de jeu</p>
+      <div class="card gate-card">
+        <div class="card-title">Accès meneur</div>
+        <p class="gate-hint">Connecte-toi avec ton compte Google autorisé.</p>
+        <button class="btn-primary" onclick="adminLogin()">Se connecter avec Google</button>
       </div>
     </div>
   </div>
 
-  <!-- ══ ADMIN ══ -->
+  <!-- ══ ÉCRAN MENEUR : TABLEAU DE BORD ══ -->
   <div id="page-admin" class="page">
-    <div class="admin-container">
+    <div class="admin-shell">
 
-      <!-- Stats -->
-      <div class="admin-full">
-        <div class="stats-bar">
-          <div class="stat-pill">Villageois <strong id="stat-viewers">0</strong></div>
-          <div class="stat-pill">Objets attribués <strong id="stat-assigns">0</strong></div>
-          <div class="stat-pill">🔥 Feu <strong id="stat-fire">—</strong></div>
-        </div>
+      <div class="admin-topbar">
+        <div class="admin-topbar-title">La Grande Veillée du Village</div>
+        <button class="admin-lock" onclick="showPage('admin-gate')">Verrouiller</button>
       </div>
 
-      <!-- ══ DIAMANT (module de jeu interactif) ══ -->
-      <div class="card admin-full" id="diamant-panel">
-        <div class="section-title">💎 Diamant — module de jeu</div>
-        <div id="diamant-admin-inactive">
-          <div style="font-size:.9rem;color:var(--amber-light);line-height:1.6;margin-bottom:1rem">
-            Une partie coopérative sur 5 manches. Les villageois connectés explorent la grotte, votent pour continuer ou rentrer, et sécurisent leur trésor. Le total alimente le feu à la fin.
-          </div>
-          <button class="btn-draw" onclick="startDiamant()">💎 Lancer une partie de Diamant</button>
-        </div>
-        <div id="diamant-admin-active" style="display:none">
-          <div class="diamant-status" id="da-status"></div>
-          <div class="diamant-event" id="da-event"></div>
-          <div class="diamant-board"><div class="diamant-path" id="da-path"></div></div>
-          <div class="diamant-players" id="da-players" style="margin-bottom:1rem"></div>
-          <div id="da-controls"></div>
-        </div>
-      </div>
+      <div class="admin-layout">
 
-      <!-- ══ FERME (module de jeu interactif — étape 1) ══ -->
-      <div class="card admin-full" id="ferme-panel">
-        <div class="section-title">🌾 La Ferme du Village — module de jeu</div>
-        <div id="ferme-admin-inactive">
-          <div style="font-size:.9rem;color:var(--amber-light);line-height:1.6;margin-bottom:1rem">
-            Version squelette : lobby, 10 tours (planification + action), métiers de base attribués au hasard, placement sur la carte, inventaire partagé. Les actions détaillées de chaque métier seront ajoutées ensuite.
-          </div>
-          <div style="display:flex;gap:.8rem;align-items:flex-end;flex-wrap:wrap">
-            <div>
-              <label>Nombre de joueurs</label>
-              <input type="number" min="1" id="ferme-target" class="fire-mini-input" value="4" style="max-width:100px">
-            </div>
-            <button class="btn-draw" onclick="startFerme()" style="flex:1;min-width:180px">🌾 Ouvrir le lobby</button>
-          </div>
-        </div>
-        <div id="ferme-admin-active" style="display:none">
-          <div class="diamant-status" id="fa-status"></div>
-          <div id="fa-lastaction"></div>
-          <div class="diamant-event" id="fa-event"></div>
-          <div id="fa-board"></div>
-          <div class="ferme-players" id="fa-players"></div>
-          <div id="fa-inventory" style="margin-bottom:1rem"></div>
-          <div id="fa-controls"></div>
-        </div>
-      </div>
+        <!-- ─── Colonne gauche ─── -->
+        <div class="admin-side">
 
-      <!-- ══ FIRE CONFIG (global, permanent) ══ -->
-      <div class="card admin-full">
-        <div class="section-title">🔥 Feu de camp de la veillée</div>
-        <div style="display:flex;align-items:center;gap:1.2rem;flex-wrap:wrap;margin-bottom:1rem">
-          <div style="text-align:center">
-            <div id="admin-fire-visual" style="font-size:2rem;line-height:1">🔥</div>
-            <div id="admin-fire-tier" style="font-family:'Cinzel',serif;font-size:.85rem;color:var(--amber-bright)">Petit feu</div>
-          </div>
-          <div style="flex:1;min-width:200px">
-            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.4rem">
-              <span style="font-size:.85rem;color:var(--amber-warm)">Points :</span>
-              <strong id="admin-fire-points" style="font-family:'Cinzel',serif;font-size:1.3rem;color:var(--amber-bright)">0</strong>
-              <div style="display:flex;gap:.3rem;margin-left:auto">
+          <!-- Gestion feu de camp -->
+          <div class="card">
+            <div class="section-title">Gestion feu de camp</div>
+            <div class="admin-fire-head">
+              <span class="admin-fire-flame" id="admin-fire-visual">🔥</span>
+              <div class="admin-fire-info">
+                <div class="admin-fire-tier" id="admin-fire-tier">Petit feu</div>
+                <div class="admin-fire-pts">Points : <strong id="admin-fire-points">0</strong></div>
+              </div>
+              <div class="admin-fire-btns">
                 <button class="btn-icon" onclick="adjustFirePoints(-5)" title="-5">−5</button>
                 <button class="btn-icon" onclick="adjustFirePoints(-1)" title="-1">−</button>
                 <button class="btn-icon" onclick="adjustFirePoints(1)" title="+1">+</button>
@@ -252,134 +259,79 @@
               </div>
             </div>
             <div class="fire-progress"><div class="fire-progress-bar" id="admin-fire-bar" style="width:0%"></div></div>
-          </div>
-        </div>
-        <div class="fire-config-row">
-          <div>
-            <div style="font-size:.75rem;color:var(--amber-bright);text-align:center;margin-bottom:.3rem;font-family:'Cinzel',serif">🔥 Grand feu dès</div>
-            <input type="number" min="1" id="fire-threshold-grand" class="fire-mini-input" value="50" onchange="saveFireConfig()">
-          </div>
-          <div>
-            <div style="font-size:.75rem;color:#f5b832;text-align:center;margin-bottom:.3rem;font-family:'Cinzel',serif">✨ Légendaire dès</div>
-            <input type="number" min="1" id="fire-threshold-legendaire" class="fire-mini-input" value="120" onchange="saveFireConfig()">
-          </div>
-        </div>
-        <div style="font-size:.78rem;color:var(--amber-mid);font-style:italic;margin-top:.6rem;text-align:center">Le feu est permanent : il gagne des points quand une épreuve réussit et ne redescend jamais tout seul.</div>
-      </div>
-
-      <!-- ══ ÉPREUVE EN COURS (bandeau) ══ -->
-      <div class="card admin-full" id="active-epreuve-card" style="display:none;border-color:rgba(97,174,27,.4)">
-        <div class="section-title" style="color:#9dcf7a">⚡ Épreuve en cours</div>
-        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
-          <div style="flex:1;min-width:200px">
-            <div id="active-epreuve-title" style="font-family:'Cinzel',serif;font-size:1.1rem;color:var(--amber-bright)"></div>
-            <div id="active-epreuve-reward" style="font-size:.85rem;color:#9dcf7a;font-style:italic"></div>
-          </div>
-          <button class="btn-small" onclick="editActiveEpreuve()" style="border-color:rgba(168,158,240,.4);color:#a89ef0">✎ Modifier</button>
-        </div>
-        <div style="display:flex;gap:.8rem;margin-top:1rem">
-          <button class="btn-activate" onclick="finishEpreuveSuccess()" style="flex:2">✅ Épreuve réussie <span id="reward-hint"></span></button>
-          <button class="btn-deactivate" onclick="finishEpreuve()" style="flex:1;margin-top:0">✕ Terminer</button>
-        </div>
-      </div>
-
-      <!-- ══ BIBLIOTHÈQUE D'ÉPREUVES ══ -->
-      <div class="card admin-full">
-        <div class="section-title">📚 Bibliothèque d'épreuves</div>
-        <input class="search-input" type="text" id="search-epreuves" placeholder="Rechercher une épreuve…" oninput="renderLibrary()">
-        <div id="library-list" style="max-height:260px;overflow-y:auto;margin-bottom:1rem">
-          <div class="empty-state">Aucune épreuve enregistrée</div>
-        </div>
-        <button class="btn-add-role" onclick="openEpreuveEditor()" style="border-color:rgba(97,174,27,.4);color:#9dcf7a">+ Créer une nouvelle épreuve</button>
-      </div>
-
-      <!-- ══ ÉDITEUR D'ÉPREUVE (création / modification) ══ -->
-      <div class="card admin-full" id="epreuve-editor" style="display:none;border-color:rgba(168,158,240,.3)">
-        <div class="section-title" id="editor-title" style="color:#a89ef0">✎ Nouvelle épreuve</div>
-        <input type="hidden" id="editor-id">
-        <div style="margin-bottom:1rem">
-          <label>Titre de l'épreuve</label>
-          <input type="text" id="game-title" placeholder="Ex : La Forêt des Murmures" maxlength="60">
-        </div>
-        <div style="margin-bottom:1rem">
-          <label>Règles &amp; objectifs</label>
-          <textarea id="game-rules" style="min-height:120px" placeholder="🎯 Objectif : Rassemblez 10 fagots avant que la lune se lève…"></textarea>
-        </div>
-        <div style="margin-bottom:1rem">
-          <label>🔥 Récompense en points <span style="color:var(--amber-mid);font-size:.8rem">(points ajoutés au feu si l'épreuve réussit)</span></label>
-          <input type="number" min="0" id="game-reward" class="fire-mini-input" value="20" style="max-width:140px">
-        </div>
-
-        <!-- Craft roles -->
-        <div class="craft-section-toggle">
-          <span class="craft-toggle-label">⚗️ Rôles artisans <span style="color:rgba(168,158,240,.5);font-size:.65rem">(optionnel)</span></span>
-          <button class="craft-toggle-btn" id="craft-toggle-btn" onclick="toggleCraftSection()">+ Ajouter des rôles</button>
-        </div>
-        <div id="craft-section" style="display:none;margin-bottom:1rem">
-          <div id="craft-roles-list"></div>
-          <button class="btn-add-role" onclick="addCraftRole()">+ Nouveau rôle artisan</button>
-        </div>
-
-        <div style="display:flex;gap:.8rem">
-          <button class="btn-activate" id="btn-save-epreuve" onclick="saveEpreuve()" style="flex:2">💾 Enregistrer</button>
-          <button class="btn-activate" id="btn-save-launch" onclick="saveAndLaunch()" style="flex:2;background:rgba(196,106,0,.2);border-color:var(--amber-warm);color:var(--amber-bright)">💾 Enregistrer + Lancer</button>
-          <button class="btn-deactivate" onclick="closeEpreuveEditor()" style="flex:1;margin-top:0">Annuler</button>
-        </div>
-      </div>
-
-      <!-- Viewer list -->
-      <div class="card">
-        <div class="section-title">Villageois connectés</div>
-        <input class="search-input" type="text" id="search-viewers" placeholder="Rechercher…" oninput="renderViewerList()">
-        <div class="viewer-list" id="viewer-list-el">
-          <div class="empty-state">Aucun villageois connecté</div>
-        </div>
-      </div>
-
-      <!-- Unified viewer panel -->
-      <div class="card admin-full" id="viewer-panel">
-        <div id="panel-empty" style="text-align:center;padding:2rem 1rem">
-          <div style="font-size:2rem;margin-bottom:.6rem;opacity:.3">👆</div>
-          <div style="color:var(--amber-mid);font-style:italic;font-size:.95rem">Sélectionne un villageois pour gérer ses attributions</div>
-        </div>
-        <div id="panel-content" style="display:none">
-          <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.4rem">
-            <div id="panel-avatar" style="width:44px;height:44px;background:var(--amber-mid);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Cinzel',serif;font-size:1rem;color:var(--amber-bright);flex-shrink:0"></div>
-            <div>
-              <div id="panel-name" style="font-family:'Cinzel',serif;font-size:1.1rem;color:var(--amber-bright);letter-spacing:.05em"></div>
-              <div id="panel-count" style="font-size:.85rem;color:var(--amber-warm);font-style:italic"></div>
+            <div class="fire-cfg">
+              <label class="fire-cfg-line"><span>Grand feu à partir de</span><input type="number" min="1" id="fire-threshold-grand" class="fire-mini-input" value="50" onchange="saveFireConfig()"></label>
+              <label class="fire-cfg-line"><span>Feu légendaire à partir de</span><input type="number" min="1" id="fire-threshold-legendaire" class="fire-mini-input" value="120" onchange="saveFireConfig()"></label>
             </div>
-            <button onclick="clearSelection()" style="margin-left:auto;background:transparent;border:1px solid rgba(122,61,0,.4);border-radius:4px;color:var(--amber-mid);font-size:.7rem;font-family:'Cinzel',serif;letter-spacing:.08em;padding:.3rem .7rem;cursor:pointer;text-transform:uppercase">✕ Fermer</button>
+            <div class="fire-cfg-note">Le feu est permanent : il gagne des points quand un objectif est atteint et ne redescend jamais tout seul.</div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
-            <div>
-              <div class="section-title">Ce que possède ce villageois</div>
-              <div id="panel-items-list" style="min-height:80px"></div>
+
+          <!-- Bibliothèque de jeux -->
+          <div class="card" id="game-library">
+            <div class="section-title">Bibliothèque de jeux</div>
+            <div class="input-group">
+              <label>Choisir un jeu</label>
+              <select id="game-select" onchange="renderGameLibrary()">
+                <option value="">— Sélectionne un jeu —</option>
+                <option value="diamant">Diamant — La Grotte aux Trésors</option>
+                <option value="ferme">La Ferme du Village</option>
+              </select>
             </div>
-            <div>
-              <div class="section-title">Attribuer</div>
-              <div class="assign-form">
-                <div>
-                  <label>Type</label>
-                  <select id="assign-type" onchange="updateTemplates()">
-                    <option value="objet">🪵 Objet</option>
-                    <option value="role">🎭 Rôle</option>
-                    <option value="info">📜 Information secrète</option>
-                    <option value="secret">🔮 Secret</option>
-                  </select>
-                </div>
-                <div>
-                  <label>Contenu</label>
-                  <textarea id="assign-content" placeholder="Ex : Tu possèdes une torche enchantée…"></textarea>
-                  <div class="templates" id="templates-list"></div>
-                </div>
-                <button class="btn-primary" onclick="assignToViewer()">⚡ Attribuer</button>
+            <div id="game-desc" class="game-desc"></div>
+            <button class="btn-draw" id="game-launch-btn" onclick="lancerJeu()">Lancer le jeu</button>
+          </div>
+
+          <!-- Villageois (base de joueurs) -->
+          <div class="card">
+            <div class="section-title">Villageois</div>
+            <input class="search-input" type="text" id="search-viewers" placeholder="Rechercher un pseudo…" oninput="renderViewerList()">
+            <div class="viewer-list" id="viewer-list-el">
+              <div class="empty-state">Aucun villageois connecté</div>
+            </div>
+            <div class="vill-hint">5 pseudos affichés — utilise la recherche pour retrouver les autres.</div>
+          </div>
+
+        </div>
+
+        <!-- ─── Colonne droite : jeu actif ─── -->
+        <div class="admin-main">
+          <div class="section-title">Jeu actif</div>
+
+          <div class="card" id="no-game-card">
+            <div class="no-game">Aucun jeu actif. Choisis un jeu dans la bibliothèque pour le lancer.</div>
+          </div>
+
+          <!-- Diamant -->
+          <div class="card" id="diamant-panel" style="display:none">
+            <div class="section-title">Diamant — La Grotte aux Trésors</div>
+            <div id="diamant-admin-active" style="display:none">
+              <div class="diamant-status" id="da-status"></div>
+              <div class="diamant-event" id="da-event"></div>
+              <div class="diamant-players" id="da-players" style="margin-bottom:1rem"></div>
+              <div id="da-controls"></div>
+            </div>
+          </div>
+
+          <!-- Ferme -->
+          <div class="card" id="ferme-panel" style="display:none">
+            <div class="section-title">La Ferme du Village</div>
+            <div id="ferme-admin-active" style="display:none">
+              <div class="diamant-status" id="fa-status"></div>
+
+              <div class="fa-main">
+                <div class="ferme-players" id="fa-players"></div>
+                <div class="fa-side" id="fa-progress"></div>
               </div>
+
+              <div class="diamant-event" id="fa-event"></div>
+              <div id="fa-controls" class="fa-cta"></div>
+              <div class="fa-give" id="fa-give"></div>
             </div>
           </div>
-        </div>
-      </div>
 
+        </div>
+
+      </div>
     </div>
   </div>
 </div>
