@@ -14,6 +14,15 @@ showPage(isAdminUrl() ? 'admin-gate' : 'viewer');
 // Re-router si le hash change sans rechargement (ex : on tape #admin à la main sur une page déjà ouverte)
 window.addEventListener('hashchange', () => showPage(isAdminUrl() ? 'admin-gate' : 'viewer'));
 
+// Au retour de la connexion Google (redirection) : si on est sur /admin et connecté en meneur, ouvre l'admin
+window.addEventListener('fb-auth', () => {
+  if(!isAdminUrl()) return;
+  const u = window.FB && window.FB.currentUser && window.FB.currentUser();
+  if(u && !u.isAnonymous && (!MENEUR_UID || u.uid === MENEUR_UID)){
+    showPage('admin'); renderViewerList(); updateStats();
+  }
+});
+
 updateStats();
 renderFireMeter();
 renderAdminFire();

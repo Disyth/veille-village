@@ -40,27 +40,20 @@ async function adminLogin(){
   if(!window.FB || !window.FB.ready || !window.FB.signInWithGoogle){
     showPage('admin'); renderViewerList(); updateStats(); return;
   }
-  let user = window.FB.currentUser && window.FB.currentUser();
-  // Déjà connecté en Google ? on saute le popup. Sinon on le lance.
-  if(!user || user.isAnonymous){
-    try { await window.FB.signInWithGoogle(); }
-    catch(e){ console.warn('Popup Google (souvent COOP/cookies — sans gravité si la connexion a réussi) :', e && e.code); }
-    user = window.FB.currentUser && window.FB.currentUser();
-  }
-  // Le popup peut échouer alors que la connexion a réussi : on se fie à l'utilisateur réellement connecté
-  if(!user || user.isAnonymous){
-    toast('Connexion Google échouée. Réessaie, ou vérifie les domaines autorisés (Firebase → Authentication → Settings).');
+  const user = window.FB.currentUser && window.FB.currentUser();
+  // Déjà connecté avec Google : on ouvre directement (le retour de redirection passe aussi par ici via 'fb-auth')
+  if(user && !user.isAnonymous){
+    if(MENEUR_UID && user.uid !== MENEUR_UID){ toast('Ce compte Google n\'est pas autorisé comme meneur.'); return; }
+    if(!MENEUR_UID){
+      console.log('Ton identifiant meneur (MENEUR_UID) à copier dans core.js :', user.uid);
+      toast('Identifiant meneur affiché dans la console (F12).');
+    }
+    showPage('admin'); renderViewerList(); updateStats();
     return;
   }
-  if(MENEUR_UID && user.uid !== MENEUR_UID){
-    toast('Ce compte Google n\'est pas autorisé comme meneur.');
-    return;
-  }
-  if(!MENEUR_UID){
-    console.log('Ton identifiant meneur (MENEUR_UID) à copier dans core.js :', user.uid);
-    toast('1re connexion — ton identifiant meneur est dans la console (F12).');
-  }
-  showPage('admin'); renderViewerList(); updateStats();
+  // Sinon : redirection vers Google. La page quitte, revient déjà connectée, et l'admin s'ouvre tout seul.
+  try { await window.FB.signInWithGoogle(); }
+  catch(e){ console.error(e); toast('Impossible de lancer la connexion Google. Vérifie les domaines autorisés (Firebase → Authentication → Settings).'); }
 }
 
 // ── VILLAGEOIS (liste de la base : 5 max, recherche sur toute la liste, suppression) ──

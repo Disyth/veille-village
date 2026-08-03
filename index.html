@@ -33,7 +33,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getDatabase, ref, onValue, set, update, remove, get, child, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-  import { getAuth, signInAnonymously, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut }
+  import { getAuth, signInAnonymously, GoogleAuthProvider, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   // ╔══════════════════════════════════════════════════════════════════╗
@@ -62,12 +62,14 @@
     const app  = initializeApp(firebaseConfig);
     const db   = getDatabase(app);
     const auth = getAuth(app);
+    // Termine une éventuelle connexion Google par redirection (au retour sur la page)
+    getRedirectResult(auth).catch((e) => console.warn('Retour connexion Google :', e && e.code));
     // Expose une API minimale au reste du script (non-module)
     window.FB = {
       ready: true,
       db, ref, onValue, set, update, remove, get, child, serverTimestamp,
       auth, onAuthStateChanged,
-      signInWithGoogle: () => signInWithPopup(auth, new GoogleAuthProvider()),
+      signInWithGoogle: () => signInWithRedirect(auth, new GoogleAuthProvider()),
       signOutAdmin:     () => signOut(auth),
       currentUser:      () => auth.currentUser
     };
