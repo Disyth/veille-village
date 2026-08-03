@@ -33,7 +33,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getDatabase, ref, onValue, set, update, remove, get, child, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-  import { getAuth, signInAnonymously, onAuthStateChanged }
+  import { getAuth, signInAnonymously, signInWithEmailAndPassword, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   // ╔══════════════════════════════════════════════════════════════════╗
@@ -67,7 +67,8 @@
       ready: true,
       db, ref, onValue, set, update, remove, get, child, serverTimestamp,
       auth, onAuthStateChanged,
-      currentUser: () => auth.currentUser
+      currentUser: () => auth.currentUser,
+      signInMeneur: (email, pass) => signInWithEmailAndPassword(auth, email, pass)
     };
     // Chaque visiteur reçoit un badge ANONYME (invisible) — requis par les règles de la base.
     let dispatched = false;
@@ -221,8 +222,12 @@
       <div class="card gate-card">
         <div class="card-title">Accès meneur</div>
         <div class="input-group">
-          <label>Code meneur</label>
-          <input type="password" id="admin-pass-input" placeholder="••••••••" onkeydown="if(event.key==='Enter')adminLogin()">
+          <label>E-mail</label>
+          <input type="email" id="admin-email-input" placeholder="ton@email.com" autocomplete="username" onkeydown="if(event.key==='Enter')adminLogin()">
+        </div>
+        <div class="input-group">
+          <label>Mot de passe</label>
+          <input type="password" id="admin-pass-input" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')adminLogin()">
         </div>
         <button class="btn-primary" onclick="adminLogin()">Se connecter</button>
       </div>

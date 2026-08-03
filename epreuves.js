@@ -35,13 +35,27 @@ function renderViewerIdle(){
 }
 
 // ── CONNEXION MENEUR ─────────────────────────────────────────────────────────
-function adminLogin(){
-  const input = document.getElementById('admin-pass-input');
-  if(input && input.value === MENEUR_CODE){
-    input.value = '';
+async function adminLogin(){
+  // Mode hors-ligne (démo locale, pas de Firebase) : accès direct
+  if(!window.FB || !window.FB.ready || !window.FB.signInMeneur){
+    showPage('admin'); renderViewerList(); updateStats(); return;
+  }
+  // Déjà connecté (session persistante) : ouvre directement
+  const u = window.FB.currentUser && window.FB.currentUser();
+  if(u && !u.isAnonymous){ showPage('admin'); renderViewerList(); updateStats(); return; }
+  // Sinon : e-mail + mot de passe, vérifiés par Firebase (côté serveur — rien en clair dans le code)
+  const emailEl = document.getElementById('admin-email-input');
+  const passEl  = document.getElementById('admin-pass-input');
+  const email = emailEl ? emailEl.value.trim() : '';
+  const pass  = passEl  ? passEl.value : '';
+  if(!email || !pass){ toast('Entre ton e-mail et ton mot de passe.'); return; }
+  try {
+    await window.FB.signInMeneur(email, pass);
+    if(passEl) passEl.value = '';
     showPage('admin'); renderViewerList(); updateStats();
-  } else {
-    toast('Code incorrect');
+  } catch(e){
+    console.warn('Connexion meneur :', e && e.code);
+    toast('E-mail ou mot de passe incorrect.');
   }
 }
 

@@ -1,6 +1,4 @@
-// Code d'accès meneur — change-le pour ce que tu veux. Il protège l'AFFICHAGE de l'admin ;
-// la base, elle, reste protégée par l'authentification anonyme + les règles Firebase.
-const MENEUR_CODE = 'veillée';
+// L'accès meneur est vérifié par Firebase (e-mail + mot de passe) — aucun secret dans le code.
 
 // ── STATE ──────────────────────────────────────────────────────────────────
 let viewers   = {};    // { key: {pseudo,joined} }
