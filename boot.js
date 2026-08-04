@@ -9,10 +9,14 @@ function updateStats(){
   }
 }
 
-// Routing initial : /admin -> écran meneur, sinon vue joueur
-showPage(isAdminUrl() ? 'admin-gate' : 'viewer');
-// Re-router si le hash change sans rechargement (ex : on tape #admin à la main sur une page déjà ouverte)
-window.addEventListener('hashchange', () => showPage(isAdminUrl() ? 'admin-gate' : 'viewer'));
+// Routing initial : /stream -> vue publique, /admin -> écran meneur, sinon vue joueur
+function routePage(){
+  if (isStreamUrl()) showPage('stream');
+  else showPage(isAdminUrl() ? 'admin-gate' : 'viewer');
+}
+routePage();
+// Re-router si le hash change sans rechargement (ex : on tape #admin ou #stream à la main)
+window.addEventListener('hashchange', routePage);
 
 
 updateStats();
@@ -20,6 +24,8 @@ renderFireMeter();
 renderAdminFire();
 renderDiamantAdmin();
 renderFermeAdmin();
+renderGalerapagosAdmin();
+renderGalerapagosStream();
 renderGameLibrary();
 // Cas où fb-ready s'est déclenché avant le chargement de ce script
 if (window.FB) initSync();

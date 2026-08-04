@@ -27,6 +27,13 @@
     </div>
   </div>
 
+  <div id="galerapagos-rules-modal" class="modal-overlay" style="display:none" onclick="galerapagosHideRules(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="galerapagosHideRules()" aria-label="Fermer">✕</button>
+      <div id="galerapagos-rules-content"></div>
+    </div>
+  </div>
+
 <script src="firebase-config.js"></script>
 
   <script type="module">
@@ -199,6 +206,27 @@
         </div>
       </div>
 
+      <!-- Galerapagos board (shown when a Galerapagos game is active) -->
+      <div id="viewer-galerapagos" style="display:none">
+        <div class="fv-layout">
+          <div class="card fv-game">
+            <div class="fv-topbar">
+              <span class="fv-game-title">🏝️ Galerapagos — L'île du Village</span>
+              <div class="fv-pills" id="gv-status"></div>
+              <button class="btn-help" onclick="galerapagosShowRules()">❓ Comment jouer</button>
+            </div>
+            <div class="diamant-event" id="gv-event"></div>
+            <div id="gv-myzone"></div>
+          </div>
+          <div class="fv-side" id="gv-side">
+            <div class="card">
+              <div class="section-title">Naufragés</div>
+              <div class="diamant-players" id="gv-players"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Aucun jeu en cours (état d'attente après connexion) -->
       <div id="viewer-idle" class="game-card" style="display:none">
         <div class="game-card-header">
@@ -281,6 +309,7 @@
                 <option value="">— Sélectionne un jeu —</option>
                 <option value="diamant">Diamant — La Grotte aux Trésors</option>
                 <option value="ferme">La Ferme du Village</option>
+                <option value="galerapagos">Galerapagos — L'île du Village</option>
               </select>
             </div>
             <div id="game-desc" class="game-desc"></div>
@@ -335,10 +364,26 @@
             </div>
           </div>
 
+          <!-- Galerapagos -->
+          <div class="card" id="galerapagos-panel" style="display:none">
+            <div class="section-title">Galerapagos — L'île du Village</div>
+            <div id="galerapagos-admin-active" style="display:none">
+              <div class="diamant-status" id="ga-status"></div>
+              <div class="diamant-event" id="ga-event"></div>
+              <div class="diamant-players" id="ga-players" style="margin-bottom:1rem"></div>
+              <div id="ga-controls"></div>
+            </div>
+          </div>
+
         </div>
 
       </div>
     </div>
+  </div>
+
+  <!-- ══ VUE STREAM (publique, lecture seule — /stream ou #stream) ══ -->
+  <div id="page-stream" class="page">
+    <div class="viewer-container" style="padding-top:1.5rem"><div id="gs-root"></div></div>
   </div>
 </div>
 
@@ -349,6 +394,7 @@
   <script src="epreuves.js"></script>
   <script src="diamant.js"></script>
   <script src="ferme.js"></script>
+  <script src="galerapagos.js"></script>
   <script src="boot.js"></script>
 </body>
 </html>

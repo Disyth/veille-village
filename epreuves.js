@@ -15,6 +15,7 @@ function viewerConnect(){
   document.getElementById('topbar-pseudo').textContent = pseudo;
   renderDiamantViewer(pseudo);
   renderFermeViewer(pseudo);
+  renderGalerapagosViewer(pseudo);
   renderViewerIdle();
 }
 

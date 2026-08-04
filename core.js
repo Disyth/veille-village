@@ -5,6 +5,7 @@ let viewers   = {};    // { key: {pseudo,joined} }
 let fire      = { points:0, grand:50, legendaire:120 };  // feu global permanent
 let diamant   = null;  // partie de Diamant en cours (null si aucune)
 let ferme     = null;  // partie de Ferme en cours (null si aucune)
+let galerapagos = null;  // partie de Galerapagos en cours (null si aucune)
 let currentViewerPseudo = null;
 
 // ── FIREBASE SYNC LAYER ─────────────────────────────────────────────────────
@@ -50,6 +51,14 @@ function attachListeners(){
     ferme = snap.val() ? fNormalize(snap.val()) : null;
     renderFermeAdmin();
     if (currentViewerPseudo) renderFermeViewer(currentViewerPseudo);
+    renderViewerIdle();
+  });
+
+  onValue(ref(db, 'galerapagos'), (snap) => {
+    galerapagos = snap.val() ? gNormalize(snap.val()) : null;
+    renderGalerapagosAdmin();
+    if (currentViewerPseudo) renderGalerapagosViewer(currentViewerPseudo);
+    renderGalerapagosStream();
     renderViewerIdle();
   });
 }
@@ -107,6 +116,18 @@ function fbSetFerme(f){
   }
 }
 
+function fbSetGalerapagos(g){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'galerapagos'), g);
+  } else {
+    galerapagos = g ? gNormalize(g) : null;
+    renderGalerapagosAdmin();
+    if(currentViewerPseudo) renderGalerapagosViewer(currentViewerPseudo);
+    renderGalerapagosStream();
+  }
+}
+
 // Firebase keys can't contain . # $ [ ] / — sanitize pseudo
 function fbKey(s){ return String(s).replace(/[.#$\[\]/]/g,'_'); }
 
@@ -123,6 +144,14 @@ function isAdminUrl(){
   return /(?:^|[?&])admin(?:=|&|$)/.test(location.search.toLowerCase());
 }
 
+// La vue stream (publique, lecture seule) est accessible par : /stream (Netlify), ou #stream / ?stream
+function isStreamUrl(){
+  const p = location.pathname.toLowerCase().replace(/\/+$/,'');
+  if (p.endsWith('/stream') || p.endsWith('/stream.html')) return true;
+  if (location.hash.toLowerCase() === '#stream') return true;
+  return /(?:^|[?&])stream(?:=|&|$)/.test(location.search.toLowerCase());
+}
+
 function showPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   const el = document.getElementById('page-'+name);
@@ -135,11 +164,14 @@ const F_GAMES = {
     desc:'Partie coopérative sur 5 manches. Les explorateurs révèlent les cartes de la grotte, votent pour continuer ou rentrer, et sécurisent leur trésor. Le total alimente le feu de camp.' },
   ferme:   { nom:'La Ferme du Village',
     desc:'Partie coopérative en 20 tours. Chaque villageois choisit son métier et son lieu à chaque tour, puis joue ses actions. Objectif : remplir les objectifs de grand-père.' },
+  galerapagos: { nom:'Galerapagos — L\'île du Village',
+    desc:'Survie pour 3 à 12 naufragés : construire un radeau et quitter l\'île avant l\'ouragan. Météo, pêche, eau, bois (gare aux serpents !), et votes de pénurie quand les vivres manquent.' },
 };
 
 function gameActive(){
   if (typeof diamant !== 'undefined' && diamant && diamant.active) return 'diamant';
   if (typeof ferme   !== 'undefined' && ferme   && ferme.active)   return 'ferme';
+  if (typeof galerapagos !== 'undefined' && galerapagos && galerapagos.active) return 'galerapagos';
   return null;
 }
 
@@ -168,4 +200,5 @@ function lancerJeu(){
   if (gameActive()){ toast('Un jeu est déjà en cours'); return; }
   if (key === 'diamant') startDiamant();
   else if (key === 'ferme') startFerme();
+  else if (key === 'galerapagos') startGalerapagos();
 }
