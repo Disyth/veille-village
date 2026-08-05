@@ -27,12 +27,12 @@ const G_EPAVE = [
   { n:1, cat:'useless',   name:"Vieux slip" },
   { n:1, cat:'useless',   name:"Clé de voiture" },
   { n:1, cat:'useless',   name:"Ticket de loterie périmé" },
-  { n:2, cat:'obj', name:"Gourde" }, { n:2, cat:'obj', name:"Canne à pêche" },
-  { n:2, cat:'obj', name:"Hache" },  { n:2, cat:'obj', name:"Gourdin" },
-  { n:3, cat:'obj', name:"Revolver" }, { n:6, cat:'obj', name:"Cartouche" },
-  { n:1, cat:'obj', name:"Boule de cristal" }, { n:1, cat:'obj', name:"Somnifères" },
-  { n:1, cat:'obj', name:"Réveil matin" }, { n:1, cat:'obj', name:"Poupée vaudou" },
-  { n:1, cat:'obj', name:"Panier garni" },
+  { n:2, cat:'obj', sub:'gourde',    name:"Gourde" }, { n:2, cat:'obj', sub:'canne', name:"Canne à pêche" },
+  { n:2, cat:'obj', sub:'hache',     name:"Hache" },  { n:2, cat:'obj', sub:'gourdin', name:"Gourdin" },
+  { n:3, cat:'obj', sub:'revolver',  name:"Revolver" }, { n:6, cat:'obj', sub:'cartouche', name:"Cartouche" },
+  { n:1, cat:'obj', sub:'boule',     name:"Boule de cristal" }, { n:1, cat:'obj', sub:'somni', name:"Somnifères" },
+  { n:1, cat:'obj', sub:'reveil',    name:"Réveil matin" }, { n:1, cat:'obj', sub:'poupee', name:"Poupée vaudou" },
+  { n:1, cat:'obj', sub:'panier',    name:"Panier garni" },
 ];
 
 // ── Utils ──
@@ -53,6 +53,7 @@ function gNormalize(st){
   ['water','food','raft','slots'].forEach(k=>{ if(typeof st.counters[k]!=='number') st.counters[k]=0; });
   st.vote      = (st.vote && typeof st.vote==='object') ? st.vote : null;
   st.deck      = Array.isArray(st.deck) ? st.deck : (st.deck ? Object.values(st.deck) : []);
+  if(!('forcedFirst' in st)) st.forcedFirst=null;
   if(typeof st.turn!=='number')       st.turn=1;
   if(typeof st.firstIdx!=='number')   st.firstIdx=0;
   if(typeof st.currentIdx!=='number') st.currentIdx=0;
@@ -63,7 +64,8 @@ function gNormalize(st){
     if(typeof p.poisoned!=='boolean') p.poisoned=false;
     if(!('action' in p))     p.action=null;
     if(!('voteTarget' in p)) p.voteTarget=null;
-    p.hand = Array.isArray(p.hand) ? p.hand : (p.hand ? Object.values(p.hand) : []);
+    p.hand    = Array.isArray(p.hand)    ? p.hand    : (p.hand    ? Object.values(p.hand)    : []);
+    p.objects = Array.isArray(p.objects) ? p.objects : (p.objects ? Object.values(p.objects) : []);
   });
   return st;
 }
@@ -82,7 +84,7 @@ function gBuildWeatherDeck(){
 let __gcard = 0;
 function gCardId(){ return 'k'+Date.now()+'_'+(__gcard++); }
 function gBuildEpaveDeck(){
-  const d=[]; G_EPAVE.forEach(t=>{ for(let i=0;i<t.n;i++) d.push({ id:gCardId(), cat:t.cat, name:t.name }); });
+  const d=[]; G_EPAVE.forEach(t=>{ for(let i=0;i<t.n;i++){ const card={ id:gCardId(), cat:t.cat, name:t.name }; if(t.sub) card.sub=t.sub; d.push(card); } });
   return gShuffle(d);
 }
 // 4 cartes par joueur à 3-8 joueurs, 3 cartes à 9-12 joueurs
@@ -91,12 +93,20 @@ function gDealHands(st, deck){
   st.turnOrder.forEach(ps=>{ const p=st.players[ps]; p.hand=[]; for(let i=0;i<per && deck.length;i++) p.hand.push(deck.shift()); });
   st.deck = deck;
 }
-function gCardIcon(c){ return ({ water:'💧', water_bad:'🤢', food:'🍖', food_bad:'🐟', antivenin:'💉', useless:'🗑️', obj:'🎁' })[c.cat] || '🃏'; }
+function gHasObj(p, sub){ return (p.objects||[]).some(o=>o.sub===sub); }
+function gCardIcon(c){
+  if(c.cat==='obj') return ({ gourde:'🍶', canne:'🎣', hache:'🪓', gourdin:'🏏', revolver:'🔫', cartouche:'•', boule:'🔮', somni:'💤', reveil:'⏰', poupee:'🪆', panier:'🧺' })[c.sub] || '🎁';
+  return ({ water:'💧', water_bad:'🤢', food:'🍖', food_bad:'🐟', antivenin:'💉', useless:'🗑️' })[c.cat] || '🃏';
+}
 
 // ── Déroulé d'un tour ──
 function gStartTurn(st){
-  // Rotation du premier joueur (vers la droite parmi les vivants), ignorée au tour 1
-  if(st.turn>1){
+  // Réveil matin : un premier joueur a été imposé pour ce tour → il prime sur la rotation
+  if(st.forcedFirst && st.players[st.forcedFirst] && st.players[st.forcedFirst].alive){
+    st.firstIdx = st.turnOrder.indexOf(st.forcedFirst);
+    st.forcedFirst = null;
+  } else if(st.turn>1){
+    // Rotation du premier joueur (vers la droite parmi les vivants), ignorée au tour 1
     const n=st.turnOrder.length;
     for(let s=1;s<=n;s++){ const i=(st.firstIdx+s)%n; const p=st.players[st.turnOrder[i]]; if(p && p.alive){ st.firstIdx=i; break; } }
   }
@@ -141,13 +151,15 @@ function galerapagosAct(pseudo, action, extra){
   const c=st.counters;
 
   if(action==='fish'){
-    const val=G_FISH_BAG[Math.floor(Math.random()*G_FISH_BAG.length)];
+    let val=G_FISH_BAG[Math.floor(Math.random()*G_FISH_BAG.length)];
+    if(gHasObj(p,'canne')) val*=2;                 // Canne à pêche : prise doublée
     c.food=Math.min(36,c.food+val);
-    p.action='fish'; st.lastEvent=pseudo+' pêche 🐟 +'+val+' nourriture.';
+    p.action='fish'; st.lastEvent=pseudo+' pêche 🐟 +'+val+' nourriture'+(gHasObj(p,'canne')?' (canne 🎣)':'')+'.';
   } else if(action==='water'){
-    const w=st.weather.current||0;
+    let w=st.weather.current||0;
+    if(gHasObj(p,'gourde')) w*=2;                   // Gourde : collecte doublée
     c.water=Math.min(36,c.water+w);
-    p.action='water'; st.lastEvent=pseudo+' collecte 💧 +'+w+' eau'+(w===0?' (rien aujourd\'hui…)':'')+'.';
+    p.action='water'; st.lastEvent=pseudo+' collecte 💧 +'+w+' eau'+(w===0?' (rien aujourd\'hui…)':(gHasObj(p,'gourde')?' (gourde 🍶)':''))+'.';
   } else if(action==='wood'){
     const k=Math.max(0,Math.min(5, extra|0));
     let gained=1, bit=false;              // 1er bois gratuit en lisière
@@ -156,6 +168,7 @@ function galerapagosAct(pseudo, action, extra){
       const drawn=gShuffle(bag).slice(0,k);
       if(drawn.includes('b')) bit=true; else gained+=k;
     }
+    if(gHasObj(p,'hache')) gained+=1;      // Hache : +1 bois
     c.raft+=gained;
     let built=0; while(c.raft>=6){ c.raft-=6; c.slots++; built++; }
     p.action='wood';
@@ -261,6 +274,89 @@ function galerapagosCure(pseudo, cardId, target){
   fbSetGalerapagos(st);
 }
 
+// Somnifères : rafle 1 carte au hasard à chaque naufragé actif (les malades sont épargnés), puis défausse.
+function galerapagosSomniferes(pseudo, cardId){
+  if(!galerapagos || galerapagos.phase==='lobby' || galerapagos.phase==='gameEnd') return;
+  const st=gNormalize(gClone(galerapagos));
+  const p=st.players[pseudo]; if(!p || !p.alive) return;
+  const idx=(p.hand||[]).findIndex(c=>c.id===cardId && c.sub==='somni'); if(idx<0) return;
+  p.hand.splice(idx,1);
+  let n=0;
+  gAlive(st).forEach(t=>{
+    if(t.pseudo===pseudo || t.sick) return;             // ni soi, ni les malades
+    const th=t.hand||[]; if(!th.length) return;
+    p.hand.push(th.splice(Math.floor(Math.random()*th.length),1)[0]); n++;
+  });
+  st.lastEvent=pseudo+' joue les Somnifères 💤 et rafle 1 carte à '+n+' naufragé(s) !';
+  fbSetGalerapagos(st);
+}
+
+// Réveil matin : désigne qui débutera le prochain tour (déplace le jeton de premier joueur), puis défausse.
+function galerapagosReveil(pseudo, cardId, target){
+  if(!galerapagos || galerapagos.phase==='lobby' || galerapagos.phase==='gameEnd') return;
+  const st=gNormalize(gClone(galerapagos));
+  const p=st.players[pseudo]; if(!p || !p.alive) return;
+  const idx=(p.hand||[]).findIndex(c=>c.id===cardId && c.sub==='reveil'); if(idx<0) return;
+  const t=st.players[target]; if(!t || !t.alive) return;
+  p.hand.splice(idx,1);
+  st.forcedFirst=target;                                // pris en compte au prochain gStartTurn
+  st.lastEvent=pseudo+' règle le Réveil matin ⏰ : '+target+' débutera le prochain tour.';
+  fbSetGalerapagos(st);
+}
+
+// ── Objets (V2-B) ──
+// Poser un permanent (gourde/canne/hache/boule/revolver) en jeu, ou ouvrir un Panier garni (+3/+3).
+function galerapagosPlayObject(pseudo, cardId){
+  if(!galerapagos || galerapagos.phase==='lobby' || galerapagos.phase==='gameEnd') return;
+  const st=gNormalize(gClone(galerapagos));
+  const p=st.players[pseudo]; if(!p || !p.alive) return;
+  const idx=(p.hand||[]).findIndex(c=>c.id===cardId && c.cat==='obj'); if(idx<0) return;
+  const card=p.hand[idx], sub=card.sub;
+  if(['gourde','canne','hache','boule','revolver','gourdin'].includes(sub)){
+    p.objects=p.objects||[]; p.objects.push(card); p.hand.splice(idx,1);
+    st.lastEvent=pseudo+' pose '+card.name+' '+gCardIcon(card)+' en jeu.';
+  } else if(sub==='panier'){
+    const c=st.counters; c.water=Math.min(36,c.water+3); c.food=Math.min(36,c.food+3); p.hand.splice(idx,1);
+    st.lastEvent=pseudo+' ouvre un Panier garni 🧺 (+3 eau, +3 nourriture).';
+    if(st.phase==='vote' && st.vote) gRecheckShortage(st);   // peut résorber une pénurie
+  } else return;                                             // gourdin/somni/reveil/poupée/cartouche : ailleurs ou en attente
+  fbSetGalerapagos(st);
+}
+
+// Poupée vaudou : vole une carte au hasard dans la main d'un joueur.
+function galerapagosVoodoo(pseudo, cardId, target){
+  if(!galerapagos || galerapagos.phase==='lobby' || galerapagos.phase==='gameEnd') return;
+  const st=gNormalize(gClone(galerapagos));
+  const p=st.players[pseudo]; if(!p || !p.alive) return;
+  const idx=(p.hand||[]).findIndex(c=>c.id===cardId && c.sub==='poupee'); if(idx<0) return;
+  const t=st.players[target]; if(!t || !t.alive || target===pseudo) return;
+  p.hand.splice(idx,1);
+  const th=t.hand||[];
+  if(th.length){ const stolen=th.splice(Math.floor(Math.random()*th.length),1)[0]; p.hand.push(stolen); st.lastEvent=pseudo+' vole une carte à '+target+' avec la Poupée vaudou 🪆.'; }
+  else st.lastEvent=pseudo+' brandit la Poupée vaudou sur '+target+'… mais sa main est vide.';
+  fbSetGalerapagos(st);
+}
+
+// Revolver (en jeu) + Cartouche (en main) → abat un joueur. Jouable à tout moment.
+function galerapagosShoot(pseudo, target){
+  if(!galerapagos || galerapagos.phase==='lobby' || galerapagos.phase==='gameEnd') return;
+  const st=gNormalize(gClone(galerapagos));
+  const p=st.players[pseudo]; if(!p || !p.alive || !gHasObj(p,'revolver')) return;
+  const ci=(p.hand||[]).findIndex(c=>c.sub==='cartouche'); if(ci<0) return;   // pas de munition
+  const t=st.players[target]; if(!t || !t.alive || target===pseudo) return;
+  p.hand.splice(ci,1);                                   // consomme la cartouche
+  gKill(st, target);
+  st.lastEvent='🔫 '+pseudo+' abat '+target+' d\'un coup de revolver !';
+  if(gAlive(st).length===0){ gWipe(st); fbSetGalerapagos(st); return; }
+  // Si le tir change le déroulé d'un vote en cours, on ré-évalue
+  if(st.phase==='vote' && st.vote){
+    const res=st.vote.resource, ctx=st.vote.context;
+    if(ctx==='embark'){ st.vote=null; Object.values(st.players).forEach(q=>{ q.voteTarget=null; }); gTryEmbark(st,true); }
+    else if(gAlive(st).length <= st.vote.capacity){ st.counters[res]=0; st.vote=null; Object.values(st.players).forEach(q=>{ q.voteTarget=null; }); if(res==='water') gResolveResource(st,'food'); else gAfterSurvival(st); }
+  }
+  fbSetGalerapagos(st);
+}
+
 // Assez de rations grâce aux cartes → la pénurie est résorbée, personne ne meurt.
 function gRecheckShortage(st){
   const res=st.vote.resource, N=gAlive(st).length;
@@ -276,7 +372,7 @@ function gRecheckShortage(st){
 // Mort d'un naufragé : sa main est mélangée et répartie alternativement à ses voisins (gauche d'abord).
 function gKill(st, pseudo){
   const p=st.players[pseudo]; if(!p || !p.alive) return;
-  p.alive=false; p.poisoned=false;
+  p.alive=false; p.poisoned=false; p.objects=[];   // objets en jeu défaussés
   gRedistribute(st, pseudo);
 }
 function gRedistribute(st, deadPseudo){
@@ -308,8 +404,9 @@ function galerapagosReveal(){
   fbSetGalerapagos(st);
 }
 
+function gVoteWeight(p){ return (gHasObj(p,'gourdin') || gHasObj(p,'revolver')) ? 2 : 1; } // gourdin OU revolver = 2 voix, sans cumul
 function gTally(st){
-  const t={}; gAlive(st).forEach(p=>{ if(p.voteTarget){ t[p.voteTarget]=(t[p.voteTarget]||0)+1; } });
+  const t={}; gAlive(st).forEach(p=>{ if(p.voteTarget){ t[p.voteTarget]=(t[p.voteTarget]||0)+gVoteWeight(p); } });
   return t;
 }
 
@@ -390,7 +487,7 @@ function galerapagosJoin(pseudo){
   if(!galerapagos || galerapagos.phase!=='lobby') return;
   const st=gNormalize(gClone(galerapagos));
   if(!st.players[pseudo] && Object.keys(st.players).length>=G_MAX_PLAYERS){ toast('12 naufragés maximum.'); return; }
-  if(!st.players[pseudo]) st.players[pseudo]={ pseudo, alive:true, sick:false, poisoned:false, acted:false, action:null, voteTarget:null, hand:[] };
+  if(!st.players[pseudo]) st.players[pseudo]={ pseudo, alive:true, sick:false, poisoned:false, acted:false, action:null, voteTarget:null, hand:[], objects:[] };
   st.lastEvent=Object.keys(st.players).length+' naufragé(s) dans le lobby.';
   fbSetGalerapagos(st);
 }
@@ -407,7 +504,7 @@ function galerapagosLaunch(){
   if(order.length<G_MIN_PLAYERS){ toast('Il faut au moins '+G_MIN_PLAYERS+' naufragés.'); return; }
   const st=gNormalize(gClone(galerapagos));
   st.turnOrder=gShuffle(order);
-  Object.values(st.players).forEach(p=>{ p.alive=true; p.sick=false; p.poisoned=false; p.acted=false; p.action=null; p.voteTarget=null; p.hand=[]; });
+  Object.values(st.players).forEach(p=>{ p.alive=true; p.sick=false; p.poisoned=false; p.acted=false; p.action=null; p.voteTarget=null; p.hand=[]; p.objects=[]; });
   st.counters=gInitCounters(order.length);
   st.weather={ deck:gBuildWeatherDeck(), current:null, isHurricane:false, hurricaneDrawn:false };
   gDealHands(st, gBuildEpaveDeck());   // deck Épave distribué (3-4 cartes/joueur), reste dans st.deck
@@ -455,11 +552,12 @@ function gPlayersList(st, highlight){
     else if(st.phase==='action') badge = isCur ? '<span class="dvote-badge dvote-wait">⏳ à jouer</span>' : (p.acted?'<span class="dvote-badge dvote-done">✓</span>':'');
     else if(st.phase==='vote')   badge = p.voteTarget ? '<span class="dvote-badge dvote-done">✓ a voté</span>' : '<span class="dvote-badge dvote-wait">…</span>';
     const cards=(!dead && Array.isArray(p.hand)) ? '<span class="t-warm-sm">🃏 '+p.hand.length+'</span>' : '';
+    const objs =(!dead && p.objects && p.objects.length) ? '<span class="t-warm-sm">'+p.objects.map(o=>gCardIcon(o)).join('')+'</span>' : '';
     const pois =(!dead && p.poisoned) ? '<span class="dvote-badge">☠️</span>' : '';
     const hl=(ps===highlight)?'u-outline':'';
     return '<div class="dplayer-row '+(dead?'out ':'')+hl+'">'+
       '<span class="dplayer-status '+(dead?'dstatus-out':'dstatus-in')+'">'+(dead?'🪦':'🧍')+'</span>'+
-      '<span class="dplayer-name">'+escHtml(ps)+'</span>'+cards+pois+badge+'</div>';
+      '<span class="dplayer-name">'+escHtml(ps)+'</span>'+cards+objs+pois+badge+'</div>';
   }).join('');
 }
 
@@ -526,7 +624,7 @@ function renderGalerapagosAdmin(){
   renderGameLibrary();
 }
 
-// Main du joueur (visible seulement sur SON écran). Objets = inertes jusqu'à la Phase B.
+// Main du joueur (visible seulement sur SON écran). Objets jouables ; certains encore en attente (Phase B+).
 function gHandHtml(st, pseudo){
   const me=st.players[pseudo]; if(!me || !me.alive) return '';
   const hand=me.hand||[];
@@ -534,27 +632,60 @@ function gHandHtml(st, pseudo){
   const warn = me.poisoned
     ? '<div class="diamant-voted" style="border-color:var(--danger-line);color:var(--danger)">☠️ Tu es EMPOISONNÉ — fais-toi soigner par un Anti-venin avant la fin du tour, sinon tu meurs.</div>'
     : '';
-  if(!hand.length) return warn+'<div class="section-title" style="margin-top:.75rem">Ta main (0)</div><div class="t-warm-sm">Vide — « Fouiller l\'épave » pour piocher.</div>';
   const canPlay = st.phase!=='lobby' && st.phase!=='gameEnd';
   const poisonedAlive=gAlive(st).filter(p=>p.poisoned);
-  const rows=hand.map(c=>{
-    let act='';
-    if(canPlay){
-      if(c.cat==='water'||c.cat==='water_bad'||c.cat==='food'||c.cat==='food_bad'){
-        const bad=(c.cat==='water_bad'||c.cat==='food_bad');
-        act='<button class="btn-small" onclick="galerapagosPlayCard(\''+esc+'\',\''+c.id+'\')">Jouer +1'+(bad?' ☠️':'')+'</button>';
-      } else if(c.cat==='antivenin'){
-        act = poisonedAlive.length
-          ? poisonedAlive.map(t=>'<button class="btn-small" onclick="galerapagosCure(\''+esc+'\',\''+c.id+'\',\''+escAttr(t.pseudo)+'\')">Soigner '+escHtml(t.pseudo)+'</button>').join('')
-          : '<span class="t-warm-sm">à garder</span>';
-      } else if(c.cat==='obj'){
-        act='<span class="t-warm-sm">objet — bientôt</span>';
-      } else act='<span class="t-warm-sm">sans effet</span>';
-    }
-    return '<div class="dplayer-row" style="justify-content:space-between">'+
-      '<span class="dplayer-name" style="color:var(--text-title)">'+gCardIcon(c)+' '+escHtml(c.name)+'</span>'+act+'</div>';
-  }).join('');
-  return warn+'<div class="section-title" style="margin-top:.75rem">Ta main ('+hand.length+')</div><div class="diamant-players">'+rows+'</div>';
+  const others=gAlive(st).filter(p=>p.pseudo!==pseudo);
+  let handPart;
+  if(!hand.length){
+    handPart='<div class="section-title" style="margin-top:.75rem">Ta main (0)</div><div class="t-warm-sm">Vide — « Fouiller l\'épave » pour piocher.</div>';
+  } else {
+    const rows=hand.map(c=>{
+      let act='';
+      if(canPlay){
+        if(c.cat==='water'||c.cat==='water_bad'||c.cat==='food'||c.cat==='food_bad'){
+          const bad=(c.cat==='water_bad'||c.cat==='food_bad');
+          act='<button class="btn-small" onclick="galerapagosPlayCard(\''+esc+'\',\''+c.id+'\')">Jouer +1'+(bad?' ☠️':'')+'</button>';
+        } else if(c.cat==='antivenin'){
+          act = poisonedAlive.length
+            ? poisonedAlive.map(t=>'<button class="btn-small" onclick="galerapagosCure(\''+esc+'\',\''+c.id+'\',\''+escAttr(t.pseudo)+'\')">Soigner '+escHtml(t.pseudo)+'</button>').join('')
+            : '<span class="t-warm-sm">à garder</span>';
+        } else if(c.cat==='obj'){
+          if(['gourde','canne','hache','boule','revolver','gourdin'].includes(c.sub)) act='<button class="btn-small" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">Poser</button>';
+          else if(c.sub==='panier')    act='<button class="btn-small" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">Ouvrir +3/+3</button>';
+          else if(c.sub==='cartouche') act='<span class="t-warm-sm">munition (revolver)</span>';
+          else if(c.sub==='poupee')    act='🪆 Voler à : '+others.map(t=>'<button class="btn-small" onclick="galerapagosVoodoo(\''+esc+'\',\''+c.id+'\',\''+escAttr(t.pseudo)+'\')">'+escHtml(t.pseudo)+'</button>').join('');
+          else if(c.sub==='somni')     act='<button class="btn-small" onclick="galerapagosSomniferes(\''+esc+'\',\''+c.id+'\')">💤 Rafler 1 carte à tous</button>';
+          else if(c.sub==='reveil')    act='⏰ 1er joueur : '+gAlive(st).map(t=>'<button class="btn-small" onclick="galerapagosReveil(\''+esc+'\',\''+c.id+'\',\''+escAttr(t.pseudo)+'\')">'+escHtml(t.pseudo)+'</button>').join('');
+          else act='<span class="t-warm-sm">objet</span>';
+        } else act='<span class="t-warm-sm">sans effet</span>';
+      }
+      return '<div class="dplayer-row" style="justify-content:space-between;flex-wrap:wrap;gap:.3rem">'+
+        '<span class="dplayer-name" style="color:var(--text-title)">'+gCardIcon(c)+' '+escHtml(c.name)+'</span><span style="display:flex;gap:.3rem;flex-wrap:wrap">'+act+'</span></div>';
+    }).join('');
+    handPart='<div class="section-title" style="margin-top:.75rem">Ta main ('+hand.length+')</div><div class="diamant-players">'+rows+'</div>';
+  }
+  return warn + handPart + gObjectsHtml(st, pseudo);
+}
+
+// Objets posés « en jeu » par le joueur (+ capacités actives : tir du revolver, coup d'œil de la boule).
+function gObjectsHtml(st, pseudo){
+  const me=st.players[pseudo]; if(!me || !me.alive) return '';
+  const objs=me.objects||[]; if(!objs.length) return '';
+  const esc=escAttr(pseudo);
+  const list='<div class="section-title" style="margin-top:.6rem">Tes objets en jeu</div><div class="diamant-players">'+
+    objs.map(o=>'<div class="dplayer-row"><span class="dplayer-name" style="color:var(--text-title)">'+gCardIcon(o)+' '+escHtml(o.name)+'</span></div>').join('')+'</div>';
+  let extra='';
+  if(gHasObj(me,'revolver') && (me.hand||[]).some(c=>c.sub==='cartouche')){
+    const targets=gAlive(st).filter(p=>p.pseudo!==pseudo);
+    extra+='<div class="diamant-voted" style="margin-top:.4rem">🔫 Tirer (consomme 1 cartouche) :</div><div class="diamant-vote-btns">'+
+      targets.map(t=>'<button class="btn-small" onclick="galerapagosShoot(\''+esc+'\',\''+escAttr(t.pseudo)+'\')">'+escHtml(t.pseudo)+'</button>').join('')+'</div>';
+  }
+  if(gHasObj(me,'boule')){
+    const nextW = (st.weather.deck && st.weather.deck.length) ? (st.weather.deck[0]==='H'?'🌀 Ouragan':gWeatherLabel(st.weather.deck[0])) : '—';
+    const top   = (st.deck && st.deck.length) ? (gCardIcon(st.deck[0])+' '+st.deck[0].name) : '—';
+    extra+='<div class="diamant-voted" style="margin-top:.4rem">🔮 Prochaine météo : <strong>'+escHtml(nextW)+'</strong> · dessus de l\'épave : <strong>'+escHtml(top)+'</strong></div>';
+  }
+  return list + extra;
 }
 
 // ── Vue joueur ──
@@ -660,6 +791,7 @@ function gRulesHtml(){
     '<li>🔍 <strong>Fouiller l\'épave</strong> : pioche une carte, gardée secrète dans ta main.</li>'+
   '</ul></div>'+
   '<div class="rules-section"><h3>🃏 Les cartes</h3><p>Ta main n\'est visible que par toi. Joue une carte <strong>ressource</strong> pour ajouter 1 eau ou 1 nourriture au stock commun (utile pour éviter une pénurie !). Attention : <strong>Eau croupie</strong> et <strong>Poisson pourri</strong> empoisonnent celui qui les joue ☠️ — sans <strong>Anti-venin</strong> avant la fin du tour, il meurt. À la mort d\'un naufragé, ses cartes passent à ses voisins.</p></div>'+
+  '<div class="rules-section"><h3>🎁 Les objets</h3><p>Les <strong>permanents</strong> se posent en jeu (visibles de tous) : 🍶 Gourde (eau ×2), 🎣 Canne à pêche (pêche ×2), 🪓 Hache (+1 bois), 🔮 Boule de cristal (tu vois la prochaine météo et le dessus de l\'épave), 🏏 Gourdin (ta voix compte double aux votes), 🔫 Revolver (voix double aussi ; avec une • Cartouche, abats un joueur). À <strong>usage unique</strong> : 🧺 Panier garni (+3 eau / +3 nourriture), 🪆 Poupée vaudou (vole 1 carte à une cible), 💤 Somnifères (rafle 1 carte à chaque naufragé actif), ⏰ Réveil matin (choisis qui débute le prochain tour).</p></div>'+
   '<div class="rules-section"><h3>🍖 Survie</h3><p>À la fin du tour, chaque survivant consomme 1 eau et 1 nourriture. En cas de pénurie, un <strong>vote</strong> désigne qui est privé — et périt.</p></div>'+
   '<div class="rules-section"><h3>🚣 Fin de partie</h3><p>Dès qu\'il y a assez de places sur le radeau et des vivres pour le voyage, vous pouvez embarquer. Si l\'ouragan 🌀 arrive, le radeau doit partir immédiatement… ou tout le monde périt !</p></div>';
 }
