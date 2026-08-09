@@ -559,21 +559,22 @@ function gTradeHtml(st, pseudo){
   let h='<div class="section-title" style="margin-top:.75rem">🤝 Troc</div>';
   incoming.forEach(tr=>{
     const from=st.players[tr.from], oc=((from&&from.hand)||[]).find(c=>c.id===tr.offer); if(!oc) return;
-    const gives=(me.hand||[]).map(c=>'<button class="btn-small" onclick="galerapagosRespondTrade(\''+tr.id+'\',\''+c.id+'\')">Donner '+gCardIcon(c)+' '+escHtml(c.name)+'</button>').join('');
+    const gives=(me.hand||[]).map(c=>'<button class="btn-secondary" onclick="galerapagosRespondTrade(\''+tr.id+'\',\''+c.id+'\')">Donner '+gCardIcon(c)+' '+escHtml(c.name)+'</button>').join('');
     h+='<div class="diamant-voted"><strong>'+escHtml(tr.from)+'</strong> t\'offre '+gCardIcon(oc)+' <strong>'+escHtml(oc.name)+'</strong> :'+
        '<div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.3rem">'+
-       '<button class="btn-small" onclick="galerapagosRespondTrade(\''+tr.id+'\',\'gift\')">Accepter (cadeau)</button>'+gives+
-       '<button class="btn-small btn-deactivate" onclick="galerapagosRespondTrade(\''+tr.id+'\',\'no\')">Refuser</button></div></div>';
+       '<button class="btn-secondary" onclick="galerapagosRespondTrade(\''+tr.id+'\',\'gift\')">Accepter (cadeau)</button>'+gives+
+       '<button class="btn-secondary" onclick="galerapagosRespondTrade(\''+tr.id+'\',\'no\')">Refuser</button></div></div>';
   });
   outgoing.forEach(tr=>{
     const oc=(me.hand||[]).find(c=>c.id===tr.offer);
-    h+='<div class="dplayer-row" style="justify-content:space-between"><span class="dplayer-name">⏳ Proposé à '+escHtml(tr.to)+' : '+(oc?gCardIcon(oc)+' '+escHtml(oc.name):'—')+'</span><button class="btn-small btn-deactivate" onclick="galerapagosCancelTrade(\''+tr.id+'\')">Annuler</button></div>';
+    h+='<div class="dplayer-row" style="justify-content:space-between"><span class="dplayer-name">⏳ Proposé à '+escHtml(tr.to)+' : '+(oc?gCardIcon(oc)+' '+escHtml(oc.name):'—')+'</span><button class="btn-secondary" onclick="galerapagosCancelTrade(\''+tr.id+'\')">Annuler</button></div>';
   });
   const offerable=(me.hand||[]).filter(c=>!outgoing.some(o=>o.offer===c.id));
   if(others.length && offerable.length){
     h+='<div class="t-warm-sm" style="margin-top:.3rem">Proposer une de tes cartes :</div>'+
-      offerable.map(c=>'<div class="dplayer-row" style="justify-content:space-between;flex-wrap:wrap;gap:.3rem"><span class="dplayer-name" style="color:var(--text-title)">'+gCardIcon(c)+' '+escHtml(c.name)+'</span><span style="display:flex;gap:.3rem;flex-wrap:wrap">'+
-        others.map(t=>'<button class="btn-small" onclick="galerapagosProposeTrade(\''+esc+'\',\''+escAttr(t.pseudo)+'\',\''+c.id+'\')">→ '+escHtml(t.pseudo)+'</button>').join('')+'</span></div>').join('');
+      offerable.map(c=>'<div class="dplayer-row" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem"><span class="dplayer-name" style="color:var(--text-title)">'+gCardIcon(c)+' '+escHtml(c.name)+'</span><span class="dd-row"><span class="dd-label">à :</span>'+
+        '<select class="dd" id="gtrade-'+c.id+'">'+others.map(t=>'<option value="'+escAttr(t.pseudo)+'">'+escHtml(t.pseudo)+'</option>').join('')+'</select>'+
+        '<button class="btn-secondary" onclick="galerapagosProposeTrade(\''+esc+'\',document.getElementById(\'gtrade-'+c.id+'\').value,\''+c.id+'\')">Proposer</button></span></div>').join('');
   } else if(!offerable.length && !incoming.length){
     h+='<div class="t-warm-sm">Aucune carte à proposer pour l\'instant.</div>';
   }
@@ -796,18 +797,24 @@ function gPlayersList(st, highlight){
     const p=st.players[ps]; if(!p) return '';
     const dead=!p.alive;
     const isCur = st.phase==='action' && st.turnOrder[st.currentIdx]===ps && !dead;
-    let badge='';
-    if(dead)              badge='<span class="dvote-badge">💀 mort</span>';
-    else if(p.sick)       badge='<span class="dvote-badge dvote-wait">🤕 malade</span>';
-    else if(st.phase==='action') badge = isCur ? '<span class="dvote-badge dvote-wait">⏳ à jouer</span>' : (p.acted?'<span class="dvote-badge dvote-done">✓</span>':'');
-    else if(st.phase==='vote')   badge = p.voteTarget ? '<span class="dvote-badge dvote-done">✓ a voté</span>' : '<span class="dvote-badge dvote-wait">…</span>';
-    const cards=(!dead && Array.isArray(p.hand)) ? '<span class="t-warm-sm">🃏 '+p.hand.length+'</span>' : '';
-    const objs =(!dead && p.objects && p.objects.length) ? '<span class="t-warm-sm">'+p.objects.map(o=>gCardIcon(o)).join('')+'</span>' : '';
-    const chief=(!dead && p.conque) ? '<span class="dvote-badge">🐚 chef</span>' : '';
-    const hl=(ps===highlight)?'u-outline':'';
-    return '<div class="dplayer-row '+(dead?'out ':'')+hl+'">'+
-      '<span class="dplayer-status '+(dead?'dstatus-out':'dstatus-in')+'">'+(dead?'🪦':'🧍')+'</span>'+
-      '<span class="dplayer-name">'+escHtml(ps)+'</span>'+cards+objs+chief+badge+'</div>';
+    let status;
+    if(dead) status='mort';
+    else if(p.sick) status='malade';
+    else if(isCur) status='à son tour';
+    else status='en vie';
+    let infos='';
+    if(!dead){
+      if(Array.isArray(p.hand)) infos+='<span class="player-info">🃏 '+p.hand.length+'</span>';
+      if(p.objects && p.objects.length) infos+='<span class="player-info">'+p.objects.map(o=>gCardIcon(o)).join('')+'</span>';
+      if(p.conque) infos+='<span class="player-info">🐚 chef</span>';
+      if(st.phase==='vote') infos += p.voteTarget ? '<span class="player-info is-voted">✓ a voté</span>' : '<span class="player-info">…</span>';
+      else if(st.phase==='action' && !isCur && p.acted) infos+='<span class="player-info is-voted">✓</span>';
+    }
+    const cls='player-row'+(dead?' is-out':'')+((ps===highlight)?' is-current':'');
+    return '<div class="'+cls+'">'+
+      '<span class="player-name">'+escHtml(ps)+'</span>'+
+      '<span class="player-infos">'+infos+'</span>'+
+      '<span class="player-status">'+status+'</span></div>';
   }).join('');
 }
 
@@ -829,25 +836,25 @@ function renderGalerapagosAdmin(){
   const ctrl=document.getElementById('ga-controls'); let h='';
   if(ph==='lobby'){
     h='<div class="diamant-voted">🚪 '+nP+' naufragé(s). Lance quand tu veux (min '+G_MIN_PLAYERS+', max '+G_MAX_PLAYERS+').</div>'+
-      '<button class="btn-draw" onclick="galerapagosLaunch()">🏝️ Lancer la partie'+(nP?(' ('+nP+')'):'')+'</button>'+
-      '<button class="btn-deactivate u-mt-sm" onclick="galerapagosCancel()">✕ Fermer le lobby</button>';
+      '<button class="btn-primary" onclick="galerapagosLaunch()">🏝️ Lancer la partie'+(nP?(' ('+nP+')'):'')+'</button>'+
+      '<button class="btn-primary-danger u-mt-sm" onclick="galerapagosCancel()">✕ Fermer le lobby</button>';
   } else if(ph==='action'){
     const cur=st.turnOrder[st.currentIdx], w=st.weather.current||0;
     h='<div class="diamant-voted">⏳ Au tour de <strong>'+escHtml(cur)+'</strong>. (Le joueur agit sur son écran ; en cas d\'absence, joue pour lui.)</div>'+
       '<div class="diamant-vote-btns">'+
-      '<button class="btn-small" onclick="galerapagosForceAction(\'fish\')">🎣 Pêcher</button>'+
-      (w>0 ? '<button class="btn-small" onclick="galerapagosForceAction(\'water\')">💧 Eau</button>'
-           : '<button class="btn-small" disabled style="opacity:.45;cursor:not-allowed">💧 Eau (0)</button>')+
-      '<button class="btn-small" onclick="galerapagosForceAction(\'wood\')">🪵 Bois (sûr)</button>'+
-      '<button class="btn-small" onclick="galerapagosForceAction(\'search\')">🔍 Fouiller</button>'+
+      '<button class="btn-secondary" onclick="galerapagosForceAction(\'fish\')">🎣 Pêcher</button>'+
+      (w>0 ? '<button class="btn-secondary" onclick="galerapagosForceAction(\'water\')">💧 Eau</button>'
+           : '<button class="btn-secondary" disabled style="opacity:.45;cursor:not-allowed">💧 Eau (0)</button>')+
+      '<button class="btn-secondary" onclick="galerapagosForceAction(\'wood\')">🪵 Bois (sûr)</button>'+
+      '<button class="btn-secondary" onclick="galerapagosForceAction(\'search\')">🔍 Fouiller</button>'+
       '</div>'+
-      '<button class="btn-deactivate u-mt-sm" onclick="galerapagosCancel()">✕ Abandonner</button>';
+      '<button class="btn-primary-danger u-mt-sm" onclick="galerapagosCancel()">✕ Abandonner</button>';
   } else if(ph==='vote'){
     const t=gTally(st), voted=gAlive(st).filter(p=>p.voteTarget).length, elig=gAlive(st).filter(p=>!p.sick).length;
     if(!st.vote.revealed){
       h='<div class="diamant-voted">🗳️ Vote en cours… '+voted+'/'+elig+' ont voté.</div>'+
-        '<button class="btn-draw" onclick="galerapagosReveal()">👁️ Révéler les votes</button>'+
-        '<button class="btn-deactivate u-mt-sm" onclick="galerapagosCancel()">✕ Abandonner</button>';
+        '<button class="btn-primary" onclick="galerapagosReveal()">👁️ Révéler les votes</button>'+
+        '<button class="btn-primary-danger u-mt-sm" onclick="galerapagosCancel()">✕ Abandonner</button>';
     } else {
       const max=Math.max(0,...Object.values(t));
       h='<div class="diamant-voted">📊 Résultat — clique sur le naufragé à éliminer (départage meneur en cas d\'égalité) :</div>'+
@@ -857,19 +864,19 @@ function renderGalerapagosAdmin(){
           return '<button class="dplayer-row '+(lead?'u-outline':'')+'" style="width:100%;cursor:pointer;text-align:left;font:inherit;color:var(--text-title);background:var(--surface-sunken);border:1px solid var(--border-soft)" onclick="galerapagosEliminate(\''+escAttr(p.pseudo)+'\')">'+
             '<span class="dplayer-name" style="color:var(--text-title)">'+escHtml(p.pseudo)+'</span><span class="t-warm-sm">'+n+' vote'+(n>1?'s':'')+'</span></button>';
         }).join('')+'</div>'+
-        '<button class="btn-deactivate u-mt-sm" onclick="galerapagosCancel()">✕ Abandonner</button>';
+        '<button class="btn-primary-danger u-mt-sm" onclick="galerapagosCancel()">✕ Abandonner</button>';
     }
   } else if(ph==='turnEnd'){
-    h='<button class="btn-draw" onclick="galerapagosNextTurn()">▶ Tour suivant ('+(st.turn+1)+')</button>'+
-      '<button class="btn-deactivate u-mt-sm" onclick="galerapagosCancel()">✕ Abandonner</button>';
+    h='<button class="btn-primary" onclick="galerapagosNextTurn()">▶ Tour suivant ('+(st.turn+1)+')</button>'+
+      '<button class="btn-primary-danger u-mt-sm" onclick="galerapagosCancel()">✕ Abandonner</button>';
   } else if(ph==='gameEnd'){
     if(st.result==='win'){
       h='<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+(st.survivors||0)+'</div><div class="dbank-lbl">Rescapés</div></div></div>'+
-        '<button class="btn-draw" onclick="galerapagosEndToFire()">🔥 +'+((st.survivors||0)*G_FIRE_PER_SURVIVOR)+' au feu + clôturer</button>'+
-        '<button class="btn-deactivate u-mt-sm" onclick="galerapagosCancel()">✕ Clôturer sans ajouter</button>';
+        '<button class="btn-primary" onclick="galerapagosEndToFire()">🔥 +'+((st.survivors||0)*G_FIRE_PER_SURVIVOR)+' au feu + clôturer</button>'+
+        '<button class="btn-primary-danger u-mt-sm" onclick="galerapagosCancel()">✕ Clôturer sans ajouter</button>';
     } else {
       h='<div class="diamant-voted">💀 Partie perdue. L\'île a gagné.</div>'+
-        '<button class="btn-deactivate" onclick="galerapagosCancel()">✕ Clôturer</button>';
+        '<button class="btn-primary-danger" onclick="galerapagosCancel()">✕ Clôturer</button>';
     }
   }
   ctrl.innerHTML=gNoEmoji(h);
@@ -882,10 +889,10 @@ function gHandHtml(st, pseudo){
   const hand=me.hand||[];
   const esc=escAttr(pseudo);
   const warn = me.sick
-    ? '<div class="diamant-voted" style="border-color:var(--danger-line)">🤕 Tu es malade : tu passeras ton prochain tour (un Anti-venin te soigne).</div>'
+    ? '<div class="diamant-voted alert-danger">🤕 Tu es malade : tu passeras ton prochain tour (un Anti-venin te soigne).</div>'
     : '';
   const res  = (me.lastResult && me.lastResult.turn===st.turn) ? '<div class="diamant-voted">'+escHtml(me.lastResult.msg)+'</div>' : '';
-  const shot = (me.shotAt && me.shotAt.turn===st.turn) ? '<div class="diamant-voted" style="border-color:var(--danger-line)">🛡️ '+escHtml(me.shotAt.by)+' t\'a tiré dessus — ta Plaque de tôle t\'a protégé !</div>' : '';
+  const shot = (me.shotAt && me.shotAt.turn===st.turn) ? '<div class="diamant-voted alert-danger">🛡️ '+escHtml(me.shotAt.by)+' t\'a tiré dessus — ta Plaque de tôle t\'a protégé !</div>' : '';
   const canPlay = st.phase!=='lobby' && st.phase!=='gameEnd';
   const sickAlive=gAlive(st).filter(p=>p.sick);
   const hasAllum=(hand.some(x=>x.sub==='allumettes'));
@@ -898,39 +905,40 @@ function gHandHtml(st, pseudo){
       let act='';
       if(canPlay){
         if(c.cat==='water'||c.cat==='food'){
-          act='<button class="btn-small" onclick="galerapagosPlayCard(\''+esc+'\',\''+c.id+'\')">Jouer +1</button>';
+          act='<button class="btn-secondary" onclick="galerapagosPlayCard(\''+esc+'\',\''+c.id+'\')">Jouer +1</button>';
         } else if(c.cat==='obj'){
           const s=c.sub;
-          if(['gourde','canne','hache','boule','revolver','gourdin'].includes(s)) act = gHasObj(me,s) ? '<span class="t-warm-sm">déjà en jeu</span>' : '<button class="btn-small" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">Poser</button>';
-          else if(s==='noixcoco')  act='<button class="btn-small" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">Boire (+3 eau)</button>';
-          else if(s==='sardines')  act='<button class="btn-small" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">Manger (+3 nourriture)</button>';
-          else if(s==='moulin')    act='<button class="btn-small" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">2 nourriture → 2 eau</button>';
-          else if(s==='placeradeau') act='<button class="btn-small" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">Ajouter au radeau (+1 place)</button>';
-          else if(s==='kitbbq')    act='<button class="btn-small" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">🍖 Cuisiner les morts</button>';
-          else if(s==='panier')    act = inPenury ? '<button class="btn-small" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">🧺 Personne ne meurt</button>' : '<span class="t-warm-sm">en cas de pénurie</span>';
+          if(['gourde','canne','hache','boule','revolver','gourdin'].includes(s)) act = gHasObj(me,s) ? '<span class="t-warm-sm">déjà en jeu</span>' : '<button class="btn-secondary" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">Poser</button>';
+          else if(s==='noixcoco')  act='<button class="btn-secondary" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">Boire (+3 eau)</button>';
+          else if(s==='sardines')  act='<button class="btn-secondary" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">Manger (+3 nourriture)</button>';
+          else if(s==='moulin')    act='<button class="btn-secondary" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">2 nourriture → 2 eau</button>';
+          else if(s==='placeradeau') act='<button class="btn-secondary" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">Ajouter au radeau (+1 place)</button>';
+          else if(s==='kitbbq')    act='<button class="btn-secondary" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">🍖 Cuisiner les morts</button>';
+          else if(s==='panier')    act = inPenury ? '<button class="btn-secondary" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">🧺 Personne ne meurt</button>' : '<span class="t-warm-sm">en cas de pénurie</span>';
           else if(s==='eaucroupie'||s==='poissonpourri'){
             const gain=(s==='eaucroupie')?'+1 eau':'+1 nourriture';
-            act='<button class="btn-small" onclick="galerapagosConsumeBad(\''+esc+'\',\''+c.id+'\',false)">Consommer ('+gain+', malade 🤢)</button>'+
-                (hasAllum?'<button class="btn-small" onclick="galerapagosConsumeBad(\''+esc+'\',\''+c.id+'\',true)">🔥 Sans risque</button>':'');
+            act='<button class="btn-secondary" onclick="galerapagosConsumeBad(\''+esc+'\',\''+c.id+'\',false)">Consommer ('+gain+', malade 🤢)</button>'+
+                (hasAllum?'<button class="btn-secondary" onclick="galerapagosConsumeBad(\''+esc+'\',\''+c.id+'\',true)">🔥 Sans risque</button>':'');
           }
-          else if(s==='antivenin') act = sickAlive.length ? sickAlive.map(t=>'<button class="btn-small" onclick="galerapagosCure(\''+esc+'\',\''+c.id+'\',\''+escAttr(t.pseudo)+'\')">💉 Soigner '+escHtml(t.pseudo)+'</button>').join('') : '<span class="t-warm-sm">à garder (aucun malade)</span>';
-          else if(s==='somni')     act='<button class="btn-small" onclick="galerapagosSomniferes(\''+esc+'\',\''+c.id+'\')">💤 Rafler à 3 naufragés</button>';
-          else if(s==='reveil')    act='⏰ 1er joueur : '+gAlive(st).map(t=>'<button class="btn-small" onclick="galerapagosReveil(\''+esc+'\',\''+c.id+'\',\''+escAttr(t.pseudo)+'\')">'+escHtml(t.pseudo)+'</button>').join('');
+          else if(s==='antivenin') act = sickAlive.length ? sickAlive.map(t=>'<button class="btn-secondary" onclick="galerapagosCure(\''+esc+'\',\''+c.id+'\',\''+escAttr(t.pseudo)+'\')">💉 Soigner '+escHtml(t.pseudo)+'</button>').join('') : '<span class="t-warm-sm">à garder (aucun malade)</span>';
+          else if(s==='somni')     act='<button class="btn-secondary" onclick="galerapagosSomniferes(\''+esc+'\',\''+c.id+'\')">💤 Rafler à 3 naufragés</button>';
+          else if(s==='reveil')    act='⏰ 1er joueur : '+gAlive(st).map(t=>'<button class="btn-secondary" onclick="galerapagosReveil(\''+esc+'\',\''+c.id+'\',\''+escAttr(t.pseudo)+'\')">'+escHtml(t.pseudo)+'</button>').join('');
           else if(s==='cartouche') act='<span class="t-warm-sm">munition (revolver)</span>';
           else if(s==='allumettes')act='<span class="t-warm-sm">à jouer avec une eau croupie / un poisson pourri</span>';
           else if(s==='plaque')    act='<span class="t-warm-sm">🛡️ te protège d\'un tir (automatique)</span>';
-          else if(s==='longuevue') act='<button class="btn-small" onclick="galerapagosPeek(\''+esc+'\',\''+c.id+'\')">🔭 Voir les mains</button>';
-          else if(s==='lampe')     act='<button class="btn-small" onclick="galerapagosPeek(\''+esc+'\',\''+c.id+'\')">🔦 Voir la pioche</button>';
-          else if(s==='barometre') act='<button class="btn-small" onclick="galerapagosPeek(\''+esc+'\',\''+c.id+'\')">🌡️ Voir la météo</button>';
-          else if(s==='cafe')    act = (st.phase==='action' && st.turnOrder[st.currentIdx]===pseudo && !me.acted) ? '<button class="btn-small" onclick="galerapagosCafe(\''+esc+'\',\''+c.id+'\')">☕ Café (2 actions)</button>' : '<span class="t-warm-sm">à jouer à ton tour</span>';
-          else if(s==='conque')  act='<button class="btn-small" onclick="galerapagosConque(\''+esc+'\',\''+c.id+'\')">🐚 Devenir chef (immunité au vote)</button>';
+          else if(s==='longuevue') act='<button class="btn-secondary" onclick="galerapagosPeek(\''+esc+'\',\''+c.id+'\')">🔭 Voir les mains</button>';
+          else if(s==='lampe')     act='<button class="btn-secondary" onclick="galerapagosPeek(\''+esc+'\',\''+c.id+'\')">🔦 Voir la pioche</button>';
+          else if(s==='barometre') act='<button class="btn-secondary" onclick="galerapagosPeek(\''+esc+'\',\''+c.id+'\')">🌡️ Voir la météo</button>';
+          else if(s==='cafe')    act = (st.phase==='action' && st.turnOrder[st.currentIdx]===pseudo && !me.acted) ? '<button class="btn-secondary" onclick="galerapagosCafe(\''+esc+'\',\''+c.id+'\')">☕ Café (2 actions)</button>' : '<span class="t-warm-sm">à jouer à ton tour</span>';
+          else if(s==='conque')  act='<button class="btn-secondary" onclick="galerapagosConque(\''+esc+'\',\''+c.id+'\')">🐚 Devenir chef (immunité au vote)</button>';
           else if(s==='pendule'){
             if(st.phase!=='action'){ act='<span class="t-warm-sm">en phase d\'action</span>'; }
             else { const cibles=gAlive(st).filter(q=>q.pseudo!==pseudo && !q.acted);
-              act = cibles.length ? ('⏳ Imposer : '+cibles.map(t=>escHtml(t.pseudo)+' '+[['fish','🎣'],['water','💧'],['wood','🪵'],['search','🔍']].filter(a=>a[0]!=='water'||(st.weather.current||0)>0).map(a=>'<button class="btn-small" onclick="galerapagosPendule(\''+esc+'\',\''+c.id+'\',\''+escAttr(t.pseudo)+'\',\''+a[0]+'\')">'+a[1]+'</button>').join('')).join(' · ')) : '<span class="t-warm-sm">personne à contraindre</span>'; }
+              const pacts=[['fish','🎣 Pêcher'],['water','💧 Eau'],['wood','🪵 Bois'],['search','🔍 Fouiller']].filter(a=>a[0]!=='water'||(st.weather.current||0)>0);
+              act = cibles.length ? ('<span class="dd-row"><span class="dd-label">⏳ Imposer</span><select class="dd" id="gpend-act-'+c.id+'">'+pacts.map(a=>'<option value="'+a[0]+'">'+a[1]+'</option>').join('')+'</select><span class="dd-label">à :</span><select class="dd" id="gpend-tgt-'+c.id+'">'+cibles.map(t=>'<option value="'+escAttr(t.pseudo)+'">'+escHtml(t.pseudo)+'</option>').join('')+'</select><button class="btn-secondary" onclick="galerapagosPendule(\''+esc+'\',\''+c.id+'\',document.getElementById(\'gpend-tgt-'+c.id+'\').value,document.getElementById(\'gpend-act-'+c.id+'\').value)">Imposer</button></span>') : '<span class="t-warm-sm">personne à contraindre</span>'; }
           }
           else if(s==='poupee'){ const morts=Object.values(st.players).filter(q=>!q.alive);
-            act = (st.phase==='action' && morts.length) ? ('🪆 Ressusciter : '+morts.map(t=>'<button class="btn-small" onclick="galerapagosResurrect(\''+esc+'\',\''+c.id+'\',\''+escAttr(t.pseudo)+'\')">'+escHtml(t.pseudo)+'</button>').join('')) : '<span class="t-warm-sm">'+(morts.length?'en début de tour':'aucun mort à ranimer')+'</span>'; }
+            act = (st.phase==='action' && morts.length) ? ('🪆 Ressusciter : '+morts.map(t=>'<button class="btn-secondary" onclick="galerapagosResurrect(\''+esc+'\',\''+c.id+'\',\''+escAttr(t.pseudo)+'\')">'+escHtml(t.pseudo)+'</button>').join('')) : '<span class="t-warm-sm">'+(morts.length?'en début de tour':'aucun mort à ranimer')+'</span>'; }
           else act='<span class="t-warm-sm">objet</span>';
         } else act='<span class="t-warm-sm">sans effet</span>';
       }
@@ -953,7 +961,7 @@ function gObjectsHtml(st, pseudo){
   if(gHasObj(me,'revolver') && (me.hand||[]).some(c=>c.sub==='cartouche')){
     const targets=gAlive(st).filter(p=>p.pseudo!==pseudo);
     extra+='<div class="diamant-voted" style="margin-top:.4rem">🔫 Tirer (consomme 1 cartouche) :</div><div class="diamant-vote-btns">'+
-      targets.map(t=>'<button class="btn-small" onclick="galerapagosShoot(\''+esc+'\',\''+escAttr(t.pseudo)+'\')">'+escHtml(t.pseudo)+'</button>').join('')+'</div>';
+      targets.map(t=>'<button class="btn-secondary" onclick="galerapagosShoot(\''+esc+'\',\''+escAttr(t.pseudo)+'\')">'+escHtml(t.pseudo)+'</button>').join('')+'</div>';
   }
   return list + extra;
 }
@@ -976,13 +984,13 @@ function renderGalerapagosViewer(pseudo){
 
   if(st.phase==='lobby'){
     zone.innerHTML = me
-      ? '<div class="diamant-voted">✓ Tu es sur le radeau ! En attente du lancement par le meneur…</div><button class="btn-small u-full" onclick="galerapagosLeave(\''+esc+'\')">↩ Quitter le lobby</button>'
-      : '<div class="diamant-voted">🚪 Une partie se prépare ! Rejoins avant le lancement.</div><button class="btn-continue u-full" onclick="galerapagosJoin(\''+esc+'\')">🏝️ Rejoindre</button>';
+      ? '<div class="diamant-voted">✓ Tu es sur le radeau ! En attente du lancement par le meneur…</div><button class="btn-secondary u-full" onclick="galerapagosLeave(\''+esc+'\')">↩ Quitter le lobby</button>'
+      : '<div class="diamant-voted">🚪 Une partie se prépare ! Rejoins avant le lancement.</div><button class="btn-primary-continue u-full" onclick="galerapagosJoin(\''+esc+'\')">🏝️ Rejoindre</button>';
     return;
   }
   if(!me){ zone.innerHTML='<div class="diamant-voted">👀 Une partie est en cours. Tu joueras à la prochaine !</div>'; return; }
   if(!me.alive){
-    const by = me.deathBy ? '<div class="diamant-voted" style="border-color:var(--danger-line)">🔫 Tu as été abattu par <strong>'+escHtml(me.deathBy)+'</strong>, qui a récupéré tes cartes et objets.</div>' : '';
+    const by = me.deathBy ? '<div class="diamant-voted alert-danger">🔫 Tu as été abattu par <strong>'+escHtml(me.deathBy)+'</strong>, qui a récupéré tes cartes et objets.</div>' : '';
     zone.innerHTML = by + '<div class="diamant-voted">🪦 Tu as péri sur l\'île. Regarde les autres survivre…</div>'; return;
   }
 
@@ -997,14 +1005,14 @@ function renderGalerapagosViewer(pseudo){
     if(st.turnOrder[st.currentIdx]===pseudo){
       const w=st.weather.current||0, wEff=w*(gHasObj(me,'gourde')?2:1);
       const waterBtn = w>0
-        ? '<button class="btn-continue u-full u-mt-sm" onclick="galerapagosAct(\''+esc+'\',\'water\',0)">💧 Collecter de l\'eau (+'+wEff+')</button>'
-        : '<button class="btn-continue u-full u-mt-sm" disabled style="opacity:.45;cursor:not-allowed">💧 Pas d\'eau à collecter aujourd\'hui</button>';
+        ? '<button class="btn-primary-continue u-full u-mt-sm" onclick="galerapagosAct(\''+esc+'\',\'water\',0)">💧 Collecter de l\'eau (+'+wEff+')</button>'
+        : '<button class="btn-primary-continue u-full u-mt-sm" disabled style="opacity:.45;cursor:not-allowed">💧 Pas d\'eau à collecter aujourd\'hui</button>';
       z='<div class="diamant-voted">⏳ <strong>C\'est ton tour</strong> — choisis une action :</div>'+
-        '<button class="btn-continue u-full" onclick="galerapagosAct(\''+esc+'\',\'fish\',0)">🎣 Pêcher (nourriture aléatoire)</button>'+
+        '<button class="btn-primary-continue u-full" onclick="galerapagosAct(\''+esc+'\',\'fish\',0)">🎣 Pêcher (nourriture aléatoire)</button>'+
         waterBtn+
-        '<button class="btn-continue u-full u-mt-sm" onclick="galerapagosAct(\''+esc+'\',\'search\',0)">🔍 Fouiller l\'épave (+1 carte)</button>'+
+        '<button class="btn-primary-continue u-full u-mt-sm" onclick="galerapagosAct(\''+esc+'\',\'search\',0)">🔍 Fouiller l\'épave (+1 carte)</button>'+
         '<div class="diamant-voted u-mt-sm">🪵 Collecter du bois — le 1ᵉʳ est gratuit. Combien risquer en plus (serpent 🐍) ?</div>'+
-        '<div class="diamant-vote-btns">'+[0,1,2,3,4,5].map(k=>'<button class="btn-small" onclick="galerapagosAct(\''+esc+'\',\'wood\','+k+')">'+(k===0?'0 (sûr)':('+'+k))+'</button>').join('')+'</div>';
+        '<div class="diamant-vote-btns">'+[0,1,2,3,4,5].map(k=>'<button class="btn-secondary" onclick="galerapagosAct(\''+esc+'\',\'wood\','+k+')">'+(k===0?'0 (sûr)':('+'+k))+'</button>').join('')+'</div>';
     } else {
       z='<div class="diamant-voted">🌊 En attente de <strong>'+escHtml(st.turnOrder[st.currentIdx])+'</strong>… tu peux jouer des cartes en attendant.</div>';
     }
@@ -1051,8 +1059,8 @@ function renderGalerapagosStream(){
   }
   root.innerHTML =
     '<div class="card fv-game">'+
-      '<div class="fv-topbar"><span class="fv-game-title">🏝️ Galerapagos — L\'île du Village</span><div class="fv-pills">'+(st.phase==='lobby'?'':gTurnPills(st))+'</div></div>'+
-      (st.phase==='lobby'?'':'<div class="fv-pills" style="margin:.4rem 0">'+gCounterPills(st)+'</div>')+
+      '<div class="container-head"><span class="container-title">🏝️ Galerapagos — L\'île du Village</span></div>'+
+      '<div class="container-pills">'+(st.phase==='lobby'?'':gTurnPills(st)+gCounterPills(st))+'</div>'+
       '<div class="diamant-event">'+escHtml(st.lastEvent||'')+'</div>'+
       vote+
       '<div class="diamant-players" style="margin-top:.6rem">'+gPlayersList(st)+'</div>'+

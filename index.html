@@ -101,8 +101,8 @@
 <div id="app">
 
   <!-- Bandeau de configuration (visible tant que Firebase n'est pas configuré) -->
-  <div id="setup-banner" style="display:none;max-width:760px;margin:1rem auto 0;padding:1rem 1.4rem;background:var(--danger-soft);border:1px solid var(--danger-line);border-radius:8px;font-size:.9rem;line-height:1.6;color:var(--amber-light)">
-    <strong style="color:var(--amber-bright);font-family:'Marcellus',serif;letter-spacing:.05em">⚙️ Mode local (hors-ligne)</strong><br>
+  <div id="setup-banner" style="display:none;max-width:760px;margin:1rem auto 0;padding:1rem 1.4rem;background:var(--danger-soft);border:1px solid var(--danger-line);border-radius:8px;font-size:.9rem;line-height:1.6;color:var(--text-hover)">
+    <strong style="color:var(--text-title);font-family:'Marcellus',serif;letter-spacing:.05em">⚙️ Mode local (hors-ligne)</strong><br>
     La synchronisation temps réel entre appareils n'est pas encore active. Pour l'activer, ouvre ce fichier dans un éditeur, colle ta config Firebase dans le bloc <code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:3px">firebaseConfig</code> en haut, puis héberge le fichier (voir le guide fourni).
   </div>
 
@@ -163,19 +163,18 @@
       <div id="viewer-diamant" style="display:none">
         <div class="fv-layout">
           <div class="card fv-game">
-            <div class="fv-topbar">
-              <span class="fv-game-title">💎 Diamant — La Grotte aux Trésors</span>
-              <div class="fv-pills" id="dv-manche"></div>
+            <div class="container-head">
+              <span class="container-title">💎 Diamant — La Grotte aux Trésors</span>
               <button class="btn-help" onclick="diamantShowRules()">❓ Comment jouer</button>
             </div>
-            <div class="fv-pills dv-stats" id="dv-stats"></div>
+            <div class="container-pills"><span id="dv-manche" style="display:contents"></span><span id="dv-stats" style="display:contents"></span></div>
             <div class="diamant-board"><div class="diamant-path" id="dv-path"></div></div>
             <div class="diamant-event" id="dv-event"></div>
             <div id="dv-myzone"></div>
           </div>
           <div class="fv-side" id="dv-side">
             <div class="card">
-              <div class="section-title">Explorateurs</div>
+              <div class="container-head"><span class="container-title is-label">Explorateurs</span></div>
               <div class="diamant-players" id="dv-players"></div>
             </div>
           </div>
@@ -187,11 +186,11 @@
         <div class="fv-layout">
           <!-- Colonne gauche : le jeu -->
           <div class="card fv-game">
-            <div class="fv-topbar">
-              <span class="fv-game-title">🌾 La Ferme du Village</span>
-              <div class="fv-pills" id="fv-status"></div>
+            <div class="container-head">
+              <span class="container-title">🌾 La Ferme du Village</span>
               <button class="btn-help" onclick="fermeShowRules()">❓ Comment jouer</button>
             </div>
+            <div class="container-pills" id="fv-status"></div>
             <div class="fv-instruction" id="fv-instruction"></div>
             <div id="fv-myzone"></div>
           </div>
@@ -210,17 +209,17 @@
       <div id="viewer-galerapagos" style="display:none">
         <div class="fv-layout">
           <div class="card fv-game">
-            <div class="fv-topbar">
-              <span class="fv-game-title">🏝️ Galerapagos — L'île du Village</span>
-              <div class="fv-pills" id="gv-status"></div>
+            <div class="container-head">
+              <span class="container-title">🏝️ Galerapagos — L'île du Village</span>
               <button class="btn-help" onclick="galerapagosShowRules()">❓ Comment jouer</button>
             </div>
+            <div class="container-pills" id="gv-status"></div>
             <div class="diamant-event" id="gv-event"></div>
             <div id="gv-myzone"></div>
           </div>
           <div class="fv-side" id="gv-side">
             <div class="card">
-              <div class="section-title">Naufragés</div>
+              <div class="container-head"><span class="container-title is-label">Naufragés</span></div>
               <div class="diamant-players" id="gv-players"></div>
             </div>
           </div>
@@ -313,7 +312,7 @@
               </select>
             </div>
             <div id="game-desc" class="game-desc"></div>
-            <button class="btn-draw" id="game-launch-btn" onclick="lancerJeu()">Lancer le jeu</button>
+            <button class="btn-primary" id="game-launch-btn" onclick="lancerJeu()">Lancer le jeu</button>
           </div>
 
           <!-- Villageois (base de joueurs) -->

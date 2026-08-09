@@ -203,14 +203,15 @@ function dPlayersList(st, highlightPseudo){
   return Object.values(st.players).map(p=>{
     const isIn = p.status==='in';
     const voteBadge = (st.phase==='voting' && isIn)
-      ? (p.vote ? '<span class="dvote-badge dvote-done">✓ a voté</span>' : '<span class="dvote-badge dvote-wait">…réfléchit</span>')
+      ? (p.vote ? '<span class="player-info is-voted">✓ a voté</span>' : '<span class="player-info">…réfléchit</span>')
       : '';
-    const hl = (p.pseudo===highlightPseudo) ? 'class="u-outline"' : '';
-    return '<div class="dplayer-row '+(isIn?'':'out')+'" '+hl+'>'+
-      '<span class="dplayer-status '+(isIn?'dstatus-in':'dstatus-out')+'">'+(isIn?'⛏️ explore':'🏕️ au camp')+'</span>'+
-      '<span class="dplayer-name">'+escHtml(p.pseudo)+'</span>'+
-      '<span class="t-warm-sm">'+(isIn?('+'+p.held+' en jeu'):('🔒 '+p.banked))+'</span>'+
-      voteBadge+'</div>';
+    const cls = 'player-row'+(isIn?'':' is-out')+((p.pseudo===highlightPseudo)?' is-current':'');
+    return '<div class="'+cls+'">'+
+      '<span class="player-name">'+escHtml(p.pseudo)+'</span>'+
+      '<span class="player-infos">'+
+        '<span class="player-info">'+(isIn?('+'+p.held):('🔒 '+p.banked))+'</span>'+voteBadge+
+      '</span>'+
+      '<span class="player-status">'+(isIn?'en jeu':'au camp')+'</span></div>';
   }).join('');
 }
 
@@ -237,25 +238,25 @@ function renderDiamantAdmin(){
   const ctrl = document.getElementById('da-controls');
   if(ph==='lobby'){
     ctrl.innerHTML = '<div class="diamant-voted">🚪 '+nPlayers+' explorateur(s) ont rejoint. Lance quand tu veux — la partie démarrera avec les joueurs présents.</div>'+
-      '<button class="btn-draw" onclick="diamantLaunch()">💎 Lancer la partie'+(nPlayers?(' ('+nPlayers+' joueur'+(nPlayers>1?'s':'')+')'):'')+'</button>'+
-      '<button class="btn-deactivate u-mt-sm" onclick="diamantCancel()">✕ Fermer le lobby</button>';
+      '<button class="btn-primary" onclick="diamantLaunch()">💎 Lancer la partie'+(nPlayers?(' ('+nPlayers+' joueur'+(nPlayers>1?'s':'')+')'):'')+'</button>'+
+      '<button class="btn-primary-danger u-mt-sm" onclick="diamantCancel()">✕ Fermer le lobby</button>';
   } else if(ph==='exploring'){
-    ctrl.innerHTML = '<button class="btn-draw" onclick="diamantDraw()">🎴 Révéler une carte ('+diamant.deck.length+' restantes)</button>'+
-      '<button class="btn-deactivate u-mt-sm" onclick="diamantCancel()">✕ Abandonner la partie</button>';
+    ctrl.innerHTML = '<button class="btn-primary" onclick="diamantDraw()">🎴 Révéler une carte ('+diamant.deck.length+' restantes)</button>'+
+      '<button class="btn-primary-danger u-mt-sm" onclick="diamantCancel()">✕ Abandonner la partie</button>';
   } else if(ph==='voting'){
     const ins = dInPlayers(diamant); const voted = ins.filter(p=>p.vote).length;
     ctrl.innerHTML = '<div class="diamant-voted">🗳️ Vote en cours… '+voted+'/'+ins.length+' ont voté</div>'+
-      '<button class="btn-draw" onclick="diamantForceResolve()">⏭️ Forcer la résolution (absents = continuent)</button>'+
-      '<button class="btn-deactivate u-mt-sm" onclick="diamantCancel()">✕ Abandonner la partie</button>';
+      '<button class="btn-primary" onclick="diamantForceResolve()">⏭️ Forcer la résolution (absents = continuent)</button>'+
+      '<button class="btn-primary-danger u-mt-sm" onclick="diamantCancel()">✕ Abandonner la partie</button>';
   } else if(ph==='roundEnd'){
     const last = diamant.round>=diamant.maxRounds;
-    ctrl.innerHTML = '<button class="btn-draw" onclick="diamantNextRound()">'+(last?'🏁 Voir le résultat final':'▶ Manche suivante ('+(diamant.round+1)+'/'+diamant.maxRounds+')')+'</button>'+
-      '<button class="btn-deactivate u-mt-sm" onclick="diamantCancel()">✕ Abandonner la partie</button>';
+    ctrl.innerHTML = '<button class="btn-primary" onclick="diamantNextRound()">'+(last?'🏁 Voir le résultat final':'▶ Manche suivante ('+(diamant.round+1)+'/'+diamant.maxRounds+')')+'</button>'+
+      '<button class="btn-primary-danger u-mt-sm" onclick="diamantCancel()">✕ Abandonner la partie</button>';
   } else if(ph==='gameEnd'){
     const total = dTotalBanked(diamant);
     ctrl.innerHTML = '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+total+'</div><div class="dbank-lbl">Trésor total</div></div></div>'+
-      '<button class="btn-draw" onclick="diamantEndToFire()">🔥 Ajouter '+total+' pts au feu + clôturer</button>'+
-      '<button class="btn-deactivate u-mt-sm" onclick="diamantCancel()">✕ Clôturer sans ajouter au feu</button>';
+      '<button class="btn-primary" onclick="diamantEndToFire()">🔥 Ajouter '+total+' pts au feu + clôturer</button>'+
+      '<button class="btn-primary-danger u-mt-sm" onclick="diamantCancel()">✕ Clôturer sans ajouter au feu</button>';
   }
   // Vue meneur : pas d'emote (réservées à la vue joueur)
   ctrl.innerHTML = fNoEmoji(ctrl.innerHTML);
@@ -280,10 +281,10 @@ function renderDiamantViewer(pseudo){
   if(diamant.phase==='lobby'){
     if(me){
       zone.innerHTML = '<div class="diamant-voted">✓ Tu as rejoint le lobby ! En attente du lancement par le meneur…</div>'+
-        '<button class="btn-small u-full" onclick="diamantLeave(\''+escAttr(pseudo)+'\')">↩ Quitter le lobby</button>';
+        '<button class="btn-secondary u-full" onclick="diamantLeave(\''+escAttr(pseudo)+'\')">↩ Quitter le lobby</button>';
     } else {
       zone.innerHTML = '<div class="diamant-voted">🚪 Une partie de Diamant se prépare ! Rejoins avant le lancement.</div>'+
-        '<button class="btn-continue u-full" onclick="diamantJoin(\''+escAttr(pseudo)+'\')">💎 Rejoindre la partie</button>';
+        '<button class="btn-primary-continue u-full" onclick="diamantJoin(\''+escAttr(pseudo)+'\')">💎 Rejoindre la partie</button>';
     }
     return;
   }
@@ -309,8 +310,8 @@ function renderDiamantViewer(pseudo){
     } else {
       zone.innerHTML = '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+me.held+'</div><div class="dbank-lbl">Ton butin en jeu</div></div></div>'+
         '<div class="diamant-vote-btns">'+
-        '<button class="btn-continue" onclick="diamantVote(\''+escAttr(pseudo)+'\',\'continue\')">⛏️ Continuer</button>'+
-        '<button class="btn-leave" onclick="diamantVote(\''+escAttr(pseudo)+'\',\'leave\')">🎒 Rentrer</button>'+
+        '<button class="btn-primary-continue" onclick="diamantVote(\''+escAttr(pseudo)+'\',\'continue\')">⛏️ Continuer</button>'+
+        '<button class="btn-primary" onclick="diamantVote(\''+escAttr(pseudo)+'\',\'leave\')">🎒 Rentrer</button>'+
         '</div>';
     }
   } else {

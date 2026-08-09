@@ -564,7 +564,7 @@ function fActionButtons(st, pseudo){
       const dis = chk.ok ? '' : 'disabled';
       const dtxt = (typeof a.desc==='function') ? a.desc(st) : a.desc;
       const tip = chk.ok ? (dtxt||'') : (chk.why||'indisponible');
-      html += '<button class="btn-continue" '+dis+(tip?(' title="'+escAttr(tip)+'"'):'')+' onclick="fermeDoAction(\''+escAttr(pseudo)+'\',\''+a.id+'\')">'+a.label+'</button>';
+      html += '<button class="btn-primary-continue" '+dis+(tip?(' title="'+escAttr(tip)+'"'):'')+' onclick="fermeDoAction(\''+escAttr(pseudo)+'\',\''+a.id+'\')">'+a.label+'</button>';
     });
     html += '</div>';
   }
@@ -572,7 +572,7 @@ function fActionButtons(st, pseudo){
   if(canMove){
     html += '<div class="f-label-mv">'+(done>=1?'Se déplacer, puis 1 dernière action :':'Se déplacer (aucune action possible ici) :')+'</div>'+
       '<div class="f-move-row">'+
-      st.locations.filter(l=>l!==p.location).map(l=>'<button class="btn-small" onclick="fermePlayerMove(\''+escAttr(pseudo)+'\',\''+escAttr(l)+'\')">'+F_LOC_ICON[l]+' '+l+'</button>').join('')+'</div>';
+      st.locations.filter(l=>l!==p.location).map(l=>'<button class="btn-secondary" onclick="fermePlayerMove(\''+escAttr(pseudo)+'\',\''+escAttr(l)+'\')">'+F_LOC_ICON[l]+' '+l+'</button>').join('')+'</div>';
   }
   return html;
 }
@@ -625,7 +625,7 @@ function fLastActionBanner(st, opts){
   opts = opts||{};
   if(!st.lastAction || !st.lastAction.msg) return '';
   const skull = /crâne/.test(st.lastAction.msg);
-  const border = skull ? 'var(--ember)' : 'var(--success)';
+  const border = skull ? 'var(--danger)' : 'var(--success)';
   const icon = skull ? '💀' : '✅';
   const body = escHtml(st.lastAction.msg.replace(st.lastAction.pseudo+' ',''));
   const dismiss = opts.dismiss
@@ -679,15 +679,15 @@ function fPlayersList(st, highlight){
   return fPlayers(st).map(p=>{
     const isCur = (st.phase==='action' && p.pseudo===cur);
     const absent = (st.phase==='action' && fIsAbsent(p));
-    const metier = p.metier ? '<span class="fmetier">'+(F_METIER_ICON[p.metier]||'')+' '+p.metier+'</span>' : '<span class="fmetier none">sans métier</span>';
-    const loc = p.location ? '<span class="floc-tag">'+F_LOC_ICON[p.location]+' '+p.location+'</span>' : '<span class="floc-tag u-dimmer">non placé</span>';
-    const hl = (p.pseudo===highlight)?'class="u-outline"':'';
-    const statut = absent
-      ? '<span class="u-mla t-warm">💤 absent</span>'
-      : (p.done?'<span class="u-mla t-success">✓ fini</span>':'');
-    return '<div class="fplayer-row'+(isCur?' current':'')+(p.done?' done':'')+'" '+hl+'>'+
-      '<span>'+(isCur?'▶ ':'')+escHtml(p.pseudo)+'</span>'+metier+loc+
-      statut+'</div>';
+    const metier = p.metier ? '<span class="player-info">'+(F_METIER_ICON[p.metier]||'')+' '+p.metier+'</span>' : '<span class="player-info u-dimmer">sans métier</span>';
+    const loc = p.location ? '<span class="player-info">'+F_LOC_ICON[p.location]+' '+p.location+'</span>' : '<span class="player-info u-dimmer">non placé</span>';
+    const status = absent ? 'absent' : (p.done ? 'a joué' : (isCur ? 'à son tour' : 'en jeu'));
+    const isCurrent = isCur || (p.pseudo===highlight);
+    const cls = 'player-row'+(isCurrent?' is-current':'')+((p.done||absent)?' is-out':'');
+    return '<div class="'+cls+'">'+
+      '<span class="player-name">'+escHtml(p.pseudo)+'</span>'+
+      '<span class="player-infos">'+metier+loc+'</span>'+
+      '<span class="player-status">'+status+'</span></div>';
   }).join('');
 }
 
@@ -726,13 +726,13 @@ function renderFermeAdmin(){
   const prog = document.getElementById('fa-progress');
   const ctrl = document.getElementById('fa-controls');
   const ph = ferme.phase;
-  const cancelBtn = '<button class="btn-deactivate" onclick="fermeCancel()">Abandonner la partie</button>';
+  const cancelBtn = '<button class="btn-primary-danger" onclick="fermeCancel()">Abandonner la partie</button>';
   const ctaRow = (main)=>'<div class="fa-cta-row">'+main+cancelBtn+'</div>';
 
   if(ph==='lobby'){
     const nJoin = fPlayers(ferme).length;
     prog.innerHTML = '<div class="diamant-voted">'+nJoin+' villageois ont rejoint. Lance quand tu veux — la partie démarrera avec les joueurs présents.</div>';
-    ctrl.innerHTML = ctaRow('<button class="btn-draw" onclick="fermeForceStart()">Lancer la partie'+(nJoin?(' ('+nJoin+' joueur'+(nJoin>1?'s':'')+')'):'')+'</button>');
+    ctrl.innerHTML = ctaRow('<button class="btn-primary" onclick="fermeForceStart()">Lancer la partie'+(nJoin?(' ('+nJoin+' joueur'+(nJoin>1?'s':'')+')'):'')+'</button>');
 
   } else if(ph==='planning'){
     const total = fPlayers(ferme).length;
@@ -743,12 +743,12 @@ function renderFermeAdmin(){
     prog.innerHTML = '<div class="diamant-voted">Planification — métiers choisis : <strong>'+withMetier+'/'+total+'</strong> · lieux choisis : <strong>'+placed+'/'+total+'</strong>.'+
       (allReady?'':' <span class="t-warm">'+nAbs+' joueur(s) sans métier seront marqués <strong>absents</strong> et passés automatiquement.</span>')+
       '<br><span class="u-dim8">Les joueurs placés nulle part sont positionnés automatiquement au lancement.</span></div>';
-    ctrl.innerHTML = ctaRow('<button class="btn-draw" onclick="fermeStartAction()">Lancer la phase d\'action'+(allReady?'':' (forcer, '+nAbs+' absent'+(nAbs>1?'s':'')+')')+'</button>');
+    ctrl.innerHTML = ctaRow('<button class="btn-primary" onclick="fermeStartAction()">Lancer la phase d\'action'+(allReady?'':' (forcer, '+nAbs+' absent'+(nAbs>1?'s':'')+')')+'</button>');
 
   } else if(ph==='action'){
     const cur = fCurrent(ferme);
     prog.innerHTML = cur ? fActionButtons(ferme, cur) : '';
-    ctrl.innerHTML = ctaRow('<button class="btn-draw" onclick="fermeEndPlayerTurn()">Terminer le tour de ce joueur</button>');
+    ctrl.innerHTML = ctaRow('<button class="btn-primary" onclick="fermeEndPlayerTurn()">Terminer le tour de ce joueur</button>');
 
   } else if(ph==='gameEnd'){
     let head = '';
@@ -757,9 +757,9 @@ function renderFermeAdmin(){
     else head='<div class="diamant-voted">Fin de la partie. Les objectifs de grand-père sont-ils remplis ?</div>';
     prog.innerHTML = head;
     ctrl.innerHTML = '<div class="fa-cta-row">'+
-      '<button class="btn-continue" onclick="fermeDeclare(true)">Victoire</button>'+
-      '<button class="btn-leave" onclick="fermeDeclare(false)">Défaite</button>'+
-      '<button class="btn-draw" onclick="fermeEndToFire()">Clôturer</button>'+
+      '<button class="btn-primary-continue" onclick="fermeDeclare(true)">Victoire</button>'+
+      '<button class="btn-primary" onclick="fermeDeclare(false)">Défaite</button>'+
+      '<button class="btn-primary" onclick="fermeEndToFire()">Clôturer</button>'+
     '</div>';
   }
 
@@ -771,7 +771,7 @@ function renderFermeAdmin(){
       '<select id="fa-res-select" class="f-select-grow">'+resOpts+'</select>'+
       '<span class="fa-give-label">Quantité :</span>'+
       '<input type="number" id="fa-res-qty" value="1" class="fire-mini-input f-input-qty">'+
-      '<button class="btn-small" onclick="fermeAddResource()">Donner</button>'+
+      '<button class="btn-secondary" onclick="fermeAddResource()">Donner</button>'+
     '</div>'+
     '<div class="fa-give-row">'+
       '<span class="fa-give-label">Or commun</span>'+
@@ -829,10 +829,10 @@ function renderFermeViewer(pseudo){
   if(ph==='lobby'){
     if(me){
       zone.innerHTML = '<div class="diamant-voted">✓ Tu as rejoint la partie ! En attente du lancement par le meneur ('+fPlayers(ferme).length+' villageois)…</div>'+
-        '<button class="btn-small u-full" onclick="fermeLeave(\''+escAttr(pseudo)+'\')">↩ Quitter le lobby</button>';
+        '<button class="btn-secondary u-full" onclick="fermeLeave(\''+escAttr(pseudo)+'\')">↩ Quitter le lobby</button>';
     } else {
       zone.innerHTML = '<div class="diamant-voted">🚪 Une partie de la Ferme se prépare ! Rejoins avant le lancement.</div>'+
-        '<button class="btn-continue u-full" onclick="fermeJoin(\''+escAttr(pseudo)+'\')">🌾 Rejoindre la partie</button>';
+        '<button class="btn-primary-continue u-full" onclick="fermeJoin(\''+escAttr(pseudo)+'\')">🌾 Rejoindre la partie</button>';
     }
     return;
   }
@@ -847,7 +847,7 @@ function renderFermeViewer(pseudo){
   if(ph==='planning'){
     const metierBtns = F_METIERS_BASE.map(m=>{
       const chosen = (me.metier===m);
-      return '<button class="btn-small" onclick="fermeSetMetier(\''+escAttr(pseudo)+'\',\''+escAttr(m)+'\')" style="'+(chosen?'background:var(--metier-line);border-color:var(--metier);color:var(--metier-bright)':'')+'">'+(F_METIER_ICON[m]||'')+' '+m+(chosen?' ✓':'')+'</button>';
+      return '<button class="btn-secondary" onclick="fermeSetMetier(\''+escAttr(pseudo)+'\',\''+escAttr(m)+'\')" style="'+(chosen?'background:var(--metier-line);border-color:var(--metier);color:var(--metier)':'')+'">'+(F_METIER_ICON[m]||'')+' '+m+(chosen?' ✓':'')+'</button>';
     }).join('');
     const boardPick = fBoard(ferme, { pseudo:pseudo, pick:'fermeSetLocation' });
     zone.innerHTML =
@@ -863,7 +863,7 @@ function renderFermeViewer(pseudo){
     const lastAct = fLastActionBanner(ferme);
     if(isMe){
       zone.innerHTML = board + fActionButtons(ferme, pseudo) + lastAct +
-        '<button class="btn-draw u-mt-md" onclick="fermeEndPlayerTurn()">Terminer mon tour</button>';
+        '<button class="btn-primary u-mt-md" onclick="fermeEndPlayerTurn()">Terminer mon tour</button>';
     } else if(fIsAbsent(me)){
       zone.innerHTML = board + '<div class="diamant-voted">💤 Tu es absent ce tour : tu n\'as pas choisi de métier à temps. Tu pourras rejouer au tour suivant en choisissant un métier pendant la planification.</div>' + lastAct;
     } else {
