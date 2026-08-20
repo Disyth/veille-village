@@ -237,8 +237,8 @@
   .fmetier { font-size: .875rem; font-family:'Marcellus',serif; letter-spacing:.03em; padding:1px 7px; border-radius:8px; background:var(--metier-line); color:var(--metier); border:1px solid var(--metier-line); }
   .fmetier.none { background:var(--hover-wash); color:var(--text-body); border-color:var(--border-soft); }
   .floc-tag { font-size: .9rem; color:var(--text-body); }
-  .finv { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.8rem; } /* rangée de pastilles d'inventaire — items = .dpill (composant partagé) */
-  .fgold { background:var(--btn-fill); border:1px solid var(--text-body); border-radius:14px; padding:.25rem .85rem; font-size:.9rem; color:var(--text-title); font-family:'Marcellus',serif; }
+  .finv { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.8rem; } /* rangée de pastilles d'inventaire — items = .inv-item (objets d'inventaire) */
+  .inv-item { background:var(--btn-fill); border:1px solid var(--text-body); border-radius:14px; padding:.25rem .85rem; font-size:.9rem; color:var(--text-title); font-family:'Marcellus',serif; }
   /* .fturn-pill (+ strong) : base unifiée avec .dpill — voir section « Pastilles » plus haut */
   .fphase-badge { font-family:'Marcellus',serif; font-size: .875rem; letter-spacing:.1em; text-transform:uppercase; padding:.25rem .7rem; border-radius:10px; }
   .fphase-lobby{ background:var(--metier-line); color:var(--metier); }
@@ -252,7 +252,7 @@
   @media(max-width:520px){
     .admin-container { padding:0 .8rem 3rem; }
     .diamant-status { gap:.5rem; }
-    .dpill, .fturn-pill, .fgold { font-size: .9rem; padding:.2rem .6rem; }
+    .dpill, .fturn-pill, .inv-item { font-size: .9rem; padding:.2rem .6rem; }
     .btn-primary, .btn-primary-continue { font-size: .875rem; padding:.7rem; }
   }
 
@@ -327,7 +327,8 @@
 .dismiss-btn { margin-left:auto; flex-shrink:0; background:transparent; border:1px solid var(--border); border-radius:4px; color:var(--text-body); font-size:.875rem; padding:.2rem .5rem; cursor:pointer; }
 
 /* Centralisation, lot 3 (derniers uniques) */
-.badge-ready { border-color:var(--success); color:var(--success); }
+.pill-ready { border-color:var(--success); color:var(--success); }
+.dpill.low { border-color:var(--danger); color:var(--danger); }   /* alerte de pénurie : ressource sous le seuil critique */
 .u-shrink0-lg { font-size:1.1rem; flex-shrink:0; }
 .f-row-mb { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.6rem; }
 .f-select-grow { flex:1; min-width:130px; }
@@ -559,6 +560,11 @@
 .container-title { font-family:'Marcellus',serif; font-size:1.05rem; letter-spacing:.03em; color:var(--text-title); }
 .container-title.is-label { text-transform:uppercase; letter-spacing:.15em; color:var(--text-body); } /* titre du conteneur joueurs (Explorateurs / Naufragés) */
 .container-head .btn-help { margin-left:auto; }
+.container-head .head-actions { margin-left:auto; display:flex; align-items:center; gap:.5rem; } /* groupe de boutons (Records + Comment jouer) ferré à droite */
+.container-head .head-actions .btn-help { margin-left:0; }
+.drecords-list { list-style:none; margin:.4rem 0 0; padding:0; }
+.drecords-list li { display:flex; justify-content:space-between; gap:1rem; padding:.35rem 0; border-top:1px solid var(--border-soft); }
+.drecords-list li:first-child { border-top:none; }
 .container-pills { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem; }
 .container-pills:empty { display:none; margin:0; }
 
@@ -570,6 +576,27 @@
 .dd option { background:var(--bg-section); color:var(--text-title); }
 .dd-row { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
 .dd-label { font-size:.9rem; color:var(--text-body); }
+
+/* ── Onglets (composant générique du design system, réutilisable par tous les jeux) ── */
+.tabs { display:flex; gap:1.4rem; border-bottom:1px solid var(--container-line); margin-bottom:1rem; }
+.tab-btn { background:transparent; border:none; border-bottom:2px solid transparent; margin-bottom:-1px; color:var(--text-body); font-family:'Marcellus',serif; font-size:.9rem; letter-spacing:.1em; text-transform:uppercase; padding:.2rem 0 .55rem; cursor:pointer; transition:color .15s, border-color .15s; }
+.tab-btn:hover { color:var(--text-hover); }
+.tab-btn.is-active { color:var(--text-title); border-bottom-color:var(--text-title); }
+.tab-panel { display:none; }
+.tab-panel.is-active { display:block; }
+
+/* ── Objectifs en LISTE (variante sans carte, avec barre + détail des ressources) ── */
+.obj-list { display:flex; flex-direction:column; gap:1rem; }
+.obj-item { display:flex; flex-direction:column; gap:.45rem; }
+.obj-item.done .obj-bar-fill { background:linear-gradient(to right,var(--success),var(--success)); }
+
+/* ── Historique des actions (popin) ── */
+.hist-list { display:flex; flex-direction:column; }
+.hist-row { display:flex; align-items:baseline; gap:.6rem; padding:.5rem 0; border-top:1px solid var(--border-soft); font-size:.9rem; }
+.hist-row:first-child { border-top:none; }
+.hist-who { font-family:'Marcellus',serif; color:var(--text-title); white-space:nowrap; flex-shrink:0; }
+.hist-msg { color:var(--text-body); flex:1; }
+.hist-turn { color:var(--text-body); opacity:.55; font-size:.8rem; white-space:nowrap; flex-shrink:0; }
 .fv-instruction { text-align:center; font-family:'Literata',serif; font-style:italic; font-size:.95rem; color:var(--text-body); margin:.2rem 0 1rem; }
 .fv-instruction:empty { display:none; }
 

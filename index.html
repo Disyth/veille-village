@@ -20,10 +20,24 @@
     </div>
   </div>
 
+  <div id="ferme-history-modal" class="modal-overlay" style="display:none" onclick="fermeHideHistory(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="fermeHideHistory()" aria-label="Fermer">✕</button>
+      <div id="ferme-history-content"></div>
+    </div>
+  </div>
+
   <div id="diamant-rules-modal" class="modal-overlay" style="display:none" onclick="diamantHideRules(event)">
     <div class="modal-box" onclick="event.stopPropagation()">
       <button class="modal-close" onclick="diamantHideRules()" aria-label="Fermer">✕</button>
       <div id="diamant-rules-content"></div>
+    </div>
+  </div>
+
+  <div id="diamant-records-modal" class="modal-overlay" style="display:none" onclick="diamantHideRecords(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="diamantHideRecords()" aria-label="Fermer">✕</button>
+      <div id="diamant-records-content"></div>
     </div>
   </div>
 
@@ -165,7 +179,7 @@
           <div class="card fv-game">
             <div class="container-head">
               <span class="container-title">💎 Diamant — La Grotte aux Trésors</span>
-              <button class="btn-help" onclick="diamantShowRules()">❓ Comment jouer</button>
+              <span class="head-actions"><button class="btn-help" onclick="diamantShowRecords()">🏆 Records</button><button class="btn-help" onclick="diamantShowRules()">❓ Comment jouer</button></span>
             </div>
             <div class="container-pills"><span id="dv-manche" style="display:contents"></span><span id="dv-stats" style="display:contents"></span></div>
             <div class="diamant-board"><div class="diamant-path" id="dv-path"></div></div>
@@ -188,19 +202,29 @@
           <div class="card fv-game">
             <div class="container-head">
               <span class="container-title">🌾 La Ferme du Village</span>
-              <button class="btn-help" onclick="fermeShowRules()">❓ Comment jouer</button>
+              <span class="head-actions">
+                <button class="btn-help" onclick="fermeShowHistory()" title="Historique des actions" aria-label="Historique des actions">📋</button>
+                <button class="btn-help" onclick="fermeShowRules()">❓ Comment jouer</button>
+              </span>
             </div>
             <div class="container-pills" id="fv-status"></div>
             <div class="fv-instruction" id="fv-instruction"></div>
             <div id="fv-myzone"></div>
           </div>
-          <!-- Colonne droite : inventaire + objectifs -->
+          <!-- Colonne droite : onglets (inventaire / objectifs) + liste des joueurs -->
           <div class="fv-side" id="fv-side">
             <div class="card">
-              <div class="section-title">Inventaire</div>
-              <div id="fv-inventory"></div>
+              <div class="tabs">
+                <button class="tab-btn is-active" data-tab-group="fv" data-tab-target="inv" onclick="uiTab('fv','inv')">Inventaire</button>
+                <button class="tab-btn" data-tab-group="fv" data-tab-target="obj" onclick="uiTab('fv','obj')">Objectifs</button>
+              </div>
+              <div class="tab-panel is-active" data-tab-group="fv" data-tab-panel="inv" id="fv-inventory"></div>
+              <div class="tab-panel" data-tab-group="fv" data-tab-panel="obj" id="fv-objectives"></div>
             </div>
-            <div id="fv-objectives"></div>
+            <div class="card">
+              <div class="container-head"><span class="container-title is-label">Joueurs</span></div>
+              <div class="player-list" id="fv-players"></div>
+            </div>
           </div>
         </div>
       </div>

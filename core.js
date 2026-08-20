@@ -136,6 +136,17 @@ function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function escAttr(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
 
+// Onglets génériques (composant design system, réutilisable par tous les jeux).
+// Boutons : <button class="tab-btn" data-tab-group="G" data-tab-target="T" onclick="uiTab('G','T')">
+// Panneaux : <div class="tab-panel" data-tab-group="G" data-tab-panel="T">
+// Active le bouton + le panneau dont la cible == target, dans le groupe G.
+function uiTab(group, target){
+  document.querySelectorAll('[data-tab-group="'+group+'"]').forEach(el=>{
+    const name = el.classList.contains('tab-btn') ? el.getAttribute('data-tab-target') : el.getAttribute('data-tab-panel');
+    el.classList.toggle('is-active', name===target);
+  });
+}
+
 // L'admin est accessible par une URL dédiée : /admin (Netlify), ou #admin / ?admin en secours (ouverture locale)
 function isAdminUrl(){
   const p = location.pathname.toLowerCase().replace(/\/+$/,'');

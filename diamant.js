@@ -1,5 +1,5 @@
 // ── DIAMANT ENGINE + UI ──────────────────────────────────────────────────────
-const D_HAZARDS = ['serpent','araignee','eboulement'];
+const D_HAZARDS = ['serpent','araignee','eboulement','feu'];
 const D_TREASURES = [1,2,3,4,5,5,7,7,9,11,11,13,14,15,17];
 const D_MAXROUNDS = 5;
 let __dseq = 0;
@@ -11,8 +11,25 @@ function dNewDeck(){
   D_HAZARDS.forEach(t=>{ for(let i=0;i<3;i++) cards.push({id:dCardId(),type:'hazard',hazard:t}); });
   return dShuffle(cards);
 }
-function dHazLabel(h){ return {serpent:'🐍 Serpent',araignee:'🕷️ Araignée',eboulement:'🪨 Éboulement'}[h]||h; }
-function dHazIcon(h){ return {serpent:'🐍',araignee:'🕷️',eboulement:'🪨'}[h]||'⚠️'; }
+// Certains emoji récents (ex. 🪨 Unicode 13) ne s'affichent pas sur Windows 10 : on teste le rendu
+// réel via canvas et on bascule sur un repli si l'emoji tombe en « tofu » (rectangle .notdef).
+function emojiSupported(ch){
+  const cache = emojiSupported._cache || (emojiSupported._cache = {});
+  if(ch in cache) return cache[ch];
+  try {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 18;
+    const ctx = cv.getContext('2d', { willReadFrequently:true });
+    ctx.textBaseline = 'top'; ctx.font = '16px sans-serif';
+    const draw = s => { ctx.clearRect(0,0,18,18); ctx.fillText(s,0,0); return cv.toDataURL(); };
+    const tofu = draw('\uFFFF');   // caractère non affichable → rectangle de repli, référence du « tofu »
+    return cache[ch] = (draw(ch) !== tofu);
+  } catch(e){ return cache[ch] = true; }   // pas de canvas (ex. tests) → on garde l'emoji
+}
+const D_HAZ_ICON = { serpent:'🐍', araignee:'🕷️', eboulement:'🪨', feu:'🌋' };
+const D_HAZ_FALLBACK = { eboulement:'⛰️' };   // repli d'icône si l'emoji n'est pas rendu (🪨 → ⛰️ sur Win10)
+const D_HAZ_NAME = { serpent:'Serpent', araignee:'Araignée', eboulement:'Éboulement', feu:'Puits de lave' };
+function dHazIcon(h){ const ic = D_HAZ_ICON[h]; if(!ic) return '⚠️'; return emojiSupported(ic) ? ic : (D_HAZ_FALLBACK[h] || '⚠️'); }
+function dHazLabel(h){ return D_HAZ_NAME[h] ? (dHazIcon(h)+' '+D_HAZ_NAME[h]) : h; }
 function dInPlayers(st){ return Object.values(st.players).filter(p=>p.status==='in'); }
 function dTotalBanked(st){ return Object.values(st.players).reduce((s,p)=>s+p.banked,0); }
 function dNormalize(st){
@@ -163,21 +180,24 @@ function diamantNextRound(){
 function diamantEndToFire(){
   if(!diamant) return;
   const total = dTotalBanked(diamant);
-  if(!confirm('Ajouter '+total+' points au feu de camp et clôturer la partie ?')) return;
-  fbSetFire(Object.assign({}, fire, { points:(fire.points||0)+total }));
+  const fireGain = Math.round(total/10);   // Diamant contribue au feu à l'échelle des autres jeux (trésor ÷10)
+  if(!confirm('Clôturer la partie : '+total+' de trésor → +'+fireGain+' points au feu de camp ?')) return;
+  const records = dUpdateRecords(diamant, total);
+  fbSetFire(Object.assign({}, fire, { points:(fire.points||0)+fireGain, diamantRecords: records }));
   fbSetDiamant(null);
-  toast('🔥 +'+total+' points au feu ! Partie clôturée.');
+  toast('🔥 +'+fireGain+' points au feu ! Partie clôturée.');
 }
 
 // ── Rendering ──
 function dRenderPath(el, board){
   if(!el) return;
-  if(!board || !board.length){ el.innerHTML='<div class="dcard-empty">La grotte est encore inexplorée…</div>'; return; }
-  el.innerHTML = board.map(c=>{
-    if(c.type==='treasure') return '<div class="dcard dcard-treasure"><span class="dico">💎</span><span class="dval">'+c.value+'</span></div>';
-    return '<div class="dcard dcard-hazard"><span class="dico">'+dHazIcon(c.hazard)+'</span></div>';
-  }).join('');
-  el.scrollLeft = el.scrollWidth;
+  const html = (!board || !board.length)
+    ? '<div class="dcard-empty">La grotte est encore inexplorée…</div>'
+    : board.map(c=>{
+        if(c.type==='treasure') return '<div class="dcard dcard-treasure"><span class="dico">💎</span><span class="dval">'+c.value+'</span></div>';
+        return '<div class="dcard dcard-hazard"><span class="dico">'+dHazIcon(c.hazard)+'</span></div>';
+      }).join('');
+  if(el._h !== html){ el.innerHTML = html; el._h = html; el.scrollLeft = el.scrollWidth; }
 }
 
 function dStatusPills(st){
@@ -254,8 +274,9 @@ function renderDiamantAdmin(){
       '<button class="btn-primary-danger u-mt-sm" onclick="diamantCancel()">✕ Abandonner la partie</button>';
   } else if(ph==='gameEnd'){
     const total = dTotalBanked(diamant);
+    const fireGain = Math.round(total/10);
     ctrl.innerHTML = '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+total+'</div><div class="dbank-lbl">Trésor total</div></div></div>'+
-      '<button class="btn-primary" onclick="diamantEndToFire()">🔥 Ajouter '+total+' pts au feu + clôturer</button>'+
+      '<button class="btn-primary" onclick="diamantEndToFire()">🔥 Ajouter '+fireGain+' pts au feu + clôturer</button>'+
       '<button class="btn-primary-danger u-mt-sm" onclick="diamantCancel()">✕ Clôturer sans ajouter au feu</button>';
   }
   // Vue meneur : pas d'emote (réservées à la vue joueur)
@@ -263,59 +284,64 @@ function renderDiamantAdmin(){
   renderGameLibrary();
 }
 
+// Rendu ciblé : n'écrit dans le DOM que si le contenu a changé (évite le clignotement du board
+// et la reconstruction des boutons de vote à chaque écriture Firebase d'un autre joueur).
+function dSet(el, html){ if(el && el._h !== html){ el.innerHTML = html; el._h = html; } }
+function dSetText(el, txt){ if(el && el._t !== txt){ el.textContent = txt; el._t = txt; } }
+
 function renderDiamantViewer(pseudo){
   const wrap = document.getElementById('viewer-diamant');
   if(!wrap) return;
   if(!diamant || !diamant.active){ wrap.style.display='none'; return; }
   wrap.style.display='block';
 
-  document.getElementById('dv-manche').innerHTML = dManchePill(diamant);
-  document.getElementById('dv-stats').innerHTML = (diamant.phase==='lobby') ? '' : dStatsPills(diamant);
-  document.getElementById('dv-event').textContent = diamant.lastEvent||'';
+  dSet(document.getElementById('dv-manche'), dManchePill(diamant));
+  dSet(document.getElementById('dv-stats'), (diamant.phase==='lobby') ? '' : dStatsPills(diamant));
+  dSetText(document.getElementById('dv-event'), diamant.lastEvent||'');
   dRenderPath(document.getElementById('dv-path'), diamant.board);
-  document.getElementById('dv-players').innerHTML = dPlayersList(diamant, pseudo);
+  dSet(document.getElementById('dv-players'), dPlayersList(diamant, pseudo));
 
   const me = diamant.players[pseudo];
   const zone = document.getElementById('dv-myzone');
 
   if(diamant.phase==='lobby'){
     if(me){
-      zone.innerHTML = '<div class="diamant-voted">✓ Tu as rejoint le lobby ! En attente du lancement par le meneur…</div>'+
-        '<button class="btn-secondary u-full" onclick="diamantLeave(\''+escAttr(pseudo)+'\')">↩ Quitter le lobby</button>';
+      dSet(zone, '<div class="diamant-voted">✓ Tu as rejoint le lobby ! En attente du lancement par le meneur…</div>'+
+        '<button class="btn-secondary u-full" onclick="diamantLeave(\''+escAttr(pseudo)+'\')">↩ Quitter le lobby</button>');
     } else {
-      zone.innerHTML = '<div class="diamant-voted">🚪 Une partie de Diamant se prépare ! Rejoins avant le lancement.</div>'+
-        '<button class="btn-primary-continue u-full" onclick="diamantJoin(\''+escAttr(pseudo)+'\')">💎 Rejoindre la partie</button>';
+      dSet(zone, '<div class="diamant-voted">🚪 Une partie de Diamant se prépare ! Rejoins avant le lancement.</div>'+
+        '<button class="btn-primary-continue u-full" onclick="diamantJoin(\''+escAttr(pseudo)+'\')">💎 Rejoindre la partie</button>');
     }
     return;
   }
 
   if(!me){
-    zone.innerHTML = '<div class="diamant-voted">👀 Une partie est en cours. Tu pourras jouer à la prochaine !</div>';
+    dSet(zone, '<div class="diamant-voted">👀 Une partie est en cours. Tu pourras jouer à la prochaine !</div>');
     return;
   }
   if(diamant.phase==='gameEnd'){
-    zone.innerHTML = '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+me.banked+'</div><div class="dbank-lbl">Ton trésor</div></div>'+
+    dSet(zone, '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+me.banked+'</div><div class="dbank-lbl">Ton trésor</div></div>'+
       '<div class="dbank-item"><div class="dbank-val">'+dTotalBanked(diamant)+'</div><div class="dbank-lbl">Total du groupe</div></div></div>'+
-      '<div class="diamant-voted">🏁 Partie terminée ! Bravo aux explorateurs.</div>';
+      '<div class="diamant-voted">🏁 Partie terminée ! Bravo aux explorateurs.</div>');
     return;
   }
   if(me.status==='out'){
-    zone.innerHTML = '<div class="diamant-voted">🏕️ Tu es rentré au camp avec <strong class="t-bright">'+me.banked+'</strong> de trésor sécurisé. Regarde les autres continuer…</div>';
+    dSet(zone, '<div class="diamant-voted">🏕️ Tu es rentré au camp avec <strong class="t-bright">'+me.banked+'</strong> de trésor sécurisé. Regarde les autres continuer…</div>');
     return;
   }
   // me is 'in'
   if(diamant.phase==='voting'){
     if(me.vote){
-      zone.innerHTML = '<div class="diamant-voted">✓ Ton choix est enregistré ('+(me.vote==='leave'?'🎒 rentrer':'⛏️ continuer')+'). En attente des autres explorateurs…</div>';
+      dSet(zone, '<div class="diamant-voted">✓ Ton choix est enregistré ('+(me.vote==='leave'?'🎒 rentrer':'⛏️ continuer')+'). En attente des autres explorateurs…</div>');
     } else {
-      zone.innerHTML = '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+me.held+'</div><div class="dbank-lbl">Ton butin en jeu</div></div></div>'+
+      dSet(zone, '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+me.held+'</div><div class="dbank-lbl">Ton butin en jeu</div></div></div>'+
         '<div class="diamant-vote-btns">'+
         '<button class="btn-primary-continue" onclick="diamantVote(\''+escAttr(pseudo)+'\',\'continue\')">⛏️ Continuer</button>'+
         '<button class="btn-primary" onclick="diamantVote(\''+escAttr(pseudo)+'\',\'leave\')">🎒 Rentrer</button>'+
-        '</div>';
+        '</div>');
     }
   } else {
-    zone.innerHTML = '<div class="diamant-voted">⛏️ Tu explores la grotte — butin en jeu : <strong class="t-bright">'+me.held+'</strong>. En attente de la prochaine carte…</div>';
+    dSet(zone, '<div class="diamant-voted">⛏️ Tu explores la grotte — butin en jeu : <strong class="t-bright">'+me.held+'</strong>. En attente de la prochaine carte…</div>');
   }
 }
 
@@ -342,5 +368,48 @@ function diamantShowRules(){
 }
 function diamantHideRules(){
   const modal = document.getElementById('diamant-rules-modal');
+  if(modal) modal.style.display = 'none';
+}
+
+// ── RECORDS (leaderboard Diamant, persistés dans le nœud « fire » pour éviter une nouvelle règle DB) ──
+function dUpdateRecords(st, total){
+  const src = (fire && fire.diamantRecords && typeof fire.diamantRecords==='object') ? fire.diamantRecords : {};
+  const rec = {
+    bestGroup: Object.assign({ total:0 }, src.bestGroup),
+    bestIndiv: Object.assign({ pseudo:'', banked:0 }, src.bestIndiv),
+    contrib:   Object.assign({}, src.contrib)
+  };
+  if(total > (rec.bestGroup.total||0)) rec.bestGroup = { total };
+  Object.values(st.players).forEach(p=>{
+    const b = p.banked||0;
+    rec.contrib[p.pseudo] = (rec.contrib[p.pseudo]||0) + b;
+    if(b > (rec.bestIndiv.banked||0)) rec.bestIndiv = { pseudo:p.pseudo, banked:b };
+  });
+  return rec;
+}
+function dRecordsHtml(){
+  const rec = (typeof fire!=='undefined' && fire && fire.diamantRecords) || {};
+  const bg = rec.bestGroup||{}, bi = rec.bestIndiv||{}, contrib = rec.contrib||{};
+  const ranking = Object.keys(contrib).map(p=>({ pseudo:p, total:contrib[p]||0 })).sort((a,b)=>b.total-a.total);
+  let h = '<h2 class="rules-title">🏆 Diamant — Records</h2>';
+  h += '<div class="rules-section"><h3>💎 Records de trésor</h3>'+
+       '<p>Meilleure partie (groupe) : <strong class="t-bright">'+(bg.total||0)+'</strong> de trésor.</p>'+
+       '<p>Meilleur butin individuel : '+(bi.pseudo ? ('<strong class="t-bright">'+escHtml(bi.pseudo)+'</strong> — <strong class="t-bright">'+(bi.banked||0)+'</strong>') : '—')+'</p></div>';
+  h += '<div class="rules-section"><h3>🥇 Trésor total rapporté (toutes parties)</h3>';
+  h += ranking.length
+     ? '<ol class="drecords-list">'+ranking.map(r=>'<li><span>'+escHtml(r.pseudo)+'</span><strong class="t-bright">'+r.total+'</strong></li>').join('')+'</ol>'
+     : '<p>Aucune partie clôturée pour l\'instant — les records apparaîtront après la première clôture au feu.</p>';
+  h += '</div>';
+  return h;
+}
+function diamantShowRecords(){
+  const box = document.getElementById('diamant-records-content');
+  const modal = document.getElementById('diamant-records-modal');
+  if(!box || !modal) return;
+  box.innerHTML = dRecordsHtml();
+  modal.style.display = 'flex';
+}
+function diamantHideRecords(){
+  const modal = document.getElementById('diamant-records-modal');
   if(modal) modal.style.display = 'none';
 }
