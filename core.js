@@ -194,10 +194,8 @@ function renderGameLibrary(){
   if (lib)    lib.style.display    = active ? 'none' : 'block';
   if (active) return;
   const sel  = document.getElementById('game-select');
-  const desc = document.getElementById('game-desc');
   const btn  = document.getElementById('game-launch-btn');
   const key  = sel ? sel.value : '';
-  if (desc) desc.textContent = (key && F_GAMES[key]) ? F_GAMES[key].desc : '';
   if (btn){
     btn.disabled = !key;
     btn.textContent = (key && F_GAMES[key]) ? ('Lancer '+F_GAMES[key].nom) : 'Lancer le jeu';

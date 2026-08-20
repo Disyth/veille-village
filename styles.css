@@ -553,7 +553,7 @@
 .fv-layout { display:grid; grid-template-columns:minmax(0,2.2fr) minmax(340px,1fr); gap:1.5rem; align-items:start; }
 @media(max-width:1024px){ .fv-layout { grid-template-columns:1fr; } }
 .fv-game { min-width:0; }
-.fv-side { display:flex; flex-direction:column; gap:1.5rem; }
+.fv-side { display:flex; flex-direction:column; gap:1.5rem; min-width:0; }
 
 /* ── Conteneur (master) : en-tête [titre à gauche + CTA aide à droite] · filet · pastilles ── */
 .container-head { display:flex; align-items:center; gap:1rem; padding-bottom:.85rem; margin-bottom:1rem; border-bottom:1px solid var(--container-line); }

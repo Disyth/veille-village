@@ -85,9 +85,19 @@ const F_MINE_GOLD = { 2:3, 3:3, 4:5, 5:8 };   // or trouvé selon le niveau
 // Chaque action : { id, label, desc, locations (null=partout), check(st)->{ok,why}, apply(st)->message }
 const F_ACTIONS = {
   'Bûcheron': [
+    { id:'hache', label:'🪓 Hache améliorée', desc:'5 or → « Couper du bois » rapporte ×2 (définitif)', locations:['Magasin'],
+      check:(st, ctx)=>{
+        if(ctx && ctx.player && ctx.player.betterAxe) return {ok:false, why:'tu as déjà une hache améliorée'};
+        return (st.gold||0)>=5 ? {ok:true} : {ok:false, why:'besoin de 5 or'};
+      },
+      apply:(st, ctx)=>{
+        st.gold=(st.gold||0)-5;
+        if(ctx && ctx.player) ctx.player.betterAxe = true;
+        return 'achète une hache améliorée 🪓 (-5 or) : « Couper du bois » rapporte désormais le double';
+      } },
     { id:'couper', label:'🪓 Couper du bois', desc:'+2 bois', locations:['Forêt'],
       check:(st)=>({ok:true}),
-      apply:(st)=>{ st.inventory['bois']=(st.inventory['bois']||0)+2; return 'coupe du bois (+2 bois)'; } },
+      apply:(st, ctx)=>{ const n=(ctx && ctx.player && ctx.player.betterAxe)?4:2; st.inventory['bois']=(st.inventory['bois']||0)+n; return 'coupe du bois (+'+n+' bois'+(n>2?' 🪓 hache améliorée':'')+')'; } },
     { id:'buche', label:'🪵 1 bois → 1 bûche', desc:null, locations:null,
       check:(st)=>((st.inventory['bois']||0)>=1?{ok:true}:{ok:false,why:'besoin de 1 bois'}),
       apply:(st)=>{ st.inventory['bois']-=1; if(st.inventory['bois']<=0)delete st.inventory['bois']; st.inventory['bûche']=(st.inventory['bûche']||0)+1; return 'transforme 1 bois en 1 bûche'; } },
@@ -108,17 +118,27 @@ const F_ACTIONS = {
       } },
   ],
   'Mineur': [
+    { id:'pioche', label:'⛏️ Pioche améliorée', desc:'5 or → pierre/charbon ×2 en mine (définitif)', locations:['Magasin'],
+      check:(st, ctx)=>{
+        if(ctx && ctx.player && ctx.player.betterPick) return {ok:false, why:'tu as déjà une pioche améliorée'};
+        return (st.gold||0)>=5 ? {ok:true} : {ok:false, why:'besoin de 5 or'};
+      },
+      apply:(st, ctx)=>{
+        st.gold=(st.gold||0)-5;
+        if(ctx && ctx.player) ctx.player.betterPick = true;
+        return 'achète une pioche améliorée ⛏️ (-5 or) : pierre et charbon rapportent le double en mine';
+      } },
     { id:'explorer', label:'⛏️ Explorer la mine', locations:['Montagne'],
       desc:(st)=>{ const lvl=st.mineLevel||1; const t=F_MINE_TABLE[lvl]||F_MINE_TABLE[5]; return 'niv. '+lvl+'/5 · monstre '+t.monstre+'%'+(t.or?(' · or '+t.or+'%'):''); },
       check:(st)=>({ok:true}),
-      apply:(st)=>{
+      apply:(st, ctx)=>{
         const lvl = st.mineLevel||1;
         const t = F_MINE_TABLE[lvl] || F_MINE_TABLE[5];
         const r = Math.random()*100;
         let acc = t.pierre;
-        if(r < acc){ st.inventory['pierre']=(st.inventory['pierre']||0)+1; return 'explore la mine (niv. '+lvl+') et trouve 1 pierre'; }
+        if(r < acc){ const n=(ctx&&ctx.player&&ctx.player.betterPick)?2:1; st.inventory['pierre']=(st.inventory['pierre']||0)+n; return 'explore la mine (niv. '+lvl+') et trouve '+n+' pierre'+(n>1?'s ⛏️':''); }
         acc += t.charbon;
-        if(r < acc){ st.inventory['charbon']=(st.inventory['charbon']||0)+1; return 'explore la mine (niv. '+lvl+') et trouve 1 charbon'; }
+        if(r < acc){ const n=(ctx&&ctx.player&&ctx.player.betterPick)?2:1; st.inventory['charbon']=(st.inventory['charbon']||0)+n; return 'explore la mine (niv. '+lvl+') et trouve '+n+' charbon'+(n>1?' ⛏️':''); }
         acc += t.or;
         if(r < acc){ const g=F_MINE_GOLD[lvl]||0; st.gold=(st.gold||0)+g; return 'explore la mine (niv. '+lvl+') et trouve un filon d\'or (+'+g+' or) !'; }
         acc += t.escalier;
@@ -747,7 +767,10 @@ function fViewerPlayers(st, mePseudo){
     const metier = p.metier
       ? '<span class="player-info">'+p.metier+'</span>'
       : '<span class="player-info u-dimmer">sans métier</span>';
-    const objet = p.betterRod ? '<span class="player-info" title="Canne à pêche améliorée">🎣</span>' : '';
+    let objet = '';
+    if(p.betterRod)  objet += '<span class="player-info" title="Canne à pêche améliorée">🎣</span>';
+    if(p.betterAxe)  objet += '<span class="player-info" title="Hache améliorée">🪓</span>';
+    if(p.betterPick) objet += '<span class="player-info" title="Pioche améliorée">⛏️</span>';
     let status = '';
     if(absent) status = 'absent';
     else if(isCur) status = 'à son tour';
@@ -1040,7 +1063,7 @@ function fRulesHtml(){
   '<div class="rules-section"><h3>⛏️ La mine</h3>'+
   '<p>Explorer la mine peut donner de la <strong>pierre</strong>, du <strong>charbon</strong>, de l\'<strong>or</strong>, un <strong>escalier</strong> (le groupe descend d\'un niveau) ou réveiller un <strong>crâne de monstre</strong> (le groupe perd un objet au hasard, <em>sauf</em> le plat de veillée et le poisson grillé). Les chances dépendent de la profondeur :</p>'+
   '<table class="rules-table"><tr><th>Niveau</th><th>Pierre</th><th>Charbon</th><th>Or</th><th>Escalier</th><th>Monstre</th></tr>'+mineRows+'</table>'+
-  '<p class="rules-note">La mine a 5 niveaux, <strong>communs à tout le groupe</strong> : elle ne remonte jamais. Plus on descend, plus le <strong>monstre</strong> guette — mais l\'<strong>or</strong> devient plus fréquent et plus généreux. Descendre est un pari : plus de risque, plus de richesse.</p></div>'+
+  '<p class="rules-note">La mine a 5 niveaux, <strong>communs à tout le groupe</strong> : elle ne remonte jamais. Plus on descend, plus le <strong>monstre</strong> guette — mais l\'<strong>or</strong> devient plus fréquent et plus généreux. Descendre est un pari : plus de risque, plus de richesse. Une <strong>pioche améliorée</strong> (achetée au Magasin, 5 or) double la pierre et le charbon trouvés en mine.</p></div>'+
 
   '<div class="rules-section"><h3>🏺 Les reliques du musée</h3>'+
   '<p>Chercher une relique en montagne en révèle une parmi celles <strong>encore à découvrir</strong> (toutes ont la même chance d\'apparaître). Un jet de dé décide si tu parviens à la dégager intacte. Une relique rapportée rejoint le <strong>musée</strong> et ne peut plus être retrouvée.</p>'+

@@ -134,6 +134,11 @@ function adjustFirePoints(delta){
   fbSetFire(newFire);
 }
 
+function resetFirePoints(){
+  if(!confirm('Réinitialiser le feu de camp à 0 point ? (les seuils Grand feu / Légendaire sont conservés)')) return;
+  fbSetFire(Object.assign({}, fire, { points:0 }));
+}
+
 function saveFireConfig(){
   const grand = Math.max(1, parseInt(document.getElementById('fire-threshold-grand').value)||50);
   const legendaire = Math.max(grand+1, parseInt(document.getElementById('fire-threshold-legendaire').value)||120);

@@ -320,7 +320,7 @@
               <label class="fire-cfg-line"><span>Grand feu à partir de</span><input type="number" min="1" id="fire-threshold-grand" class="fire-mini-input" value="50" onchange="saveFireConfig()"></label>
               <label class="fire-cfg-line"><span>Feu légendaire à partir de</span><input type="number" min="1" id="fire-threshold-legendaire" class="fire-mini-input" value="120" onchange="saveFireConfig()"></label>
             </div>
-            <div class="fire-cfg-note">Le feu est permanent : il gagne des points quand un objectif est atteint et ne redescend jamais tout seul.</div>
+            <button class="btn-secondary u-full" onclick="resetFirePoints()">↺ Réinitialiser le feu</button>
           </div>
 
           <!-- Bibliothèque de jeux -->
@@ -335,7 +335,6 @@
                 <option value="galerapagos">Galerapagos — L'île du Village</option>
               </select>
             </div>
-            <div id="game-desc" class="game-desc"></div>
             <button class="btn-primary" id="game-launch-btn" onclick="lancerJeu()">Lancer le jeu</button>
           </div>
 
@@ -346,7 +345,6 @@
             <div class="viewer-list" id="viewer-list-el">
               <div class="empty-state">Aucun villageois connecté</div>
             </div>
-            <div class="vill-hint">5 pseudos affichés — utilise la recherche pour retrouver les autres.</div>
           </div>
 
         </div>
