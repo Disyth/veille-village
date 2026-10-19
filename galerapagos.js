@@ -588,10 +588,14 @@ function gTradeHtml(st, pseudo){
   });
   const offerable=(me.hand||[]).filter(c=>!outgoing.some(o=>o.offer===c.id));
   if(others.length && offerable.length){
+    // Un seul formulaire : menu de la carte à proposer + menu du destinataire + CTA
     h+='<div class="t-warm-sm" style="margin-top:.3rem">Proposer une de tes cartes :</div>'+
-      offerable.map(c=>'<div class="dplayer-row" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem"><span class="dplayer-name" style="color:var(--text-title)">'+gCardIcon(c)+' '+escHtml(c.name)+'</span><span class="dd-row"><span class="dd-label">à :</span>'+
-        '<select class="dd" id="gtrade-'+c.id+'">'+others.map(t=>'<option value="'+escAttr(t.pseudo)+'">'+escHtml(t.pseudo)+'</option>').join('')+'</select>'+
-        '<button class="btn-secondary" onclick="galerapagosProposeTrade(\''+esc+'\',document.getElementById(\'gtrade-'+c.id+'\').value,\''+c.id+'\')">Proposer</button></span></div>').join('');
+      '<div class="dd-row" style="flex-wrap:wrap;gap:.5rem;margin-top:.3rem">'+
+        '<select class="dd" id="gtrade-card" aria-label="Carte à proposer">'+offerable.map(c=>'<option value="'+escAttr(c.id)+'">'+gCardIcon(c)+' '+escHtml(c.name)+'</option>').join('')+'</select>'+
+        '<span class="dd-label">à :</span>'+
+        '<select class="dd" id="gtrade-to" aria-label="Destinataire du troc">'+others.map(t=>'<option value="'+escAttr(t.pseudo)+'">'+escHtml(t.pseudo)+'</option>').join('')+'</select>'+
+        '<button class="btn-secondary" onclick="galerapagosProposeTrade(\''+esc+'\',document.getElementById(\'gtrade-to\').value,document.getElementById(\'gtrade-card\').value)">Proposer</button>'+
+      '</div>';
   } else if(!offerable.length && !incoming.length){
     h+='<div class="t-warm-sm">Aucune carte à proposer pour l\'instant.</div>';
   }
