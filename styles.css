@@ -602,3 +602,21 @@
 
 /* ── Écran de connexion meneur (Google) ── */
 .gate-hint { font-family:'Literata',serif; font-style:italic; font-size:.9rem; color:var(--text-body); text-align:center; margin-bottom:1rem; }
+/* ═══ Récapitulatif des votes (Galerapagos) — une ligne par naufragé visé ═══ */
+.vote-recap { background:var(--surface-sunken-soft); border:1px solid var(--border); border-radius:8px; padding:.8rem 1rem; margin-top:.4rem; }
+.vote-head { display:flex; justify-content:space-between; align-items:baseline; gap:.6rem; font-family:'Marcellus',serif; color:var(--text-title); font-size:1rem; padding-bottom:.5rem; border-bottom:1px solid var(--border-soft); }
+.vote-head span { font-family:'Literata',serif; font-size:.8rem; color:var(--text-body); }
+.vote-row { padding:.5rem .4rem; border-bottom:1px solid var(--border-soft); }
+.vote-row.is-lead { background:var(--danger-soft); border:1px solid var(--danger-line); border-radius:6px; margin:.35rem 0; }
+.vote-line { display:flex; align-items:center; gap:.6rem; min-width:0; }
+.vote-name { font-family:'Marcellus',serif; color:var(--text-title); font-size:.95rem; white-space:nowrap; min-width:6.5rem; }
+.vote-tag { font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; color:var(--danger); border:1px solid var(--danger-line); border-radius:999px; padding:.05rem .45rem; white-space:nowrap; }
+.vote-bar { flex:1; height:6px; background:var(--scrim); border-radius:3px; overflow:hidden; min-width:1.5rem; }
+.vote-bar span { display:block; height:100%; background:var(--fire); border-radius:3px; }
+.vote-row.is-lead .vote-bar span { background:var(--danger); }
+.vote-count { font-family:'Marcellus',serif; color:var(--text-title); font-size:.9rem; white-space:nowrap; min-width:3.6rem; text-align:right; }
+.vote-voters { display:flex; flex-wrap:wrap; gap:.25rem; margin-top:.35rem; }
+.vote-chip { font-size:.75rem; color:var(--text-body); background:var(--btn-fill); border:1px solid var(--border-soft); border-radius:999px; padding:.05rem .5rem; }
+.vote-chip b { color:var(--text-hover); font-weight:600; }
+.vote-foot { font-size:.8rem; color:var(--text-body); margin-top:.5rem; }
+@media(max-width:600px){ .vote-recap{ padding:.7rem .7rem; } .vote-name{ min-width:0; } .vote-count{ min-width:0; } .vote-line{ gap:.45rem; } }

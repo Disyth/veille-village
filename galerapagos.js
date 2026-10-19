@@ -664,13 +664,55 @@ function gTally(st){
   const t={}; gAlive(st).forEach(p=>{ if(p.voteTarget){ const tp=st.players[p.voteTarget]; if(tp && tp.conque) return; t[p.voteTarget]=(t[p.voteTarget]||0)+gVoteWeight(p); } });   // Conque : immunisé au vote
   return t;
 }
-// Révélation lisible (qui a voté quoi + totaux) — partagée vue joueur / stream.
-function gRevealHtml(st){
-  const who=gAlive(st).map(p=>escHtml(p.pseudo)+' → '+(p.voteTarget?escHtml(p.voteTarget):'—')+(gVoteWeight(p)>1?' <span class="t-warm-sm">(×2)</span>':'')).join('<br>');
-  const t=gTally(st), max=Math.max(0,...Object.values(t));
-  const tot=Object.keys(t).sort((a,b)=>t[b]-t[a]).map(k=>escHtml(k)+' : '+t[k]+' voix'+(t[k]===max&&max>0?' ◀':'')).join('<br>');
-  return '<div class="diamant-voted">📊 <strong>Votes révélés</strong><br>'+who+'</div>'+
-         '<div class="diamant-voted" style="margin-top:.4rem"><strong>Total</strong><br>'+(tot||'—')+'</div>';
+// Révélation lisible — une ligne par naufragé visé, triée par nombre de voix :
+// [nom] [barre] [voix] + les votants en étiquettes dessous. Partagée vue joueur / stream. Tient jusqu'à 12 votants.
+// opts.live (Boule de cristal) : votes EN COURS, sans totaux ni barre ; opts.exclude = pseudo à ne pas lister (le porteur).
+function gRevealHtml(st, opts){
+  opts=opts||{};
+  const live=!!opts.live;
+  const alive=gAlive(st).filter(p=>p.pseudo!==opts.exclude), t=gTally(st);
+  const max=Math.max(0,...Object.values(t));
+  const leaders=Object.keys(t).filter(k=>t[k]===max && max>0);
+  const total=Object.values(t).reduce((a,n)=>a+n,0);
+  // votants par cible (y compris les votes annulés par la Conque)
+  const by={};
+  alive.forEach(p=>{ if(p.voteTarget){ (by[p.voteTarget]=by[p.voteTarget]||[]).push(p); } });
+  if(live){
+    // Votes en cours : une ligne par cible avec ses votants, triée par nombre de votants
+    const keys=Object.keys(by).filter(k=>!(st.players[k] && st.players[k].conque)).sort((x,y)=>by[y].length-by[x].length || x.localeCompare(y));
+    const lrows=keys.map(k=>'<div class="vote-row"><div class="vote-line"><span class="vote-name">'+escHtml(k)+'</span></div>'+
+      '<div class="vote-voters">'+by[k].map(p=>'<span class="vote-chip">'+escHtml(p.pseudo)+(gVoteWeight(p)>1?' <b>×2</b>':'')+'</span>').join('')+'</div></div>').join('');
+    const lvoided=Object.keys(by).filter(k=>st.players[k] && st.players[k].conque);
+    const waiting=alive.filter(p=>!p.voteTarget).map(p=>escHtml(p.pseudo)+(p.sick?' (malade)':''));
+    let lfoot='';
+    lvoided.forEach(k=>{ lfoot+='<div class="vote-foot">🐚 Votes contre <strong>'+escHtml(k)+'</strong> annulés (chef) : '+by[k].map(p=>escHtml(p.pseudo)).join(', ')+'</div>'; });
+    if(waiting.length) lfoot+='<div class="vote-foot">Pas encore voté : '+waiting.join(', ')+'</div>';
+    return '<div class="vote-recap">'+
+      '<div class="vote-head">🔮 Boule de cristal <span>tu votes en dernier — votes en cours</span></div>'+
+      (lrows||'<div class="vote-foot">Personne n\'a encore voté.</div>')+lfoot+
+    '</div>';
+  }
+  const chip=(p)=>'<span class="vote-chip">'+escHtml(p.pseudo)+(gVoteWeight(p)>1?' <b>×2</b>':'')+'</span>';
+  const rows=Object.keys(t).sort((x,y)=>t[y]-t[x] || x.localeCompare(y)).map(k=>{
+    const lead=leaders.indexOf(k)>=0, pct=max?Math.round(t[k]/max*100):0;
+    const tag=lead?'<span class="vote-tag">'+(leaders.length>1?'égalité':'en tête')+'</span>':'';
+    return '<div class="vote-row'+(lead?' is-lead':'')+'">'+
+      '<div class="vote-line"><span class="vote-name">'+escHtml(k)+'</span>'+tag+
+        '<span class="vote-bar"><span style="width:'+pct+'%"></span></span>'+
+        '<span class="vote-count">'+t[k]+' voix</span></div>'+
+      '<div class="vote-voters">'+(by[k]||[]).map(chip).join('')+'</div>'+
+    '</div>';
+  }).join('');
+  // votes annulés (cible protégée par la Conque) et naufragés sans vote
+  const voided=Object.keys(by).filter(k=>st.players[k] && st.players[k].conque);
+  const none=alive.filter(p=>!p.voteTarget).map(p=>escHtml(p.pseudo)+(p.sick?' (malade)':''));
+  let foot='';
+  voided.forEach(k=>{ foot+='<div class="vote-foot">🐚 Votes contre <strong>'+escHtml(k)+'</strong> annulés (chef) : '+by[k].map(p=>escHtml(p.pseudo)).join(', ')+'</div>'; });
+  if(none.length) foot+='<div class="vote-foot">Sans vote : '+none.join(', ')+'</div>';
+  return '<div class="vote-recap">'+
+    '<div class="vote-head">📊 Votes révélés <span>'+total+' voix exprimée'+(total>1?'s':'')+'</span></div>'+
+    (rows||'<div class="vote-foot">Aucun vote valable.</div>')+foot+
+  '</div>';
 }
 
 function galerapagosEliminate(target){
@@ -1054,8 +1096,7 @@ function renderGalerapagosViewer(pseudo){
         ).join('')+'</div>';
     }
     if(gHasObj(me,'boule') && !st.vote.revealed && !me.sick){   // Boule de cristal : voir les votes en cours (tu votes en dernier)
-      const live=gAlive(st).filter(p=>p.pseudo!==pseudo).map(p=>escHtml(p.pseudo)+' → '+(p.voteTarget?escHtml(p.voteTarget):'…')).join('<br>');
-      z+='<div class="diamant-voted" style="margin-top:.4rem">🔮 <strong>Boule de cristal</strong> — tu votes en dernier. Votes en cours :<br>'+(live||'—')+'</div>';
+      z+=gRevealHtml(st, { live:true, exclude:pseudo });
     }
     zone.innerHTML = z + gHandHtml(st,pseudo);
     return;
@@ -1076,7 +1117,7 @@ function renderGalerapagosStream(){
   let vote='';
   if(st.phase==='vote'){
     vote = st.vote && st.vote.revealed
-      ? '<div class="diamant-voted">📊 Votes révélés — le meneur tranche.</div>'
+      ? gRevealHtml(st)+'<div class="t-warm-sm" style="margin-top:.3rem">Le meneur tranche…</div>'
       : '<div class="diamant-voted">🗳️ Vote en cours…</div>';
   }
   root.innerHTML =
