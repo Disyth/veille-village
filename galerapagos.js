@@ -1069,19 +1069,84 @@ function renderGalerapagosStream(){
 
 // ── Règles (popin) ──
 function gRulesHtml(){
+  // Petit helper local : une ligne de tableau [icône + nom | effet]
+  const row=(ico,name,fx)=>'<tr><td>'+ico+' <strong>'+name+'</strong></td><td>'+fx+'</td></tr>';
+  const table=(h1,h2,rows)=>'<table class="rules-table"><thead><tr><th>'+h1+'</th><th>'+h2+'</th></tr></thead><tbody>'+rows+'</tbody></table>';
   return ''+
   '<h2 class="rules-title">🏝️ Galerapagos — L\'île du Village — Comment jouer</h2>'+
-  '<div class="rules-section"><h3>🎯 Le but</h3><p>Naufragés sur une île, construisez ensemble un radeau et quittez l\'île avant l\'ouragan. Ceux qui embarquent gagnent.</p></div>'+
-  '<div class="rules-section"><h3>🔄 Un tour</h3><p>À chaque tour : la météo est tirée (elle fixe l\'eau récoltable), puis chacun choisit <strong>une</strong> action :</p><ul>'+
-    '<li>🎣 <strong>Pêcher</strong> : ajoute de la nourriture (quantité aléatoire).</li>'+
-    '<li>💧 <strong>Collecter de l\'eau</strong> : ajoute l\'eau du jour (0 à 3 selon la météo).</li>'+
-    '<li>🪵 <strong>Collecter du bois</strong> : +1 sûr, puis tu peux en risquer plus… mais gare au serpent 🐍 (morsure = malade au tour suivant).</li>'+
-    '<li>🔍 <strong>Fouiller l\'épave</strong> : pioche une carte, gardée secrète dans ta main.</li>'+
+
+  '<div class="rules-section"><h3>🎯 Le but</h3><ul>'+
+    '<li>Vous êtes naufragés sur une île.</li>'+
+    '<li>Construisez <strong>ensemble</strong> un radeau et quittez l\'île <strong>avant l\'ouragan</strong>.</li>'+
+    '<li>Ceux qui embarquent gagnent.</li>'+
   '</ul></div>'+
-  '<div class="rules-section"><h3>🃏 Les cartes</h3><p>Ta main n\'est visible que par toi. Joue une <strong>Bouteille d\'eau</strong> ou un <strong>Sandwich</strong> pour +1 au stock commun ; 🥥 Noix de coco = +3 eau, 🐟 Sardines = +3 nourriture. <strong>Eau croupie</strong> / <strong>Poisson pourri</strong> donnent +1 ration mais rendent MALADE 1 tour (les 🔥 Allumettes évitent ça). À la mort d\'un naufragé, ses cartes passent à ses voisins.</p></div>'+
-  '<div class="rules-section"><h3>🎁 Les objets</h3><p><strong>Permanents</strong> (posés, visibles de tous) : 🍶 Gourde (eau ×2), 🎣 Canne (garde la meilleure de 3 boules), 🪓 Hache (2 bois sûrs), 🔮 Boule de cristal (vote en dernier), 🏏 Gourdin & 🔫 Revolver (voix double ; le revolver + • Cartouche abat un joueur). <strong>Consommables</strong> : 💉 Anti-venin (soigne la maladie), 💤 Somnifère (rafle 1 carte à 3 naufragés), ⏰ Réveil matin (choisis le 1er joueur), 🥣 Moulin (2 nourriture→2 eau), 🪵 Planche (+1 place), 🧺 Panier garni (en cas de pénurie : personne ne meurt, le stock est vidé), 🍖 Kit BBQ (+2 nourriture par mort du tour), 🛡️ Plaque de tôle (bloque un tir). D\'autres objets arrivent bientôt.</p></div>'+
-  '<div class="rules-section"><h3>🍖 Survie</h3><p>À la fin du tour, chaque survivant consomme 1 eau et 1 nourriture. En cas de pénurie, un <strong>vote</strong> désigne qui est privé — et périt.</p></div>'+
-  '<div class="rules-section"><h3>🚣 Fin de partie</h3><p>Dès qu\'il y a assez de places sur le radeau et des vivres pour le voyage, vous pouvez embarquer. Si l\'ouragan 🌀 arrive, le radeau doit partir immédiatement… ou tout le monde périt !</p></div>';
+
+  '<div class="rules-section"><h3>🔄 Un tour</h3><ul>'+
+    '<li><strong>1. Météo</strong> : une carte est tirée, elle fixe l\'eau récoltable ce tour-ci.</li>'+
+    '<li><strong>2. Actions</strong> : chacun choisit <strong>une</strong> action (tableau ci-dessous).</li>'+
+    '<li><strong>3. Survie</strong> : chaque survivant consomme 1 eau et 1 nourriture.</li>'+
+  '</ul>'+
+  table('Action','Effet',
+    row('🎣','Pêcher','Ajoute de la nourriture (quantité aléatoire).')+
+    row('💧','Collecter de l\'eau','Ajoute l\'eau du jour (0 à 3 selon la météo).')+
+    row('🪵','Collecter du bois','+1 sûr, puis tu peux en risquer plus… mais gare au serpent 🐍 (morsure = malade au tour suivant).')+
+    row('🔍','Fouiller l\'épave','Pioche une carte, gardée secrète dans ta main.')
+  )+'</div>'+
+
+  '<div class="rules-section"><h3>🃏 Les cartes</h3><ul>'+
+    '<li>Ta main n\'est visible <strong>que par toi</strong>.</li>'+
+    '<li>À la mort d\'un naufragé, ses cartes passent à ses voisins.</li>'+
+  '</ul>'+
+  table('Carte','Effet',
+    row('💧','Bouteille d\'eau','+1 eau au stock commun')+
+    row('🍖','Sandwich','+1 nourriture au stock commun')+
+    row('🥥','Noix de coco','+3 eau')+
+    row('🐟','Sardines','+3 nourriture')+
+    row('🤢','Eau croupie','+1 eau, mais rend <strong>MALADE</strong> 1 tour')+
+    row('🐟','Poisson pourri','+1 nourriture, mais rend <strong>MALADE</strong> 1 tour')+
+    row('🗑️','Cartes inutiles','Ticket de loterie, Jeu de société, Vieux slip, Clé de voiture, Brosse à WC : aucun effet, mais elles s\'échangent au troc')
+  )+
+  '<p class="rules-note">🔥 Les Allumettes évitent la maladie de l\'Eau croupie et du Poisson pourri.</p></div>'+
+
+  '<div class="rules-section"><h3>🎁 Les objets</h3><div class="rules-cols">'+
+    '<div class="rules-half"><h4>Permanents — posés, visibles de tous</h4>'+
+    table('Objet','Effet',
+      row('🍶','Gourde','Eau ×2')+
+      row('🎣','Canne','Garde la meilleure de 3 boules')+
+      row('🪓','Hache','2 bois sûrs')+
+      row('🔮','Boule de cristal','Vote en dernier')+
+      row('🏏','Gourdin','Voix double')+
+      row('🔫','Revolver','Voix double ; avec une • Cartouche, abat un joueur')
+    )+'</div>'+
+    '<div class="rules-half"><h4>Consommables — défaussés à l\'usage</h4>'+
+    table('Objet','Effet',
+      row('💉','Anti-venin','Soigne la maladie')+
+      row('💤','Somnifère','Rafle 1 carte à 3 naufragés')+
+      row('⏰','Réveil matin','Choisis le 1er joueur')+
+      row('🥣','Moulin','2 nourriture → 2 eau')+
+      row('🪵','Planche','+1 place sur le radeau')+
+      row('🧺','Panier garni','En cas de pénurie : personne ne meurt, le stock est vidé')+
+      row('🍖','Kit BBQ','+2 nourriture par mort du tour')+
+      row('🛡️','Plaque de tôle','Bloque un tir')+
+      row('☕','Café','2 actions ce tour (à jouer pendant ton tour, avant d\'agir)')+
+      row('🐚','Conque','Tu deviens chef ce tour : personne ne peut voter contre toi')+
+      row('⏳','Pendule','Impose une action à un naufragé qui n\'a pas encore joué (le bois imposé est sans risque)')+
+      row('🔭','Longue-vue','Vois les mains des autres naufragés')+
+      row('🔦','Lampe torche','Vois les 3 prochaines cartes de l\'épave')+
+      row('🌡️','Baromètre','Vois les 2 prochaines météos')+
+      row('🪆','Poupée vaudou','Ressuscite un naufragé mort')
+    )+'</div>'+
+  '</div><p class="rules-note">🔭🔦🌡️ Ce que tu vois avec ces objets n\'est visible que par toi, jusqu\'à la fin du tour.</p></div>'+
+
+  '<div class="rules-section"><h3>🍖 Survie</h3><ul>'+
+    '<li>À la fin du tour, chaque survivant consomme <strong>1 eau</strong> et <strong>1 nourriture</strong>.</li>'+
+    '<li>En cas de pénurie, un <strong>vote</strong> désigne qui est privé — et périt.</li>'+
+  '</ul></div>'+
+
+  '<div class="rules-section"><h3>🚣 Fin de partie</h3><ul>'+
+    '<li>Dès qu\'il y a assez de <strong>places</strong> sur le radeau et des <strong>vivres</strong> pour le voyage, vous pouvez embarquer.</li>'+
+    '<li>Si l\'ouragan 🌀 arrive, le radeau doit partir <strong>immédiatement</strong>… ou tout le monde périt !</li>'+
+  '</ul></div>';
 }
 function galerapagosShowRules(){ const b=document.getElementById('galerapagos-rules-content'), m=document.getElementById('galerapagos-rules-modal'); if(!b||!m) return; b.innerHTML=gRulesHtml(); m.style.display='flex'; }
 function galerapagosHideRules(){ const m=document.getElementById('galerapagos-rules-modal'); if(m) m.style.display='none'; }

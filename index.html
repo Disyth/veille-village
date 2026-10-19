@@ -48,6 +48,13 @@
     </div>
   </div>
 
+  <div id="galerapagos-history-modal" class="modal-overlay" style="display:none" onclick="galerapagosHideHistory(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="galerapagosHideHistory()" aria-label="Fermer">✕</button>
+      <div id="galerapagos-history-content"></div>
+    </div>
+  </div>
+
 <script src="firebase-config.js"></script>
 
   <script type="module">
@@ -235,7 +242,10 @@
           <div class="card fv-game">
             <div class="container-head">
               <span class="container-title">🏝️ Galerapagos — L'île du Village</span>
-              <button class="btn-help" onclick="galerapagosShowRules()">❓ Comment jouer</button>
+              <span class="head-actions">
+                <button class="btn-help" onclick="galerapagosShowHistory()" title="Historique des actions" aria-label="Historique des actions">📋</button>
+                <button class="btn-help" onclick="galerapagosShowRules()">❓ Comment jouer</button>
+              </span>
             </div>
             <div class="container-pills" id="gv-status"></div>
             <div class="diamant-event" id="gv-event"></div>
