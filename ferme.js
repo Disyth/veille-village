@@ -711,7 +711,7 @@ function fStatusPills(st, opts){
   let html = '<div class="fturn-pill">Tour <strong>'+st.turn+'/'+st.maxTurns+'</strong></div>'+
          '<span class="fphase-badge fphase-'+st.phase+'">'+phaseLabel+'</span>'+
          '<div class="fturn-pill">⛏️ Mine <strong>niv. '+(st.mineLevel||1)+'/5</strong></div>';
-  if(opts.gold!==false) html += '<div class="fgold">🪙 '+st.gold+' or</div>';
+  if(opts.gold!==false) html += '<div class="inv-item">🪙 '+st.gold+' or</div>';   // .inv-item (ex-.fgold, renommée dans le design system)
   return html;
 }
 

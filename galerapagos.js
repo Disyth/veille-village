@@ -851,8 +851,10 @@ function gTurnPills(st){
 }
 function gCounterPills(st){
   const c=st.counters;
-  return '<div class="dpill">💧 Eau <strong>'+c.water+'</strong></div>'+
-         '<div class="dpill">🍖 Nourriture <strong>'+c.food+'</strong></div>'+
+  // Alerte pénurie (.dpill.low) : réserve inférieure au nombre de naufragés en vie → la nuit ne nourrira pas tout le monde
+  const N=gAlive(st).length, low=v=>(N>0 && v<N) ? ' low' : '';
+  return '<div class="dpill'+low(c.water)+'">💧 Eau <strong>'+c.water+'</strong></div>'+
+         '<div class="dpill'+low(c.food)+'">🍖 Nourriture <strong>'+c.food+'</strong></div>'+
          '<div class="dpill">🪵 Radeau <strong>'+c.raft+'/6</strong></div>'+
          '<div class="dpill">🚣 Places <strong>'+c.slots+'</strong></div>';
 }
