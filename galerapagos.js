@@ -63,6 +63,22 @@ function gNoEmoji(s){ return (typeof fNoEmoji==='function') ? fNoEmoji(s) : s; }
 function gWeatherLabel(v){ return ({0:'☀️ Grand soleil (0 eau)',1:'☁️ Nuageux (+1 eau)',2:'🌧️ Pluie (+2 eau)',3:'⛈️ Orage (+3 eau)'})[v] || '—'; }
 function gAlive(st){ return Object.values(st.players).filter(p=>p.alive); }
 
+// ── Journal des actions ──
+// gLog : affiche le message dans le bandeau (lastEvent) ET l'ajoute à l'historique de la partie.
+// gLogAppend : complète le dernier message (bandeau + dernière ligne du journal).
+const G_HISTORY_MAX = 150;   // lignes conservées (borne pour ne pas gonfler Firebase)
+function gLog(st, msg){
+  st.lastEvent = msg;
+  st.history = Array.isArray(st.history) ? st.history : (st.history ? Object.values(st.history) : []);
+  st.history.push({ msg, turn:st.turn, at:Date.now() });
+  if(st.history.length > G_HISTORY_MAX) st.history = st.history.slice(-G_HISTORY_MAX);
+}
+function gLogAppend(st, extra){
+  st.lastEvent = (st.lastEvent||'') + extra;
+  const h = Array.isArray(st.history) ? st.history : [];
+  if(h.length) h[h.length-1].msg = (h[h.length-1].msg||'') + extra;
+}
+
 function gNormalize(st){
   if(!st) return st;
   // Firebase supprime null / false / objets & tableaux vides — on reconstruit pour ne jamais tomber sur undefined
@@ -70,6 +86,7 @@ function gNormalize(st){
   st.turnOrder = Array.isArray(st.turnOrder) ? st.turnOrder : (st.turnOrder ? Object.values(st.turnOrder) : []);
   st.weather   = (st.weather && typeof st.weather==='object') ? st.weather : { deck:[], current:null, isHurricane:false, hurricaneDrawn:false };
   st.weather.deck = Array.isArray(st.weather.deck) ? st.weather.deck : (st.weather.deck ? Object.values(st.weather.deck) : []);
+  st.history  = Array.isArray(st.history) ? st.history : (st.history ? Object.values(st.history) : []);
   st.counters  = (st.counters && typeof st.counters==='object') ? st.counters : { water:0, food:0, raft:0, slots:0 };
   ['water','food','raft','slots'].forEach(k=>{ if(typeof st.counters[k]!=='number') st.counters[k]=0; });
   st.vote      = (st.vote && typeof st.vote==='object') ? st.vote : null;
@@ -147,10 +164,10 @@ function gStartTurn(st){
   const card = st.weather.deck.length ? st.weather.deck.shift() : 'H';
   if(card==='H'){
     st.weather.current=null; st.weather.isHurricane=true; st.weather.hurricaneDrawn=true;
-    st.lastEvent='🌀 L\'OURAGAN approche ! Le radeau DOIT partir à la fin de ce tour, sinon tout le monde périt.';
+    gLog(st, '🌀 L\'OURAGAN approche ! Le radeau DOIT partir à la fin de ce tour, sinon tout le monde périt.');
   } else {
     st.weather.current=card; st.weather.isHurricane=false;
-    st.lastEvent='Météo du tour '+st.turn+' : '+gWeatherLabel(card)+'.';
+    gLog(st, 'Météo du tour '+st.turn+' : '+gWeatherLabel(card)+'.');
   }
   gBeginActions(st);
 }
@@ -168,7 +185,7 @@ function gSeekActor(st){
   for(let s=0;s<n;s++){
     const i=(st.firstIdx+s)%n; const ps=order[i]; const p=st.players[ps];
     if(p && p.alive && !p.acted){
-      if(p.sick){ p.sick=false; p.acted=true; p.action='sick'; st.lastEvent=ps+' se remet de sa morsure et passe son tour.'; continue; }
+      if(p.sick){ p.sick=false; p.acted=true; p.action='sick'; gLog(st, ps+' se remet de sa morsure et passe son tour.'); continue; }
       st.currentIdx=i; return true;
     }
   }
@@ -189,14 +206,14 @@ function galerapagosAct(pseudo, action, extra){
     if(gHasObj(p,'canne')) val=Math.max(draw(),draw(),draw());   // Canne : 1 + 2 boules, on garde la meilleure
     else val=draw();
     c.food=Math.min(36,c.food+val);
-    p.action='fish'; st.lastEvent=pseudo+' pêche 🐟 +'+val+' nourriture'+(gHasObj(p,'canne')?' (canne 🎣 : meilleure de 3)':'')+'.';
+    p.action='fish'; gLog(st, pseudo+' pêche 🐟 +'+val+' nourriture'+(gHasObj(p,'canne')?' (canne 🎣 : meilleure de 3)':'')+'.');
     p.lastResult={ msg:'🎣 Tu as pêché +'+val+' nourriture.', turn:st.turn };
   } else if(action==='water'){
     if((st.weather.current||0)===0) return;          // pas d'eau aujourd'hui : action indisponible
     let w=st.weather.current;
     if(gHasObj(p,'gourde')) w*=2;                     // Gourde : collecte doublée
     c.water=Math.min(36,c.water+w);
-    p.action='water'; st.lastEvent=pseudo+' collecte 💧 +'+w+' eau'+(gHasObj(p,'gourde')?' (gourde 🍶)':'')+'.';
+    p.action='water'; gLog(st, pseudo+' collecte 💧 +'+w+' eau'+(gHasObj(p,'gourde')?' (gourde 🍶)':'')+'.');
     p.lastResult={ msg:'💧 Tu as collecté +'+w+' eau.', turn:st.turn };
   } else if(action==='wood'){
     const k=Math.max(0,Math.min(5, extra|0));
@@ -209,17 +226,17 @@ function galerapagosAct(pseudo, action, extra){
     c.raft+=gained;
     let built=0; while(c.raft>=6){ c.raft-=6; c.slots++; built++; }
     p.action='wood';
-    if(bit){ p.sick=true; st.lastEvent=pseudo+' est mordu par un serpent 🐍 ! Malade au prochain tour. Bois rapporté : +'+gained+'.'; p.lastResult={ msg:'🐍 Mordu ! +'+gained+' bois, mais malade au prochain tour.', turn:st.turn }; }
-    else { st.lastEvent=pseudo+' rapporte 🪵 +'+gained+' bois.'+(built?(' 🚣 Un morceau de radeau construit ('+c.slots+' place'+(c.slots>1?'s':'')+') !'):''); p.lastResult={ msg:'🪵 Tu as rapporté +'+gained+' bois.'+(built?' 🚣 Radeau agrandi !':''), turn:st.turn }; }
+    if(bit){ p.sick=true; gLog(st, pseudo+' est mordu par un serpent 🐍 ! Malade au prochain tour. Bois rapporté : +'+gained+'.'); p.lastResult={ msg:'🐍 Mordu ! +'+gained+' bois, mais malade au prochain tour.', turn:st.turn }; }
+    else { gLog(st, pseudo+' rapporte 🪵 +'+gained+' bois.'+(built?(' 🚣 Un morceau de radeau construit ('+c.slots+' place'+(c.slots>1?'s':'')+') !'):'')); p.lastResult={ msg:'🪵 Tu as rapporté +'+gained+' bois.'+(built?' 🚣 Radeau agrandi !':''), turn:st.turn }; }
   } else if(action==='search'){
     p.hand = p.hand || [];
-    if(st.deck.length){ const drawn=st.deck.shift(); p.hand.push(drawn); p.action='search'; st.lastEvent=pseudo+' fouille l\'épave 🔍 (+1 carte en main).'; p.lastResult={ msg:'🔍 Tu as pioché : '+gCardIcon(drawn)+' '+drawn.name+'.', turn:st.turn }; }
-    else { p.action='search'; st.lastEvent=pseudo+' fouille l\'épave… mais la cale est vide.'; p.lastResult={ msg:'🔍 La cale de l\'épave est vide.', turn:st.turn }; }
+    if(st.deck.length){ const drawn=st.deck.shift(); p.hand.push(drawn); p.action='search'; gLog(st, pseudo+' fouille l\'épave 🔍 (+1 carte en main).'); p.lastResult={ msg:'🔍 Tu as pioché : '+gCardIcon(drawn)+' '+drawn.name+'.', turn:st.turn }; }
+    else { p.action='search'; gLog(st, pseudo+' fouille l\'épave… mais la cale est vide.'); p.lastResult={ msg:'🔍 La cale de l\'épave est vide.', turn:st.turn }; }
   } else return;
 
   if(p.bonusActions>0){                 // Café : action bonus → le joueur rejoue sans passer la main
     p.bonusActions--; p.action=null;
-    st.lastEvent+=' ☕ (action bonus)';
+    gLogAppend(st, ' ☕ (action bonus)');
     fbSetGalerapagos(st); return;
   }
   p.acted=true;
@@ -245,20 +262,20 @@ function gResolveResource(st, res){
   if(N===0){ gWipe(st); return; }
   if(have>=N){                                   // assez de rations : chacun consomme 1
     c[res]=have-N;
-    st.lastEvent='Ration '+de+' distribuée à '+N+' survivant(s).';
+    gLog(st, 'Ration '+de+' distribuée à '+N+' survivant(s).');
     if(res==='water') gResolveResource(st,'food'); else gAfterSurvival(st);
     return;
   }
   if(have===0){                                  // 0 ration : personne ne peut être servi
     alive.forEach(p=>{ p.alive=false; });
-    st.lastEvent='💀 Plus '+de+' du tout ! Tous les survivants périssent.';
+    gLog(st, '💀 Plus '+de+' du tout ! Tous les survivants périssent.');
     gWipe(st); return;
   }
   // Pénurie : il faut réduire les survivants au nombre de rations → vote
   st.vote={ resource:res, context:'penury', capacity:have, revealed:false, round:1 };
   Object.values(st.players).forEach(p=>{ if(p.alive) p.voteTarget=null; });
   st.phase='vote';
-  st.lastEvent='⚠️ Pénurie '+de+' : '+have+' ration(s) pour '+N+' survivant(s). Votez pour désigner qui sera privé.';
+  gLog(st, '⚠️ Pénurie '+de+' : '+have+' ration(s) pour '+N+' survivant(s). Votez pour désigner qui sera privé.');
 }
 
 function gAfterSurvival(st){
@@ -269,10 +286,10 @@ function gAfterSurvival(st){
   if(c.slots>=N && c.water>=N && c.food>=N){ gTryEmbark(st,false); return; }
   st.phase='turnEnd';
   st.canEmbark=false;
-  st.lastEvent='Fin du tour '+st.turn+'. Il manque encore des places sur le radeau ou des vivres pour partir.';
+  gLog(st, 'Fin du tour '+st.turn+'. Il manque encore des places sur le radeau ou des vivres pour partir.');
 }
 
-function gWipe(st){ st.phase='gameEnd'; st.result='lose'; st.lastEvent='💀 Tous les naufragés ont péri. L\'île a eu raison de vous…'; }
+function gWipe(st){ st.phase='gameEnd'; st.result='lose'; gLog(st, '💀 Tous les naufragés ont péri. L\'île a eu raison de vous…'); }
 
 // ── Cartes en main (V2) ──
 // Bouteille d'eau / Sandwich → +1 ration au stock commun.
@@ -286,7 +303,7 @@ function galerapagosPlayCard(pseudo, cardId){
   else if(card.cat==='food')  c.food =Math.min(36,c.food +1);
   else return;
   p.hand.splice(idx,1);
-  st.lastEvent=pseudo+' joue '+card.name+' (+1 au stock commun).';
+  gLog(st, pseudo+' joue '+card.name+' (+1 au stock commun).');
   gAfterCardPlay(st);
   fbSetGalerapagos(st);
 }
@@ -307,7 +324,7 @@ function galerapagosCure(pseudo, cardId, target){
   const idx=(p.hand||[]).findIndex(c=>c.id===cardId && c.sub==='antivenin'); if(idx<0) return;
   const t=st.players[target]; if(!t || !t.alive || !t.sick) return;
   t.sick=false; p.hand.splice(idx,1);
-  st.lastEvent=pseudo+' utilise un Anti-venin sur '+target+' 💉 : plus malade.';
+  gLog(st, pseudo+' utilise un Anti-venin sur '+target+' 💉 : plus malade.');
   fbSetGalerapagos(st);
 }
 
@@ -320,7 +337,7 @@ function galerapagosSomniferes(pseudo, cardId){
   p.hand.splice(idx,1);
   const cibles=gShuffle(gAlive(st).filter(t=>t.pseudo!==pseudo && !t.sick && (t.hand||[]).length)).slice(0,3);
   cibles.forEach(t=>{ p.hand.push(t.hand.splice(Math.floor(Math.random()*t.hand.length),1)[0]); });
-  st.lastEvent=pseudo+' joue le Somnifère 💤 et rafle 1 carte à '+cibles.length+' naufragé(s).';
+  gLog(st, pseudo+' joue le Somnifère 💤 et rafle 1 carte à '+cibles.length+' naufragé(s).');
   fbSetGalerapagos(st);
 }
 
@@ -333,7 +350,7 @@ function galerapagosReveil(pseudo, cardId, target){
   const t=st.players[target]; if(!t || !t.alive) return;
   p.hand.splice(idx,1);
   st.forcedFirst=target;
-  st.lastEvent=pseudo+' règle le Réveil matin ⏰ : '+target+' débutera le prochain tour.';
+  gLog(st, pseudo+' règle le Réveil matin ⏰ : '+target+' débutera le prochain tour.');
   fbSetGalerapagos(st);
 }
 
@@ -348,8 +365,8 @@ function galerapagosConsumeBad(pseudo, cardId, useAllumettes){
   if(useAllumettes){ const ai=(p.hand||[]).findIndex(x=>x.sub==='allumettes'); if(ai>=0){ p.hand.splice(ai,1); safe=true; } }
   if(isWater) c.water=Math.min(36,c.water+1); else c.food=Math.min(36,c.food+1);
   p.hand.splice(p.hand.findIndex(x=>x.id===cardId),1);
-  if(!safe){ p.sick=true; st.lastEvent=pseudo+' consomme '+card.name+' (+1) — et tombe MALADE 🤢 (passe le prochain tour).'; }
-  else st.lastEvent=pseudo+' consomme '+card.name+' (+1) sans danger grâce aux Allumettes 🔥.';
+  if(!safe){ p.sick=true; gLog(st, pseudo+' consomme '+card.name+' (+1) — et tombe MALADE 🤢 (passe le prochain tour).'); }
+  else gLog(st, pseudo+' consomme '+card.name+' (+1) sans danger grâce aux Allumettes 🔥.');
   gAfterCardPlay(st);
   fbSetGalerapagos(st);
 }
@@ -370,7 +387,7 @@ function galerapagosPeek(pseudo, cardId){
     p.peek={ type:'weather', data:(st.weather.deck||[]).slice(0,2).map(v=> v==='H'?'🌀 Ouragan':gWeatherLabel(v)), turn:st.turn };
   }
   p.hand.splice(idx,1);
-  st.lastEvent=pseudo+' utilise '+({longuevue:'la Longue-vue 🔭',lampe:'la Lampe torche 🔦',barometre:'le Baromètre 🌡️'})[sub]+'.';
+  gLog(st, pseudo+' utilise '+({longuevue:'la Longue-vue 🔭',lampe:'la Lampe torche 🔦',barometre:'le Baromètre 🌡️'})[sub]+'.');
   fbSetGalerapagos(st);
 }
 
@@ -393,7 +410,7 @@ function galerapagosCafe(pseudo, cardId){
   if(st.turnOrder[st.currentIdx]!==pseudo || p.acted) return;
   const idx=(p.hand||[]).findIndex(c=>c.id===cardId && c.sub==='cafe'); if(idx<0) return;
   p.hand.splice(idx,1); p.bonusActions=(p.bonusActions||0)+1;
-  st.lastEvent=pseudo+' boit un Café ☕ : 2 actions ce tour.';
+  gLog(st, pseudo+' boit un Café ☕ : 2 actions ce tour.');
   fbSetGalerapagos(st);
 }
 
@@ -404,7 +421,7 @@ function galerapagosConque(pseudo, cardId){
   const p=st.players[pseudo]; if(!p || !p.alive) return;
   const idx=(p.hand||[]).findIndex(c=>c.id===cardId && c.sub==='conque'); if(idx<0) return;
   p.hand.splice(idx,1); p.conque=true;
-  st.lastEvent=pseudo+' souffle dans la Conque 🐚 : chef ce tour, personne ne peut voter contre lui.';
+  gLog(st, pseudo+' souffle dans la Conque 🐚 : chef ce tour, personne ne peut voter contre lui.');
   // Si un vote est révélé et que le meneur allait sacrifier ce joueur, il est désormais protégé (le meneur en désigne un autre).
   fbSetGalerapagos(st);
 }
@@ -431,7 +448,7 @@ function galerapagosPendule(from, cardId, target, action){
     if(st.deck.length){ t.hand=t.hand||[]; t.hand.push(st.deck.shift()); } t.action='search';
   }
   p.hand.splice(idx,1); t.acted=true;
-  st.lastEvent=from+' impose « '+({fish:'Pêcher',water:'Eau',wood:'Bois',search:'Fouiller'}[action])+' » à '+target+' avec le Pendule ⏳.';
+  gLog(st, from+' impose « '+({fish:'Pêcher',water:'Eau',wood:'Bois',search:'Fouiller'}[action])+' » à '+target+' avec le Pendule ⏳.');
   if(st.turnOrder[st.currentIdx]===target){ if(!gSeekActor(st)) gRunSurvival(st); }   // si c'était son tour, on avance
   fbSetGalerapagos(st);
 }
@@ -445,7 +462,7 @@ function galerapagosResurrect(from, cardId, target){
   const idx=(p.hand||[]).findIndex(c=>c.id===cardId && c.sub==='poupee'); if(idx<0) return;
   p.hand.splice(idx,1);
   t.alive=true; t.sick=false; t.acted=false; t.action=null; t.voteTarget=null; t.hand=t.hand||[]; t.objects=t.objects||[]; delete t.deathBy; delete t.shotAt;
-  st.lastEvent=from+' brandit la Poupée vaudou 🪆 et RESSUSCITE '+target+' !';
+  gLog(st, from+' brandit la Poupée vaudou 🪆 et RESSUSCITE '+target+' !');
   fbSetGalerapagos(st);
 }
 
@@ -460,16 +477,16 @@ function galerapagosPlayObject(pseudo, cardId){
   if(['gourde','canne','hache','boule','revolver','gourdin'].includes(sub)){
     if(gHasObj(p,sub)) return;                          // un seul exemplaire de chaque permanent par joueur
     p.objects=p.objects||[]; p.objects.push(card); discard();
-    st.lastEvent=pseudo+' pose '+card.name+' '+gCardIcon(card)+' en jeu.';
-  } else if(sub==='noixcoco'){ c.water=Math.min(36,c.water+3); discard(); st.lastEvent=pseudo+' boit une Noix de coco 🥥 (+3 eau).'; gAfterCardPlay(st); }
-  else if(sub==='sardines'){  c.food =Math.min(36,c.food +3); discard(); st.lastEvent=pseudo+' mange des Sardines 🐟 (+3 nourriture).'; gAfterCardPlay(st); }
-  else if(sub==='moulin'){    if(c.food<2) return; c.food-=2; c.water=Math.min(36,c.water+2); discard(); st.lastEvent=pseudo+' passe 2 nourritures au Moulin à légumes 🥣 (→ +2 eau).'; gAfterCardPlay(st); }
-  else if(sub==='placeradeau'){ c.slots+=1; discard(); st.lastEvent=pseudo+' ajoute une Planche de radeau 🪵 (+1 place).'; }
-  else if(sub==='kitbbq'){    const bonus=2*(st.deathsThisTurn||0); c.food=Math.min(36,c.food+bonus); discard(); st.lastEvent=pseudo+' allume le Kit BBQ Cannibale 🍖 (+'+bonus+' nourriture pour '+(st.deathsThisTurn||0)+' mort(s) ce tour).'; gAfterCardPlay(st); }
+    gLog(st, pseudo+' pose '+card.name+' '+gCardIcon(card)+' en jeu.');
+  } else if(sub==='noixcoco'){ c.water=Math.min(36,c.water+3); discard(); gLog(st, pseudo+' boit une Noix de coco 🥥 (+3 eau).'); gAfterCardPlay(st); }
+  else if(sub==='sardines'){  c.food =Math.min(36,c.food +3); discard(); gLog(st, pseudo+' mange des Sardines 🐟 (+3 nourriture).'); gAfterCardPlay(st); }
+  else if(sub==='moulin'){    if(c.food<2) return; c.food-=2; c.water=Math.min(36,c.water+2); discard(); gLog(st, pseudo+' passe 2 nourritures au Moulin à légumes 🥣 (→ +2 eau).'); gAfterCardPlay(st); }
+  else if(sub==='placeradeau'){ c.slots+=1; discard(); gLog(st, pseudo+' ajoute une Planche de radeau 🪵 (+1 place).'); }
+  else if(sub==='kitbbq'){    const bonus=2*(st.deathsThisTurn||0); c.food=Math.min(36,c.food+bonus); discard(); gLog(st, pseudo+' allume le Kit BBQ Cannibale 🍖 (+'+bonus+' nourriture pour '+(st.deathsThisTurn||0)+' mort(s) ce tour).'); gAfterCardPlay(st); }
   else if(sub==='panier'){    // en cas de pénurie : personne ne meurt, le compteur concerné est remis à zéro
     if(st.phase!=='vote' || !st.vote || st.vote.context!=='penury') return;
     const res=st.vote.resource; c[res]=0; discard();
-    st.lastEvent=pseudo+' déballe le Panier garni 🧺 : personne ne meurt, le stock '+(res==='water'?"d'eau":'de nourriture')+' est vidé.';
+    gLog(st, pseudo+' déballe le Panier garni 🧺 : personne ne meurt, le stock '+(res==='water'?"d'eau":'de nourriture')+' est vidé.');
     st.vote=null; Object.values(st.players).forEach(q=>{ q.voteTarget=null; });
     if(res==='water') gResolveResource(st,'food'); else gAfterSurvival(st);
   } else return;                                        // cartouche / allumettes / différés : gérés ailleurs
@@ -485,11 +502,11 @@ function galerapagosShoot(pseudo, target){
   const t=st.players[target]; if(!t || !t.alive || target===pseudo) return;
   p.hand.splice(ci,1);                                   // consomme la cartouche
   const pi=(t.hand||[]).findIndex(c=>c.sub==='plaque');
-  if(pi>=0){ t.hand.splice(pi,1); t.shotAt={by:pseudo, blocked:true, turn:st.turn}; st.lastEvent='🔫 '+pseudo+' tire sur '+target+'… 🛡️ bloqué par une Plaque de tôle !'; fbSetGalerapagos(st); return; }
+  if(pi>=0){ t.hand.splice(pi,1); t.shotAt={by:pseudo, blocked:true, turn:st.turn}; gLog(st, '🔫 '+pseudo+' tire sur '+target+'… 🛡️ bloqué par une Plaque de tôle !'); fbSetGalerapagos(st); return; }
   const loot=((t.objects||[]).length)+((t.hand||[]).length);
   gKill(st, target, pseudo);                             // le tueur récupère les objets posés + la main de la victime
   t.deathBy=pseudo;                                      // pour informer la victime
-  st.lastEvent='🔫 '+pseudo+' abat '+target+' d\'un coup de revolver'+(loot?(' et récupère ses '+loot+' carte(s)/objet(s)'):'')+' !';
+  gLog(st, '🔫 '+pseudo+' abat '+target+' d\'un coup de revolver'+(loot?(' et récupère ses '+loot+' carte(s)/objet(s)'):'')+' !');
   if(gAlive(st).length===0){ gWipe(st); fbSetGalerapagos(st); return; }
   if(st.phase==='vote' && st.vote){
     const res=st.vote.resource, ctx=st.vote.context;
@@ -510,7 +527,7 @@ function galerapagosProposeTrade(from, to, cardId){
   st.trades=st.trades||[];
   if(st.trades.some(tr=>tr.from===from && tr.to===to && tr.offer===cardId)) return;  // pas de doublon
   st.trades.push({ id:'t'+Date.now()+Math.floor(Math.random()*1000), from, to, offer:cardId });
-  st.lastEvent=from+' propose un troc à '+to+' 🤝.';
+  gLog(st, from+' propose un troc à '+to+' 🤝.');
   fbSetGalerapagos(st);
 }
 
@@ -522,21 +539,21 @@ function galerapagosRespondTrade(tradeId, giveId){
   const i=st.trades.findIndex(tr=>tr.id===tradeId); if(i<0) return;
   const tr=st.trades[i], p=st.players[tr.from], t=st.players[tr.to];
   const drop=()=>st.trades.splice(i,1);
-  if(giveId==='no'){ drop(); st.lastEvent=tr.to+' refuse le troc de '+tr.from+'.'; fbSetGalerapagos(st); return; }
+  if(giveId==='no'){ drop(); gLog(st, tr.to+' refuse le troc de '+tr.from+'.'); fbSetGalerapagos(st); return; }
   if(!p || !p.alive || !t || !t.alive){ drop(); fbSetGalerapagos(st); return; }
   const oi=(p.hand||[]).findIndex(c=>c.id===tr.offer);
-  if(oi<0){ drop(); st.lastEvent='Troc annulé : la carte n\'est plus disponible.'; fbSetGalerapagos(st); return; }
+  if(oi<0){ drop(); gLog(st, 'Troc annulé : la carte n\'est plus disponible.'); fbSetGalerapagos(st); return; }
   const offered=p.hand[oi];
   if(giveId==='gift'){
     p.hand.splice(oi,1); t.hand=t.hand||[]; t.hand.push(offered);
-    st.lastEvent=tr.from+' donne '+offered.name+' à '+tr.to+' 🤝.';
+    gLog(st, tr.from+' donne '+offered.name+' à '+tr.to+' 🤝.');
   } else {
     const gi=(t.hand||[]).findIndex(c=>c.id===giveId);
     if(gi<0){ drop(); fbSetGalerapagos(st); return; }
     const given=t.hand[gi];
     p.hand.splice(oi,1); t.hand.splice(gi,1);
     p.hand.push(given); t.hand.push(offered);
-    st.lastEvent=tr.from+' troque '+offered.name+' contre '+given.name+' avec '+tr.to+' 🤝.';
+    gLog(st, tr.from+' troque '+offered.name+' contre '+given.name+' avec '+tr.to+' 🤝.');
   }
   st.trades=st.trades.filter(x=>x.id!==tradeId && x.offer!==tr.offer);   // la carte a bougé → invalide les autres trocs dessus
   fbSetGalerapagos(st);
@@ -587,7 +604,7 @@ function gRecheckShortage(st){
   if(res!=='raft' && st.counters[res]>=N){
     st.counters[res]-=N;
     const de = res==='water' ? "d'eau" : 'de nourriture';
-    st.lastEvent='Pénurie '+de+' résorbée grâce aux cartes — personne ne meurt.';
+    gLog(st, 'Pénurie '+de+' résorbée grâce aux cartes — personne ne meurt.');
     st.vote=null; Object.values(st.players).forEach(q=>{ q.voteTarget=null; });
     if(res==='water') gResolveResource(st,'food'); else gAfterSurvival(st);
   }
@@ -660,14 +677,14 @@ function galerapagosEliminate(target){
   if(p.conque) return;                 // Conque : ce joueur est protégé, le meneur doit en désigner un autre
   const res=st.vote.resource, ctx=st.vote.context;
   gKill(st, target);   // mort + redistribution de sa main aux voisins
-  st.lastEvent='💀 '+target+' est sacrifié ('+({water:'mort de soif',food:'mort de faim',raft:'pas de place sur le radeau'}[res])+').';
+  gLog(st, '💀 '+target+' est sacrifié ('+({water:'mort de soif',food:'mort de faim',raft:'pas de place sur le radeau'}[res])+').');
   Object.values(st.players).forEach(q=>{ q.voteTarget=null; });
 
   if(ctx==='penury'){
     const N=gAlive(st).length;
     if(st.counters[res] < N){                          // toujours en pénurie (compteur courant) → nouveau tour
       st.vote.revealed=false; st.vote.round++; st.vote.capacity=st.counters[res]; st.phase='vote';
-      st.lastEvent+=' Encore trop de survivants — nouveau vote.';
+      gLogAppend(st, ' Encore trop de survivants — nouveau vote.');
     } else {                                            // assez de rations désormais : on sert et on continue
       st.counters[res]-=N;
       st.vote=null;
@@ -686,7 +703,7 @@ function gTryEmbark(st, forced){
   if(c.slots>=N && c.water>=N && c.food>=N){         // succès : tout le monde embarque
     c.water-=N; c.food-=N; st.escaped=true; st.survivors=N;
     st.phase='gameEnd'; st.result='win';
-    st.lastEvent='🚣 '+N+' naufragé(s) quittent l\'île sur le radeau. VICTOIRE !';
+    gLog(st, '🚣 '+N+' naufragé(s) quittent l\'île sur le radeau. VICTOIRE !');
     return;
   }
   if(forced){                                        // ouragan : il faut sacrifier pour que le radeau parte
@@ -694,7 +711,7 @@ function gTryEmbark(st, forced){
     if(M<=0){                                         // personne ne peut partir → l'ouragan emporte tout le monde
       gAlive(st).forEach(p=>{ p.alive=false; });
       st.phase='gameEnd'; st.result='lose';
-      st.lastEvent='🌀 L\'ouragan frappe et le radeau n\'est pas prêt (pas de place ou pas de vivres). Personne ne s\'échappe. DÉFAITE.';
+      gLog(st, '🌀 L\'ouragan frappe et le radeau n\'est pas prêt (pas de place ou pas de vivres). Personne ne s\'échappe. DÉFAITE.');
       return;
     }
     let res; if(c.slots<N) res='raft'; else if(c.water<N) res='water'; else res='food';
@@ -702,7 +719,7 @@ function gTryEmbark(st, forced){
     Object.values(st.players).forEach(p=>{ if(p.alive) p.voteTarget=null; });
     st.phase='vote';
     const rl={raft:'places sur le radeau',water:'eau pour le voyage',food:'nourriture pour le voyage'}[res];
-    st.lastEvent='⚠️ Embarquement impossible pour tous ('+rl+' insuffisante). Seuls '+M+' peuvent partir — votez pour sacrifier un naufragé.';
+    gLog(st, '⚠️ Embarquement impossible pour tous ('+rl+' insuffisante). Seuls '+M+' peuvent partir — votez pour sacrifier un naufragé.');
   } else {
     st.phase='turnEnd';                              // embarquement volontaire mais conditions non réunies (ne devrait pas arriver)
   }
@@ -760,6 +777,7 @@ function galerapagosLaunch(){
   st.weather={ deck:gBuildWeatherDeck(), current:null, isHurricane:false, hurricaneDrawn:false };
   gDealHands(st, gBuildEpaveDeck());   // deck Épave distribué (3-4 cartes/joueur), reste dans st.deck
   st.turn=1; st.firstIdx=0; st.currentIdx=0; st.vote=null; st.result=null; st.escaped=false; st.canEmbark=false; st.trades=[];
+  st.history=[];   // journal repart à zéro à chaque partie (le lobby n'est pas journalisé)
   gStartTurn(st);
   fbSetGalerapagos(st);
   toast('🏝️ Partie lancée avec '+order.length+' naufragés !');
@@ -1150,3 +1168,27 @@ function gRulesHtml(){
 }
 function galerapagosShowRules(){ const b=document.getElementById('galerapagos-rules-content'), m=document.getElementById('galerapagos-rules-modal'); if(!b||!m) return; b.innerHTML=gRulesHtml(); m.style.display='flex'; }
 function galerapagosHideRules(){ const m=document.getElementById('galerapagos-rules-modal'); if(m) m.style.display='none'; }
+
+// ── Historique des actions (popin) — du plus récent au plus ancien ──
+function gHistoryHtml(st){
+  const hist = Array.isArray(st.history) ? st.history : [];
+  let h = '<h2 class="rules-title">📋 Historique des actions</h2>';
+  if(!hist.length) return h + '<p>Aucune action pour l\'instant — l\'historique se remplit au fil de la partie.</p>';
+  h += '<div class="hist-list">' + hist.slice().reverse().map(a=>
+    '<div class="hist-row">'+
+      '<span class="hist-msg">'+escHtml(a.msg||'')+'</span>'+
+      '<span class="hist-turn">T'+(a.turn||'?')+'</span>'+
+    '</div>'
+  ).join('') + '</div>';
+  return h;
+}
+function galerapagosShowHistory(){
+  const b=document.getElementById('galerapagos-history-content'), m=document.getElementById('galerapagos-history-modal');
+  if(!b||!m||!galerapagos) return;
+  b.innerHTML=gHistoryHtml(galerapagos); m.style.display='flex';
+}
+function galerapagosHideHistory(){ const m=document.getElementById('galerapagos-history-modal'); if(m) m.style.display='none'; }
+// Fermeture à la touche Échap
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') galerapagosHideHistory(); });
+}
