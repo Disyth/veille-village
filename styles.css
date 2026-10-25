@@ -48,6 +48,17 @@
   --text-out:            #9a8b76;             /* texte atténué d'un joueur sorti */
   --text-out-soft:       #7d6f5c;             /* infos atténuées d'un joueur sorti */
 
+  /* ─── Chroniques d'Avel : couleurs des héros (toujours doublées de l'initiale) et des tuiles ─── */
+  --hero-1: #e8735a;   /* Aldric — corail */
+  --hero-2: #5aa9e8;   /* Ysolde — bleu */
+  --hero-3: #4cc9b0;   /* Gaspard — turquoise */
+  --hero-4: #b48be8;   /* Mélusine — violet */
+  --hero-5: #f2d24c;   /* Théobald — jaune */
+  --hero-6: #e9e4d4;   /* Brunehilde — ivoire */
+  --tile-face:   #3b2208;               /* tuile révélée */
+  --tile-castle: #4a2c0c;               /* tuile du château */
+  --tile-hidden: rgba(197,148,99,.10);  /* tuile face cachée */
+
 
   /* ─── Espacements de la vue meneur (LEVIERS DE CALAGE : ajuste ces valeurs) ─── */
   --admin-shell-pad-y: 1.1rem;      /* marge haut de la zone admin (bas = ×2.4) */
@@ -106,6 +117,7 @@
   .btn-primary-continue:hover { background:var(--success-line); }
   .btn-primary-danger { background:var(--danger-soft); border-color:var(--danger); color:var(--danger); }
   .btn-primary-danger:hover { background:var(--danger-hover); }
+  .btn-primary-continue:disabled, .btn-primary-danger:disabled { opacity:.4; cursor:not-allowed; }
 
   /* ── GAME card viewer ── */
   .game-card { background:var(--success-soft); border:1px solid var(--success-line); border-radius:8px; padding:1.5rem 1.8rem; margin-bottom:1.5rem; animation:fadeIn .5s ease; }
@@ -549,3 +561,79 @@
 .vote-chip b { color:var(--text-hover); font-weight:600; }
 .vote-foot { font-size:.8rem; color:var(--text-body); margin-top:.5rem; }
 @media(max-width:600px){ .vote-recap{ padding:.7rem .7rem; } .vote-name{ min-width:0; } .vote-count{ min-width:0; } .vote-line{ gap:.45rem; } }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CHRONIQUES D'AVEL
+   ══════════════════════════════════════════════════════════════════════════ */
+/* Carte (aperçu + carte complète) : cadre creux, légende en bas à droite */
+.av-map { position:relative; background:var(--scrim); border:1px solid var(--border); border-radius:6px; padding:1rem 1rem 2.6rem; margin-bottom:1rem; display:flex; justify-content:center; }
+.av-map-svg { width:100%; max-width:340px; height:auto; display:block; overflow:visible; }
+.av-map.is-full .av-map-svg, .av-map-svg.is-full { max-width:620px; }
+.av-hex polygon { fill:var(--tile-face); stroke:var(--border-strong); stroke-width:2; }
+.av-hex.is-castle polygon { fill:var(--tile-castle); }
+.av-hex.is-hidden polygon { fill:var(--tile-hidden); stroke:var(--border); stroke-dasharray:6 5; }
+.av-hex.is-here polygon { stroke:var(--text-hover); stroke-width:4; }
+.av-hex text { text-anchor:middle; dominant-baseline:auto; pointer-events:none; }
+.av-hex-ico { font-size:22px; }
+.av-hex-name { font-family:'Literata',serif; font-size:9.5px; fill:var(--text-body); }
+.av-hex-q { font-family:'Marcellus',serif; font-size:26px; fill:var(--text-out-soft); }
+.av-hex-sc { font-size:13px; }
+.av-hex .av-mon { fill:var(--danger); stroke:var(--bg-page); stroke-width:1.5; }
+.av-mon-n { font-family:'Marcellus',serif; font-size:11px; fill:var(--bg-page); }
+.av-hero-dot { stroke:var(--bg-page); stroke-width:1.5; }
+.av-hero-ini { font-family:'Marcellus',serif; font-size:9px; font-weight:700; fill:var(--bg-page); }
+.av-legend { position:absolute; right:.6rem; bottom:.5rem; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:.35rem .8rem; font-size:.75rem; color:var(--text-body); }
+.av-legend-item { display:inline-flex; align-items:center; gap:.3rem; white-space:nowrap; }
+.av-legend-dot { width:10px; height:10px; border-radius:50%; background:var(--text-title); }
+.av-legend-mon { width:9px; height:9px; background:var(--danger); transform:rotate(45deg); }
+.av-legend-sc { font-size:.8rem; line-height:1; }
+.av-legend-q { font-family:'Marcellus',serif; color:var(--text-out-soft); border:1px dashed var(--border); border-radius:3px; padding:0 .25rem; line-height:1.2; }
+.av-map-heroes { display:flex; flex-wrap:wrap; gap:.4rem 1rem; font-size:.9rem; color:var(--text-title); }
+.av-map-hero { display:inline-flex; align-items:center; gap:.35rem; }
+
+/* Pastille de héros (rond de couleur + initiale) */
+.av-dot { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; font-family:'Marcellus',serif; font-size:10px; font-weight:700; color:var(--bg-page); flex-shrink:0; vertical-align:middle; }
+
+/* Paire de CTA sous la carte (Repos / Voir toute la carte) */
+.av-cta-row { display:flex; gap:.75rem; margin-bottom:1.4rem; }
+.av-cta-row > * { flex:1; width:auto; }
+.av-cta-row .btn-secondary { padding:1rem; }
+
+/* Ligne d'action : libellé à gauche, contrôles (menus + CTA) à droite */
+.action-row { display:flex; align-items:center; justify-content:space-between; gap:.6rem 1rem; flex-wrap:wrap; background:var(--surface-sunken-soft); border-radius:6px; padding:.55rem .7rem; margin-bottom:.5rem; }
+.action-row-label { color:var(--text-title); font-size:.95rem; min-width:0; display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; }
+.action-row-sub { color:var(--text-body); font-size:.85rem; font-style:italic; }
+.action-row-ctrl { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-left:auto; }
+.action-row .dd { max-width:15rem; }
+#av-actions .section-title, #av-inventory .section-title { margin:1.2rem 0 .6rem; }
+
+/* Ligne de valeur (inventaire, détail d'un héros) : affichage seul — même forme, pas le même rôle que .action-row */
+.stat-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; background:var(--surface-sunken-soft); border-radius:4px; padding:.5rem .7rem; margin-bottom:.3rem; font-size:.95rem; color:var(--text-title); }
+.stat-row strong { font-weight:400; color:var(--text-title); }
+
+/* Joueur cliquable (ouvre le détail de son héros) */
+.player-row.av-clickable { cursor:pointer; }
+.player-row.av-clickable .player-name { text-decoration:underline; text-underline-offset:3px; }
+.player-row.av-clickable:hover { background:var(--hover-wash-2); }
+.player-row .av-dot { width:14px; height:14px; font-size:8px; }
+
+/* Dernière action (toaster de la carte Joueurs) : entrée animée, variante « exploit » */
+.av-toast { font-style:italic; color:var(--text-hover); font-size:.95rem; line-height:1.45; padding:.7rem 1rem; background:var(--scrim-soft); border-radius:6px; border-left:3px solid var(--text-body); margin-bottom:.8rem; position:relative; overflow:hidden; }
+.av-toast.is-empty { display:none; }
+.av-toast.is-enter { animation:avToastIn .45s ease-out, avToastFlash 1.2s ease-out; }
+.av-toast.is-epic { border-left-color:var(--fire); color:var(--text-title); box-shadow:0 0 0 1px var(--fire-glow), 0 0 18px var(--fire-glow); }
+.av-toast.is-epic.is-enter { animation:avToastIn .45s ease-out, avToastEpic 1.4s ease-in-out 3; }
+.av-toast.is-epic::after { content:''; position:absolute; inset:0; background:linear-gradient(110deg, transparent 30%, var(--fire-soft) 50%, transparent 70%); transform:translateX(-100%); animation:avToastShine 2.2s ease-in-out infinite; pointer-events:none; }
+@keyframes avToastIn { from{ opacity:0; transform:translateY(-8px); } to{ opacity:1; transform:translateY(0); } }
+@keyframes avToastFlash { 0%{ background:var(--fire-soft); } 100%{ background:var(--scrim-soft); } }
+@keyframes avToastEpic { 0%,100%{ box-shadow:0 0 0 1px var(--fire-glow), 0 0 10px var(--fire-glow); } 50%{ box-shadow:0 0 0 2px var(--fire), 0 0 28px var(--fire-glow); } }
+@keyframes avToastShine { 0%{ transform:translateX(-100%); } 60%,100%{ transform:translateX(100%); } }
+@media (prefers-reduced-motion: reduce){ .av-toast, .av-toast::after { animation:none !important; } }
+
+@media(max-width:520px){
+  .av-cta-row { flex-direction:column; gap:.5rem; }
+  .action-row-ctrl { margin-left:0; width:100%; }
+  .action-row .dd { flex:1; max-width:none; }
+  .av-legend { position:static; justify-content:center; margin-top:.6rem; }
+  .av-map { flex-direction:column; align-items:center; padding-bottom:.8rem; }
+}

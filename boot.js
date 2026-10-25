@@ -26,6 +26,7 @@ renderDiamantAdmin();
 renderFermeAdmin();
 renderGalerapagosAdmin();
 renderGalerapagosStream();
+renderAvelAdmin();
 renderGameLibrary();
 // Cas où fb-ready s'est déclenché avant le chargement de ce script
 if (window.FB) initSync();

@@ -6,6 +6,7 @@ let fire      = { points:0, grand:50, legendaire:120 };  // feu global permanent
 let diamant   = null;  // partie de Diamant en cours (null si aucune)
 let ferme     = null;  // partie de Ferme en cours (null si aucune)
 let galerapagos = null;  // partie de Galerapagos en cours (null si aucune)
+let avel      = null;  // partie des Chroniques d'Avel en cours (null si aucune)
 let currentViewerPseudo = null;
 
 // ── FIREBASE SYNC LAYER ─────────────────────────────────────────────────────
@@ -59,6 +60,13 @@ function attachListeners(){
     renderGalerapagosAdmin();
     if (currentViewerPseudo) renderGalerapagosViewer(currentViewerPseudo);
     renderGalerapagosStream();
+    renderViewerIdle();
+  });
+
+  onValue(ref(db, 'avel'), (snap) => {
+    avel = snap.val() ? avNormalize(snap.val()) : null;
+    renderAvelAdmin();
+    if (currentViewerPseudo) renderAvelViewer(currentViewerPseudo);
     renderViewerIdle();
   });
 }
@@ -128,6 +136,18 @@ function fbSetGalerapagos(g){
   }
 }
 
+function fbSetAvel(a){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'avel'), a);
+  } else {
+    avel = a ? avNormalize(a) : null;
+    renderAvelAdmin();
+    if(currentViewerPseudo) renderAvelViewer(currentViewerPseudo);
+    renderViewerIdle();
+  }
+}
+
 // Firebase keys can't contain . # $ [ ] / — sanitize pseudo
 function fbKey(s){ return String(s).replace(/[.#$\[\]/]/g,'_'); }
 
@@ -177,12 +197,15 @@ const F_GAMES = {
     desc:'Partie coopérative en 20 tours. Chaque villageois choisit son métier et son lieu à chaque tour, puis joue ses actions. Objectif : remplir les objectifs de grand-père.' },
   galerapagos: { nom:'Galerapagos — L\'île du Village',
     desc:'Survie pour 3 à 12 naufragés : construire un radeau et quitter l\'île avant l\'ouragan. Météo, pêche, eau, bois (gare aux serpents !), et votes de pénurie quand les vivres manquent.' },
+  avel: { nom:'Chroniques d\'Avel',
+    desc:'Aventure coopérative pour 1 à 12 joueurs : explorer les terres du château, affronter les monstres et se préparer à la Lune Noire.' },
 };
 
 function gameActive(){
   if (typeof diamant !== 'undefined' && diamant && diamant.active) return 'diamant';
   if (typeof ferme   !== 'undefined' && ferme   && ferme.active)   return 'ferme';
   if (typeof galerapagos !== 'undefined' && galerapagos && galerapagos.active) return 'galerapagos';
+  if (typeof avel !== 'undefined' && avel && avel.active) return 'avel';
   return null;
 }
 
@@ -210,4 +233,5 @@ function lancerJeu(){
   if (key === 'diamant') startDiamant();
   else if (key === 'ferme') startFerme();
   else if (key === 'galerapagos') startGalerapagos();
+  else if (key === 'avel') startAvel();
 }

@@ -16,6 +16,7 @@ function viewerConnect(){
   renderDiamantViewer(pseudo);
   renderFermeViewer(pseudo);
   renderGalerapagosViewer(pseudo);
+  renderAvelViewer(pseudo);
   renderViewerIdle();
 }
 
@@ -24,7 +25,7 @@ function viewerDisconnect(){
   document.getElementById('viewer-hero').style.display = '';
   document.getElementById('viewer-topframe').style.display = 'none';
   document.getElementById('viewer-pseudo').value = '';
-  ['viewer-ferme','viewer-diamant','viewer-idle'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+  ['viewer-ferme','viewer-diamant','viewer-galerapagos','viewer-avel','viewer-idle'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
   renderViewerIdle();
 }
 

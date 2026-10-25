@@ -55,6 +55,14 @@
     </div>
   </div>
 
+  <!-- Popin unique des Chroniques d'Avel (règles, historique, carte complète, détail d'un héros) -->
+  <div id="avel-modal" class="modal-overlay" style="display:none" onclick="avelHideModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="avelHideModal()" aria-label="Fermer">✕</button>
+      <div id="avel-modal-content"></div>
+    </div>
+  </div>
+
 <script src="firebase-config.js"></script>
 
   <script type="module">
@@ -260,6 +268,37 @@
         </div>
       </div>
 
+      <!-- Chroniques d'Avel (shown when an Avel game is active) -->
+      <div id="viewer-avel" style="display:none">
+        <div class="fv-layout">
+          <div class="card fv-game">
+            <div class="container-head">
+              <span class="container-title">Chroniques d'Avel</span>
+              <span class="head-actions"><button class="btn-help" onclick="avelShowRules()">❓ Comment jouer</button></span>
+            </div>
+            <div class="container-pills" id="av-status"></div>
+            <div class="fv-instruction" id="av-instruction"></div>
+            <div id="av-lobby"></div>
+            <div id="av-board" style="display:none">
+              <div class="av-map" id="av-map"></div>
+              <div class="av-cta-row" id="av-cta"></div>
+              <div id="av-actions"></div>
+              <div id="av-inventory"></div>
+            </div>
+          </div>
+          <div class="fv-side">
+            <div class="card">
+              <div class="container-head">
+                <span class="container-title is-label">Joueurs</span>
+                <span class="head-actions"><button class="btn-help" onclick="avelShowHistory()" title="Historique des actions" aria-label="Historique des actions">📋</button></span>
+              </div>
+              <div class="av-toast" id="av-toast" aria-live="polite"></div>
+              <div class="player-list" id="av-players"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Aucun jeu en cours (état d'attente après connexion) -->
       <div id="viewer-idle" class="game-card" style="display:none">
         <div class="game-card-header">
@@ -343,6 +382,7 @@
                 <option value="diamant">Diamant — La Grotte aux Trésors</option>
                 <option value="ferme">La Ferme du Village</option>
                 <option value="galerapagos">Galerapagos — L'île du Village</option>
+                <option value="avel">Chroniques d'Avel</option>
               </select>
             </div>
             <button class="btn-primary" id="game-launch-btn" onclick="lancerJeu()">Lancer le jeu</button>
@@ -395,6 +435,15 @@
             </div>
           </div>
 
+          <!-- Chroniques d'Avel -->
+          <div class="card" id="avel-panel" style="display:none">
+            <div class="section-title">Chroniques d'Avel</div>
+            <div class="diamant-status" id="aa-status"></div>
+            <div class="diamant-event" id="aa-event"></div>
+            <div class="player-list" id="aa-players" style="margin-bottom:1rem"></div>
+            <div id="aa-controls"></div>
+          </div>
+
           <!-- Galerapagos -->
           <div class="card" id="galerapagos-panel" style="display:none">
             <div class="section-title">Galerapagos — L'île du Village</div>
@@ -426,6 +475,7 @@
   <script src="diamant.js"></script>
   <script src="ferme.js"></script>
   <script src="galerapagos.js"></script>
+  <script src="avel.js"></script>
   <script src="boot.js"></script>
 </body>
 </html>
