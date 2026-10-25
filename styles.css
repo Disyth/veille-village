@@ -577,7 +577,7 @@
 .av-hex-ico { font-size:22px; }
 .av-hex-name { font-family:'Literata',serif; font-size:9.5px; fill:var(--text-body); }
 .av-hex-q { font-family:'Marcellus',serif; font-size:26px; fill:var(--text-out-soft); }
-.av-hex-sc { font-size:13px; }
+.av-hex-badge { font-size:13px; font-family:'Marcellus',serif; fill:var(--text-title); }
 .av-hex .av-mon { fill:var(--danger); stroke:var(--bg-page); stroke-width:1.5; }
 .av-mon-n { font-family:'Marcellus',serif; font-size:11px; fill:var(--bg-page); }
 .av-hero-dot { stroke:var(--bg-page); stroke-width:1.5; }
@@ -590,6 +590,33 @@
 .av-legend-q { font-family:'Marcellus',serif; color:var(--text-out-soft); border:1px dashed var(--border); border-radius:3px; padding:0 .25rem; line-height:1.2; }
 .av-map-heroes { display:flex; flex-wrap:wrap; gap:.4rem 1rem; font-size:.9rem; color:var(--text-title); }
 .av-map-hero { display:inline-flex; align-items:center; gap:.35rem; }
+
+/* Minuteur (tour, choix d'objet) : passe en rouge dans les 15 dernières secondes */
+.av-timer { font-variant-numeric:tabular-nums; }
+.av-timer.is-urgent { color:var(--danger); }
+
+/* Bandeau bloquant au-dessus de la carte (objet à choisir, amélioration, sac qui déborde) */
+.av-alert { border:1px solid var(--text-hover); border-radius:8px; background:var(--fire-soft); padding:.8rem 1rem; margin-bottom:1rem; animation:avToastIn .35s ease-out; }
+.av-alert.is-danger { border-color:var(--danger); background:var(--danger-soft); }
+.av-alert-title { font-family:'Marcellus',serif; color:var(--text-title); font-size:1rem; margin-bottom:.6rem; }
+.av-alert .action-row { margin-bottom:0; }
+
+/* Carte de choix d'objet (3 proposées, on en garde 1) */
+.pick-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:.6rem; margin-bottom:.5rem; }
+.pick-card { display:flex; flex-direction:column; align-items:center; gap:.25rem; text-align:center; padding:.8rem .6rem; background:var(--surface-sunken); border:1px solid var(--border); border-radius:8px; cursor:pointer; font:inherit; color:var(--text-body); transition:all .15s; }
+.pick-card:hover { border-color:var(--text-hover); background:var(--btn-fill); transform:translateY(-2px); }
+.pick-card-ico { font-size:1.8rem; line-height:1; }
+.pick-card-name { font-family:'Marcellus',serif; color:var(--text-title); font-size:.95rem; }
+.pick-card-slot { font-size:.75rem; text-transform:uppercase; letter-spacing:.08em; }
+.pick-card-fx { font-size:.85rem; font-style:italic; line-height:1.35; }
+@media(max-width:520px){ .pick-grid { grid-template-columns:1fr; } .pick-card { flex-direction:row; flex-wrap:wrap; justify-content:flex-start; text-align:left; } }
+
+/* Jauge du sac à dos : une case par place, rouge au-delà de la capacité */
+.bag-meter { display:flex; gap:4px; margin:-.2rem 0 .6rem; }
+.bag-cell { flex:1; height:8px; border-radius:2px; background:var(--surface-sunken); border:1px solid var(--border-soft); }
+.bag-cell.is-full { background:var(--fire); border-color:var(--fire); }
+.bag-meter.is-over .bag-cell.is-full { background:var(--danger); border-color:var(--danger); }
+.bag-cell.is-extra { outline:1px dashed var(--danger); outline-offset:1px; }
 
 /* Pastille de héros (rond de couleur + initiale) */
 .av-dot { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; font-family:'Marcellus',serif; font-size:10px; font-weight:700; color:var(--bg-page); flex-shrink:0; vertical-align:middle; }

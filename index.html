@@ -67,7 +67,7 @@
 
   <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getDatabase, ref, onValue, set, update, remove, get, child, serverTimestamp }
+  import { getDatabase, ref, onValue, set, update, remove, get, child, serverTimestamp, runTransaction }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
   import { getAuth, signInAnonymously, signInWithEmailAndPassword, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -101,7 +101,7 @@
     // Expose une API minimale au reste du script (non-module)
     window.FB = {
       ready: true,
-      db, ref, onValue, set, update, remove, get, child, serverTimestamp,
+      db, ref, onValue, set, update, remove, get, child, serverTimestamp, runTransaction,
       auth, onAuthStateChanged,
       currentUser: () => auth.currentUser,
       signInMeneur: (email, pass) => signInWithEmailAndPassword(auth, email, pass)
@@ -280,6 +280,7 @@
             <div class="fv-instruction" id="av-instruction"></div>
             <div id="av-lobby"></div>
             <div id="av-board" style="display:none">
+              <div id="av-alert"></div>
               <div class="av-map" id="av-map"></div>
               <div class="av-cta-row" id="av-cta"></div>
               <div id="av-actions"></div>

@@ -63,6 +63,9 @@ function attachListeners(){
     renderViewerIdle();
   });
 
+  // Décalage entre l'horloge de cet appareil et celle du serveur (minuteurs communs à tous)
+  onValue(ref(db, '.info/serverTimeOffset'), (snap) => { window.FB_OFFSET = snap.val() || 0; });
+
   onValue(ref(db, 'avel'), (snap) => {
     avel = snap.val() ? avNormalize(snap.val()) : null;
     renderAvelAdmin();
@@ -139,13 +142,39 @@ function fbSetGalerapagos(g){
 function fbSetAvel(a){
   if (ONLINE){
     const { db, ref, set } = window.FB;
-    set(ref(db, 'avel'), a);
+    // Écriture refusée (souvent : règle « avel » absente dans Firebase) → on le dit au lieu d'échouer en silence
+    set(ref(db, 'avel'), a).catch((e) => {
+      console.error('Écriture Chroniques d\'Avel refusée :', e);
+      toast('Firebase refuse l\'écriture : ajoute la règle « avel » dans la base.');
+    });
   } else {
     avel = a ? avNormalize(a) : null;
     renderAvelAdmin();
     if(currentViewerPseudo) renderAvelViewer(currentViewerPseudo);
     renderViewerIdle();
   }
+}
+
+// Transaction sur le nœud « avel » : si deux joueurs agissent dans la même seconde, Firebase
+// rejoue automatiquement la modification perdue (indispensable au tour libre).
+// update(cur) reçoit l'état actuel et renvoie le nouvel état, ou undefined pour annuler.
+function fbTxAvel(update){
+  if (ONLINE && window.FB.runTransaction){
+    const { db, ref, runTransaction } = window.FB;
+    return runTransaction(ref(db, 'avel'), update).catch((e) => {
+      console.error('Écriture Chroniques d\'Avel refusée :', e);
+      toast('Firebase refuse l\'écriture : ajoute la règle « avel » dans la base.');
+      return { committed:false };
+    });
+  }
+  const r = update(avel ? JSON.parse(JSON.stringify(avel)) : null);
+  if (r !== undefined){
+    avel = r ? avNormalize(r) : null;
+    renderAvelAdmin();
+    if(currentViewerPseudo) renderAvelViewer(currentViewerPseudo);
+    renderViewerIdle();
+  }
+  return Promise.resolve({ committed: r !== undefined });
 }
 
 // Firebase keys can't contain . # $ [ ] / — sanitize pseudo
