@@ -58,6 +58,14 @@
   --tile-face:   #3b2208;               /* tuile révélée */
   --tile-castle: #4a2c0c;               /* tuile du château */
   --tile-hidden: rgba(197,148,99,.10);  /* tuile face cachée */
+  /* Dés (combat, lac) */
+  --die-vert:   #9dcf7a;
+  --die-orange: #f08a24;
+  --die-bleu:   #1e88ff;
+  --die-jaune:  #f2c94c;
+  --die-violet: #c62fe0;
+  --die-noir:   #000000;
+  --die-ink:    #2a1500;   /* sort ✨ dessiné sur les dés clairs */
 
 
   /* ─── Espacements de la vue meneur (LEVIERS DE CALAGE : ajuste ces valeurs) ─── */
@@ -663,4 +671,49 @@
   .action-row .dd { flex:1; max-width:none; }
   .av-legend { position:static; justify-content:center; margin-top:.6rem; }
   .av-map { flex-direction:column; align-items:center; padding-bottom:.8rem; }
+}
+
+/* ── Combat (lot 4) ── */
+.av-fight { border:1px solid var(--text-body); border-radius:12px; background:linear-gradient(165deg,var(--bg-section),var(--bg-page)); padding:1.6rem 1.8rem; margin-bottom:1rem; box-shadow:0 10px 30px var(--shadow-strong); animation:avToastIn .35s ease-out; }
+.av-fight-title { font-family:'Marcellus',serif; color:var(--text-title); font-size:1.5rem; margin-bottom:1.2rem; display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap; }
+.av-fight-rolls { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.4rem; }
+.av-roll { border:1px solid var(--border); border-radius:8px; padding:.8rem 1rem; background:var(--surface-sunken-soft); }
+.av-roll-title { font-family:'Marcellus',serif; color:var(--text-title); font-size:.95rem; margin-bottom:.6rem; }
+.av-dice { display:flex; flex-wrap:wrap; gap:.6rem; min-height:48px; }
+.av-die { position:relative; width:48px; height:48px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
+.av-die img { width:32px; height:32px; image-rendering:pixelated; }
+.av-die svg { width:26px; height:26px; fill:var(--die-ink); }
+.av-die.die-vert   { background:var(--die-vert); }
+.av-die.die-orange { background:var(--die-orange); }
+.av-die.die-bleu   { background:var(--die-bleu); }
+.av-die.die-bleu svg, .av-die.die-violet svg, .av-die.die-noir svg { fill:var(--text-title); }
+.av-die.die-jaune  { background:var(--die-jaune); }
+.av-die.die-violet { background:var(--die-violet); }
+.av-die.die-noir   { background:var(--die-noir); border:1px solid var(--border); }
+.av-die.is-reroll::after { content:'↻'; position:absolute; top:-7px; right:-7px; width:16px; height:16px; border-radius:50%; background:var(--bg-page); border:1px solid var(--text-body); color:var(--text-title); font-size:10px; line-height:14px; text-align:center; }
+.av-fight-res-title { font-family:'Marcellus',serif; color:var(--text-body); font-size:1.1rem; letter-spacing:.03em; margin-bottom:.5rem; }
+.av-fight-res p { font-size:.95rem; line-height:1.6; color:var(--text-body); margin:0 0 .6rem; min-height:1.6em; }
+.av-fight-res .av-fight-notes { font-size:.85rem; font-style:italic; min-height:0; }
+.av-fight-cta { display:flex; flex-wrap:wrap; align-items:center; gap:1rem; margin-top:1rem; }
+.av-mon-pv { color:var(--text-body); font-size:.9rem; white-space:nowrap; }
+/* Animation de lancer : chaque dé apparaît en tournant, faces qui défilent (JS), puis texte écrit */
+.av-fight.is-rolling .av-die { opacity:0; animation:avDieIn .65s cubic-bezier(.2,.8,.3,1.2) forwards; }
+.av-fight.is-rolling .av-fight-cta { visibility:hidden; }
+.av-die.is-landed { animation:avDieLand .25s ease-out !important; opacity:1 !important; }
+@keyframes avDieIn { 0%{ opacity:0; transform:translateY(-14px) rotate(-200deg) scale(.6); } 60%{ opacity:1; transform:translateY(3px) rotate(15deg) scale(1.05); } 100%{ opacity:1; transform:none; } }
+@keyframes avDieLand { 0%{ transform:scale(1.15); } 100%{ transform:none; } }
+@media (prefers-reduced-motion: reduce){ .av-fight.is-rolling .av-die { animation:none; opacity:1; } }
+/* Modale Victoire / Défaite */
+.av-end-sub { font-family:'Marcellus',serif; color:var(--text-body); font-size:1.05rem; letter-spacing:.03em; margin:.2rem 0 .6rem; }
+.av-end-p { font-size:.95rem; line-height:1.6; color:var(--text-body); margin:0 0 .7rem; }
+.discard-list { display:flex; flex-direction:column; gap:.35rem; }
+.discard-row { display:flex; justify-content:space-between; align-items:center; gap:1rem; width:100%; padding:.75rem .9rem; background:var(--surface-sunken-soft); border:1px solid transparent; border-radius:6px; color:var(--text-title); font:inherit; font-size:.95rem; cursor:pointer; text-align:left; transition:all .15s; }
+.discard-row strong { font-weight:400; }
+.discard-row:hover { border-color:var(--danger); background:var(--danger-soft); }
+@media(max-width:600px){
+  .av-fight { padding:1.1rem 1rem; }
+  .av-fight-title { font-size:1.2rem; }
+  .av-fight-rolls { grid-template-columns:1fr; }
+  .av-die { width:40px; height:40px; }
+  .av-die img { width:26px; height:26px; }
 }

@@ -54,11 +54,11 @@ function avRoll(color){ const f=AV_DICE[color]; return f[Math.floor(Math.random(
 // ── HÉROS (couleurs = tokens --hero-1..6 de styles.css) ──
 const AV_HEROES = [
   { nom:'Aldric',     ini:'A' },
-  { nom:'Ysolde',     ini:'Y' },
+  { nom:'Ysolde',     ini:'Y', f:true },
   { nom:'Gaspard',    ini:'G' },
-  { nom:'Mélusine',   ini:'M' },
+  { nom:'Mélusine',   ini:'M', f:true },
   { nom:'Théobald',   ini:'T' },
-  { nom:'Brunehilde', ini:'B' },
+  { nom:'Brunehilde', ini:'B', f:true },
 ];
 const AV_SLOTS = [ ['arme','Arme'], ['bouclier','Bouclier'], ['casque','Casque'] ];
 
@@ -141,6 +141,52 @@ const AV_MONSTERS = {
 };
 const AV_MONSTER_COPIES = 2;
 
+// ── COMBAT ──
+// dice : dés lancés par le monstre · loot : récompense { coins, item, upg }
+// malus (grands monstres) : vert = 1 dé vert en moins · couleur = 1 dé orange, bleu et jaune en moins ·
+// arme / bouclier / casque = effets de cet emplacement bloqués · elixir = élixirs interdits
+const AV_MON_COMBAT = {
+  chauve:    { dice:['violet'],                         loot:{ coins:2 } },
+  rat:       { dice:['violet','violet'],                loot:{ coins:2 } },
+  follet:    { dice:['noir'],                           loot:{ item:1 } },
+  gobelin:   { dice:['violet','noir'],                  loot:{ coins:3 } },
+  loup:      { dice:['noir','violet'],                  loot:{ item:1 } },
+  araignee:  { dice:['violet','violet'],                loot:{ coins:3 } },
+  serpent:   { dice:['noir'],                           loot:{ upg:1 } },
+  squelette: { dice:['violet','noir'],                  loot:{ item:1 } },
+  ours:      { dice:['noir','noir'],                    loot:{ item:1, coins:2 }, malus:'vert' },
+  basilic:   { dice:['noir','violet','violet'],         loot:{ upg:1, coins:2 },  malus:'bouclier' },
+  troll:     { dice:['noir','noir','violet'],           loot:{ item:1, coins:2 }, malus:'arme' },
+  liche:     { dice:['noir','noir','violet'],           loot:{ upg:1, coins:2 },  malus:'elixir' },
+  minotaure: { dice:['noir','noir','noir'],             loot:{ item:1, coins:2 }, malus:'casque' },
+  wyverne:   { dice:['noir','noir','noir','violet'],    loot:{ item:1, coins:4 }, malus:'couleur' },
+};
+const AV_MALUS_LABEL = { vert:'1 dé vert en moins', couleur:'1 dé orange, bleu et jaune en moins', arme:'tes effets d\'arme sont bloqués', bouclier:'tes effets de bouclier sont bloqués', casque:'tes effets de casque sont bloqués', elixir:'élixirs interdits' };
+const AV_CLASHES = 3;                 // affrontements maximum par combat
+const AV_HERO_DICE = 2;               // dés verts de base
+const AV_COMBAT_ELIXIRS = { elixForce:'orange', elixGarde:'bleu', elixArcane:'jaune' };
+// Effets des objets en combat (lus par le moteur). dice : dés en plus à chaque affrontement ·
+// att / def : +1 ⚔️ / +1 🛡️ une fois par combat (contre une famille, ou '*' = toutes) ·
+// reroll : relance de dés vides, une fois par combat · monReroll : fait relancer une attaque du monstre ·
+// heal : PV rendus après une victoire
+const AV_FX = {
+  epee:     { base:{ dice:{orange:1} },                       up:{ dice:{orange:2} } },
+  hache:    { base:{ att:'bete' },                            up:{ dice:{orange:1}, att:'bete' } },
+  masse:    { base:{ att:'maudit' },                          up:{ dice:{orange:1}, att:'maudit' } },
+  lance:    { base:{ att:'brute' },                           up:{ dice:{orange:1}, att:'brute' } },
+  baton:    { base:{ dice:{jaune:1} },                        up:{ dice:{jaune:2} } },
+  dague:    { base:{ reroll:{ n:1, colors:['vert'] } },       up:{ reroll:{ n:2, colors:null } } },
+  rondache: { base:{ dice:{bleu:1} },                         up:{ dice:{bleu:2} } },
+  pavois:   { base:{ def:'brute' },                           up:{ dice:{bleu:1}, def:'brute' } },
+  runique:  { base:{ def:'maudit' },                          up:{ dice:{bleu:1}, def:'maudit' } },
+  ecu:      { base:{ def:'bete' },                            up:{ dice:{bleu:1}, def:'bete' } },
+  targe:    { base:{ monReroll:['violet'] },                  up:{ monReroll:['noir','violet'] } },
+  heaume:   { base:{ reroll:{ n:1, colors:['vert'] } },       up:{ dice:{vert:1} } },
+  capuche:  { base:{ dice:{jaune:1} },                        up:{ dice:{jaune:1}, reroll:{ n:1, colors:['jaune'] } } },
+  cornes:   { base:{ att:'*' },                               up:{ dice:{orange:1} } },
+  couronne: { base:{ heal:1 },                                up:{ heal:2 } },
+};
+
 const AV_DIRS = [ [0,-1,'nord'], [1,-1,'nord-est'], [1,0,'sud-est'], [0,1,'sud'], [-1,1,'sud-ouest'], [-1,0,'nord-ouest'] ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -206,6 +252,15 @@ function avNormalize(st){
     if(h.pick){ h.pick.opts=avArr(h.pick.opts); if(!h.pick.opts.length) h.pick=null; }
     else h.pick=null;
     if(!h.dice) h.dice=null;
+    if(typeof h.ko!=='boolean') h.ko=false;
+    if(typeof h.discard!=='number') h.discard=0;
+    if(h.fight){
+      const f=h.fight;
+      f.rounds=avArr(f.rounds).map(r=>{ r.hd=avArr(r.hd); r.md=avArr(r.md); r.text=avArr(r.text); r.notes=avArr(r.notes); return r; });
+      f.used=(f.used && typeof f.used==='object') ? f.used : {};
+      if(typeof f.clash!=='number') f.clash=f.rounds.length;
+      if(!f.over) f.over=null;
+    } else h.fight=null;
   });
   Object.keys(st.tiles).forEach(key=>{
     const t=st.tiles[key];
@@ -214,6 +269,18 @@ function avNormalize(st){
     if(typeof t.sc!=='boolean')   t.sc=false;
     if(typeof t.seal!=='boolean') t.seal=false;
   });
+  // Partie lancée avec une version précédente du jeu : on crée ce qui manque
+  if(st.heroes.length){
+    if(!st.limit){
+      st.limit=avLimit(st.heroes.length);
+      st.seals=st.limit-Object.values(st.tiles).filter(t=>t.seal).length;
+    }
+    if(!st.poolInit){   // pioche d'objets : tout le catalogue, moins les objets déjà détenus
+      const pool=avBuildPool();
+      st.heroes.forEach(h=>avAllItems(h).forEach(it=>{ const i=pool.indexOf(it.k); if(i>=0) pool.splice(i,1); }));
+      st.pool=pool; st.poolInit=true;
+    }
+  }
   return st;
 }
 
@@ -349,15 +416,22 @@ function avActsLeft(st, pseudo){ const p=st.players[pseudo]; return p ? Math.max
 // Ce qui empêche un héros d'agir (objet à choisir, amélioration à placer, sac qui déborde)
 function avBlocker(h){
   if(!h) return 'no';
+  if(h.ko) return 'ko';
   if(h.pick) return 'pick';
   if(h.upg>0) return 'upg';
+  if(h.discard>0) return 'discard';
+  if(avFighting(h)) return 'fight';
   if(avOverflow(h)) return 'bag';
   return null;
 }
+function avFighting(h){ return !!(h && h.fight && !h.fight.over); }
 function avCanAct(st, pseudo){
   return !!st && st.active && st.phase==='play' && avActsLeft(st,pseudo)>0 && !avBlocker(avHeroOf(st,pseudo));
 }
-function avAllDone(st){ return Object.keys(st.players).filter(ps=>avHeroOf(st,ps)).every(ps=>avActsLeft(st,ps)===0); }
+function avAllDone(st){
+  if(st.heroes.some(avFighting)) return false;   // on ne termine pas le tour pendant un combat
+  return Object.keys(st.players).filter(ps=>avHeroOf(st,ps)).every(ps=>avActsLeft(st,ps)===0);
+}
 
 // Une action jouée : on la décompte, et le tour se termine si tout le monde a joué
 function avSpend(st, pseudo){
@@ -366,6 +440,13 @@ function avSpend(st, pseudo){
 }
 function avEndRound(st){
   Object.values(st.players).forEach(p=>{ p.acts=0; });
+  st.heroes.forEach(h=>{
+    if(avFighting(h)){ h.fight.over='timeout'; avUnlockMonster(st, h.fight); }
+    if(h.ko){
+      h.ko=false; h.pv=AV_PV_MAX; h.pos='0,0';
+      avLog(st, '🌅 '+avHeroDef(h.id).nom+' se réveille au château, PV au maximum.');
+    }
+  });
   st.moon=Math.min(st.moon+1, AV_MOON_TRACK.length-1);
   const sym=AV_MOON_TRACK[st.moon], R=st.round;
   if(sym==='lair'){
@@ -404,6 +485,9 @@ function avAction(pseudo, fn){
     if(b==='pick') return 'Choisis d\'abord ton objet.';
     if(b==='upg')  return 'Choisis d\'abord l\'objet à améliorer.';
     if(b==='bag')  return 'Ton sac déborde : jette quelque chose d\'abord.';
+    if(b==='ko')   return 'Ton héros est évanoui jusqu\'au prochain tour.';
+    if(b==='discard') return 'Défausse d\'abord un objet.';
+    if(b==='fight') return 'Termine d\'abord ton combat.';
     const t=st.tiles[h.pos];
     const e=fn(st, h, t, avTileDef(t)); if(e) return e;
     avSpend(st, pseudo);
@@ -471,6 +555,7 @@ function avelMarket(pseudo, ops){
       st.pool.push(it.k); h.coins+=AV_PRICE.sell; sold.push(avItemLabel(it));
     }
     if(h.coins < buys*AV_PRICE.buy) return 'Pas assez de pièces : il en faut '+(buys*AV_PRICE.buy)+'.';
+    if(buys && !st.pool.length) return 'La pioche d\'objets est vide : le marchand n\'a plus rien à vendre.';
     h.coins-=buys*AV_PRICE.buy;
     const parts=[];
     if(sold.length) parts.push('vend '+sold.join(' et ')+' (+'+(sold.length*AV_PRICE.sell)+' 🪙)');
@@ -589,6 +674,7 @@ function avelUpgradeChoice(pseudo, id){
 }
 function avelEquip(pseudo, id){
   return avFree(pseudo, (st,h)=>{
+    if(avFighting(h)) return 'Impossible de changer d\'équipement pendant un combat.';
     const i=h.bag.findIndex(it=>it.id===id); if(i<0) return 'Objet introuvable.';
     const it=h.bag[i], slot=avItemDef(it).slot; if(slot==='elixir') return 'Un élixir ne se porte pas.';
     h.bag.splice(i,1);
@@ -597,7 +683,10 @@ function avelEquip(pseudo, id){
   });
 }
 function avelUnequip(pseudo, slot){
-  return avFree(pseudo, (st,h)=>{ if(!h.eq[slot]) return 'silent'; h.bag.push(h.eq[slot]); h.eq[slot]=null; });
+  return avFree(pseudo, (st,h)=>{
+    if(avFighting(h)) return 'Impossible de changer d\'équipement pendant un combat.';
+    if(!h.eq[slot]) return 'silent'; h.bag.push(h.eq[slot]); h.eq[slot]=null;
+  });
 }
 function avelDrop(pseudo, id){
   return avFree(pseudo, (st,h)=>{
@@ -614,6 +703,178 @@ function avelDrink(pseudo, id){
     avTakeItem(h,id); st.pool.push('soin'); h.pv=AV_PV_MAX;
     avLog(st, '🍶 '+avWho(pseudo,h)+' boit une potion de soin : PV au maximum.');
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  COMBAT (lot 4) — jusqu'à 3 affrontements. Lancer le combat coûte 1 action ;
+//  « Combattre à nouveau » et « Arrêter le combat » sont compris dans cette action.
+// ═══════════════════════════════════════════════════════════════════════════
+function avPlural(n, w){ return n+' '+w+(n>1?'s':''); }
+function avFightMonster(st, f){ const t=st.tiles[f.tile]; return t ? t.monsters.find(x=>x.id===f.mid) : null; }
+function avUnlockMonster(st, f){ const m=avFightMonster(st,f); if(m) delete m.fighter; }
+function avMonCombat(k){ return AV_MON_COMBAT[k] || { dice:['violet'], loot:{ coins:1 } }; }
+// Effets actifs des objets portés (les emplacements bloqués par le monstre sont ignorés)
+function avFxList(h, malus){
+  const out=[];
+  AV_SLOTS.forEach(([s])=>{
+    const it=h.eq[s]; if(!it || malus===s) return;
+    const fx=AV_FX[it.k]; if(!fx) return;
+    out.push({ it, slot:s, fx:(it.up ? fx.up : fx.base) });
+  });
+  return out;
+}
+// Dés lancés par le héros à chaque affrontement
+function avHeroDicePool(h, malus, elixir){
+  const pool={ vert:AV_HERO_DICE, orange:0, bleu:0, jaune:0 };
+  avFxList(h, malus).forEach(e=>{ if(e.fx.dice) Object.keys(e.fx.dice).forEach(c=>{ pool[c]+=e.fx.dice[c]; }); });
+  if(elixir && AV_COMBAT_ELIXIRS[elixir]) pool[AV_COMBAT_ELIXIRS[elixir]]++;
+  if(malus==='vert') pool.vert=Math.max(0, pool.vert-1);
+  if(malus==='couleur') ['orange','bleu','jaune'].forEach(c=>{ if(pool[c]) pool[c]--; });
+  return pool;
+}
+const AV_ORDINAL = ['premier','deuxième','troisième','quatrième'];
+
+// Un affrontement : lancers, effets, résolution, conséquences
+function avClash(st, h, f, pseudo){
+  const m=avFightMonster(st,f); if(!m) return;
+  const md=AV_MONSTERS[m.k], mc=avMonCombat(m.k), malus=mc.malus;
+  const fx=avFxList(h, malus), pool=avHeroDicePool(h, malus, f.elixir);
+  const hd=[]; ['vert','orange','bleu','jaune'].forEach(c=>{ for(let i=0;i<pool[c];i++) hd.push({ c, f:avRoll(c) }); });
+  const mdice=mc.dice.map(c=>({ c, f:avRoll(c) }));
+  const notes=[];
+  if(f.elixir && f.clash===0) notes.push(avItemDef({k:f.elixir}).nom+' : +1 dé '+AV_COMBAT_ELIXIRS[f.elixir]+' à chaque affrontement');
+  // Relances (une fois par combat chacune, automatiques sur les dés vides / une attaque du monstre)
+  fx.forEach(e=>{
+    const key='r_'+e.slot;
+    if(e.fx.reroll && !f.used[key]){
+      const c=hd.filter(d=>d.f==='vide' && (!e.fx.reroll.colors || e.fx.reroll.colors.includes(d.c))).slice(0, e.fx.reroll.n);
+      if(c.length){ c.forEach(d=>{ d.f=avRoll(d.c); d.r=1; }); f.used[key]=1; notes.push(avItemDef(e.it).nom+' : relance de '+avPlural(c.length,'dé')+' vide'+(c.length>1?'s':'')); }
+    }
+    if(e.fx.monReroll && !f.used[key]){
+      const d=mdice.find(x=>x.f==='att' && e.fx.monReroll.includes(x.c));
+      if(d){ d.f=avRoll(d.c); d.r=1; f.used[key]=1; notes.push(avItemDef(e.it).nom+' : le monstre relance une attaque'); }
+    }
+  });
+  let att=hd.filter(d=>d.f==='att').length, def=hd.filter(d=>d.f==='def').length;
+  const spells=hd.filter(d=>d.f==='sort').length;
+  const mAtt=mdice.filter(d=>d.f==='att').length, mDef=mdice.filter(d=>d.f==='def').length;
+  // Bonus +1 ⚔️ / +1 🛡️ une fois par combat
+  fx.forEach(e=>{
+    const ka='a_'+e.slot, kd='d_'+e.slot;
+    if(e.fx.att && !f.used[ka] && (e.fx.att==='*' || e.fx.att===md.fam)){ att++; f.used[ka]=1; notes.push(avItemDef(e.it).nom+' : +1 ⚔️'); }
+    if(e.fx.def && !f.used[kd] && e.fx.def===md.fam && mAtt>def){ def++; f.used[kd]=1; notes.push(avItemDef(e.it).nom+' : +1 🛡️'); }
+  });
+  // Sorts ✨ : en attaque s'ils permettent d'achever le monstre, sinon d'abord en défense
+  const left=md.res-m.dmg;
+  let sa=0, sd=0;
+  if(spells){
+    const needKill=Math.max(0, left+mDef-att);
+    if(needKill>0 && needKill<=spells){ sa=needKill; sd=spells-sa; }
+    else if(needKill===0){ sd=spells; }
+    else { sd=Math.min(spells, Math.max(0, mAtt-def)); sa=spells-sd; }
+    notes.push('✨ '+(sa?sa+' en attaque':'')+(sa&&sd?', ':'')+(sd?sd+' en défense':''));
+  }
+  att+=sa; def+=sd;
+  const blocked=Math.min(mDef, att), wounds=att-blocked, saved=Math.min(def, mAtt), hurt=mAtt-saved;
+  m.dmg=Math.min(md.res, m.dmg+wounds);
+  h.pv=Math.max(0, h.pv-hurt);
+  const R=md.res-m.dmg;
+  // Textes de résolution
+  let t1;
+  if(att===0) t1='Vous ne portez aucun coup.';
+  else if(mDef===0) t1='Le monstre n\'a obtenu aucune face de défense. Vous portez '+avPlural(att,'coup')+'.';
+  else if(wounds===0) t1='Vous portez '+avPlural(att,'coup')+', mais le monstre les bloque tous.';
+  else t1='Vous portez '+avPlural(att,'coup')+', mais le monstre bloque '+(blocked===1?'l\'une de vos attaques':blocked+' de vos attaques')+'.';
+  if(wounds>0) t1+=' Le monstre subit '+avPlural(wounds,'blessure')+(R<=0 ? '. Ses points de vie tombent à 0 !' : ' (il lui reste '+R+' PV).');
+  let t2;
+  if(mAtt===0) t2='Le monstre ne parvient pas à vous toucher.';
+  else if(hurt===0) t2='Le monstre donne '+avPlural(mAtt,'coup')+'. Heureusement, votre défense absorbe totalement l\'impact. Vous ne perdez aucun PV.';
+  else if(def===0) t2='Comme vous n\'avez fait aucun bouclier sur ce tour, vous ne pouvez rien bloquer. Vous perdez '+hurt+' PV.';
+  else t2='Le monstre donne '+avPlural(mAtt,'coup')+' ; vous en bloquez '+saved+'. Vous perdez '+hurt+' PV.';
+  f.rounds.push({ hd, md:mdice, text:['Attaque du héros : '+t1, 'Attaque du monstre : '+t2], notes });
+  f.clash++;
+  // Conséquences
+  const dead=m.dmg>=md.res, ko=h.pv<=0, who=avWho(pseudo,h);
+  if(dead){
+    const loot=mc.loot||{}, got=[];
+    st.tiles[f.tile].monsters=st.tiles[f.tile].monsters.filter(x=>x.id!==m.id);
+    if(loot.coins){ h.coins+=loot.coins; got.push('+'+loot.coins+' 🪙'); }
+    if(loot.item){ avStartPick(st, h, loot.item); got.push('un objet'); }
+    if(loot.upg){ if(avUpgradable(h).length){ h.upg+=loot.upg; got.push('une amélioration'); } else got.push('une amélioration (aucun objet à améliorer)'); }
+    const heal=fx.reduce((s,e)=>s+(e.fx.heal||0),0);
+    if(heal && !ko){ h.pv=Math.min(AV_PV_MAX, h.pv+heal); got.push('+'+heal+' PV'); }
+    f.loot=got;
+    f.over='win';
+    avLog(st, '🏆 '+who+' terrasse '+md.ico+' '+md.nom+' ! Récompense : '+got.join(', ')+'.', md.taille==='grand');
+  }
+  if(ko){
+    const lost=h.coins;
+    h.coins=0; h.ko=true;
+    h.discard=avAllItems(h).length ? 1 : 0;
+    h.players.forEach(ps=>{ if(st.players[ps]) st.players[ps].acts=avAllowance(st,ps); });   // actions du tour perdues
+    f.ko=true; f.lost=lost;
+    if(!dead){ f.over='lose'; avUnlockMonster(st,f); }
+    avLog(st, '💫 '+avHeroDef(h.id).nom+' est '+(avHeroDef(h.id).f?'évanouie':'évanoui')+' face à '+md.nom+' et perd '+avPlural(lost,'pièce')+' d\'or.', true);
+  }
+  if(!f.over && f.clash>=AV_CLASHES){
+    f.over='max'; avUnlockMonster(st,f);
+    avLog(st, '⚔️ '+who+' et '+md.nom+' se séparent après '+AV_CLASHES+' affrontements (il lui reste '+R+' PV).');
+  }
+}
+// Un combat vient de se terminer : le tour peut se finir si tout le monde a joué
+function avAfterFight(st){ if(st.phase==='play' && avAllDone(st)) avEndRound(st); }
+
+function avelFight(pseudo, mid, elixirId){
+  return avAction(pseudo, (st,h,t)=>{
+    const m=t.monsters.find(x=>x.id===mid); if(!m) return 'Ce monstre n\'est plus là.';
+    if(typeof m.fighter==='number' && m.fighter!==h.id) return 'Un autre héros combat déjà ce monstre.';
+    const mc=avMonCombat(m.k);
+    let elixir=null;
+    if(elixirId){
+      if(mc.malus==='elixir') return 'Ce monstre empêche de boire un élixir.';
+      const f=avFindItem(h, elixirId); if(!f || !AV_COMBAT_ELIXIRS[f.it.k]) return 'Élixir introuvable.';
+      avTakeItem(h, elixirId); st.pool.push(f.it.k); elixir=f.it.k;
+    }
+    m.fighter=h.id;
+    h.fight={ id:avNewId('f'), mid, k:m.k, tile:h.pos, by:pseudo, clash:0, elixir, used:{}, rounds:[], over:null };
+    const md=AV_MONSTERS[m.k];
+    avLog(st, '⚔️ '+avWho(pseudo,h)+' affronte '+md.ico+' '+md.nom+(elixir?' (avec '+avItemDef({k:elixir}).nom+')':'')+'.');
+    avClash(st, h, h.fight, pseudo);
+  });   // avSpend termine le tour si tout le monde a joué (jamais pendant un combat en cours)
+}
+function avelFightAgain(pseudo){
+  return avTx(st=>{
+    const h=avHeroOf(st,pseudo); if(!h || !avFighting(h)) return 'silent';
+    if(h.fight.by!==pseudo) return 'C\'est '+h.fight.by+' qui mène ce combat.';
+    if(h.fight.clash>=AV_CLASHES) return 'silent';
+    avClash(st, h, h.fight, pseudo);
+    if(h.fight.over) avAfterFight(st);
+  });
+}
+function avelFightStop(pseudo){
+  return avTx(st=>{
+    const h=avHeroOf(st,pseudo); if(!h || !h.fight) return 'silent';
+    if(avFighting(h)){
+      const m=avFightMonster(st,h.fight), md=AV_MONSTERS[h.fight.k]||{nom:'?'};
+      h.fight.over='stop'; avUnlockMonster(st,h.fight);
+      avLog(st, '🏃 '+avWho(pseudo,h)+' bat en retraite face à '+md.nom+(m?' (il lui reste '+(md.res-m.dmg)+' PV)':'')+'.');
+      avAfterFight(st);
+    }
+    h.fight=null;   // ferme le module
+  });
+}
+// Défausse obligatoire après une défaite
+function avelDiscard(pseudo, id){
+  return avFree(pseudo, (st,h)=>{
+    if(!(h.discard>0)) return 'silent';
+    const it=avTakeItem(h,id); if(!it) return 'Objet introuvable.';
+    st.pool.push(it.k); h.discard=avAllItems(h).length ? h.discard-1 : 0;
+    avLog(st, '🗑️ '+avWho(pseudo,h)+' perd '+avItemLabel(it)+' dans sa chute.');
+  });
+}
+function avelFightFromUi(pseudo, mid){
+  const v=avSel('av-elx-'+mid);
+  avelFight(pseudo, mid, v||null);
 }
 
 // Lecture des menus déroulants au clic (le choix lui-même ne déclenche rien)
@@ -680,7 +941,7 @@ function avelLaunch(){
     const order=Object.values(st.players).sort((a,b)=>(a.at||0)-(b.at||0)).map(p=>p.pseudo);
     if(!order.length) return 'Il faut au moins 1 joueur.';
     const nH=Math.min(order.length, AV_MAX_HEROES);
-    st.pool=avBuildPool();
+    st.pool=avBuildPool(); st.poolInit=true;
     st.heroes=[];
     for(let i=0;i<nH;i++){
       const h={ id:i, pv:AV_PV_MAX, coins:AV_START_COINS, pos:'0,0', eq:{ arme:null, bouclier:null, casque:null }, bag:[], upg:0, pick:null, dice:null, players:[] };
@@ -823,7 +1084,9 @@ function avPlayersHtml(st, mePseudo){
       const isMe=ps===mePseudo, mine=me && me.id===h.id;
       const click=(!mine) ? ' av-clickable" role="button" tabindex="0" onclick="avelShowHero('+h.id+')" onkeydown="if(event.key===\'Enter\')avelShowHero('+h.id+')' : '';
       let status='', out=false;
-      if(st.phase==='play'){
+      if(h.ko){ status='<span class="player-status">évanoui'+(avHeroDef(h.id).f?'e':'')+'</span>'; out=true; }
+      else if(avFighting(h)) status='<span class="player-status">en combat</span>';
+      else if(st.phase==='play'){
         const left=avActsLeft(st,ps);
         if(left>0) status='<span class="player-status">'+left+' action'+(left>1?'s':'')+'</span>';
         else { status='<span class="player-status">a joué</span>'; out=true; }
@@ -895,14 +1158,7 @@ function avSlotLabel(slot){ return slot==='elixir' ? 'Élixir' : ((AV_SLOTS.find
 function avAlertHtml(st, h, pseudo){
   const esc=escAttr(pseudo);
   if(h.pick){
-    const cards=h.pick.opts.map((k,i)=>{
-      const d=AV_ITEMS[k]||{nom:'?',ico:'?',slot:'',base:''};
-      const v=d.slot==='elixir'?AV_VOL.elixir:AV_VOL.equip;
-      return '<button class="pick-card" onclick="avelPick(\''+esc+'\','+i+')">'+
-        '<span class="pick-card-ico">'+d.ico+'</span><span class="pick-card-name">'+escHtml(d.nom)+'</span>'+
-        '<span class="pick-card-slot">'+escHtml(avSlotLabel(d.slot))+' · '+v+' place'+(v>1?'s':'')+'</span>'+
-        '<span class="pick-card-fx">'+escHtml(d.base)+'</span></button>';
-    }).join('');
+    const cards=avPickCards(h, pseudo);
     return '<div class="av-alert"><div class="av-alert-title">🎁 Choisis ton objet'+((h.pick.left||1)>1?' ('+h.pick.left+' à choisir)':'')+' — '+avTimerSpan(h.pick.until)+'</div>'+
       '<div class="pick-grid">'+cards+'</div><div class="action-row-sub">Sans choix à la fin du temps, un objet est pris au hasard.</div></div>';
   }
@@ -911,6 +1167,13 @@ function avAlertHtml(st, h, pseudo){
     return '<div class="av-alert"><div class="av-alert-title">✨ Choisis l\'objet à améliorer</div>'+
       '<div class="action-row"><span class="action-row-label"><select class="dd" id="av-upg-sel">'+opts.join('')+'</select></span>'+
       avBtn('btn-secondary','Améliorer','avelUpgChoiceFromUi(\''+esc+'\')',false)+'</div></div>';
+  }
+  if(h.discard>0){
+    return '<div class="av-alert is-danger"><div class="av-alert-title">🗑️ Défausse 1 objet (défaite)</div>'+avDiscardRows(h, pseudo)+'</div>';
+  }
+  if(h.ko){
+    return '<div class="av-alert is-danger"><div class="av-alert-title">💫 '+escHtml(avHeroDef(h.id).nom)+' est '+(avHeroDef(h.id).f?'évanouie':'évanoui')+'</div>'+
+      '<div class="action-row-sub">Réveil au château au début du prochain tour, avec tous ses PV.</div></div>';
   }
   if(avOverflow(h)){
     return '<div class="av-alert is-danger"><div class="av-alert-title">🎒 Ton sac déborde ('+avBagVol(h)+'/'+AV_BAG_CAP+' places)</div>'+
@@ -942,29 +1205,38 @@ function avActionsHtml(st, pseudo){
        avBtn('btn-secondary','Donner','avelGiveFromUi(\''+esc+'\','+o.id+')',!can, monsterHere?'Impossible avec un monstre sur la tuile':(!giveOk?'Seulement s\'il te reste des actions ce tour':''))+'</span></div>';
   });
   t.monsters.forEach(m=>{
-    const md=AV_MONSTERS[m.k]||{nom:'?',ico:'?',res:0,fam:''}, fam=AV_FAMS[md.fam];
-    z+='<div class="action-row"><span class="action-row-label">'+md.ico+' '+escHtml(md.nom)+' <span class="action-row-sub">'+(fam?fam.ico+' '+fam.nom+' · ':'')+'résistance '+(md.res-(m.dmg||0))+'/'+md.res+'</span></span>'+
-       avBtn('btn-secondary','Combattre','',true,'Le combat arrive au prochain lot')+'</div>';
+    const md=AV_MONSTERS[m.k]||{nom:'?',ico:'?',res:0,fam:''}, fam=AV_FAMS[md.fam], mc=avMonCombat(m.k);
+    const busy=typeof m.fighter==='number' && m.fighter!==h.id;
+    const elix=mc.malus==='elixir' ? [] : h.bag.filter(it=>AV_COMBAT_ELIXIRS[it.k]);
+    const sub=[(fam?fam.ico+' '+fam.nom:''), (mc.malus?'⚠️ '+AV_MALUS_LABEL[mc.malus]:''), (busy?'en combat avec '+avHeroDef(m.fighter).nom:'')].filter(Boolean).join(' · ');
+    z+='<div class="action-row"><span class="action-row-label">'+md.ico+' '+escHtml(md.nom)+' <span class="av-mon-pv">❤️ '+(md.res-(m.dmg||0))+'/'+md.res+'</span>'+
+       (sub?' <span class="action-row-sub">'+escHtml(sub)+'</span>':'')+'</span>'+
+       '<span class="action-row-ctrl">'+
+       (elix.length ? '<select class="dd" id="av-elx-'+m.id+'"><option value="">Sans élixir</option>'+elix.map(it=>avOpt(it.id, avItemDef(it).nom)).join('')+'</select>' : '')+
+       avBtn('btn-secondary','Combattre','avelFightFromUi(\''+esc+'\',\''+m.id+'\')', !my || busy, busy?'Un autre héros combat déjà ce monstre':'')+'</span></div>';
   });
-  let hint, can=my;
-  if(def.act==='coins'){ hint = monsterHere ? 'Un monstre rôde : impossible d\'aider les habitants.' : 'Aider les habitants : +'+AV_COIN_GAIN+' pièces d\'or.'; can = my && !monsterHere; }
-  else if(def.act) hint=avPlaceHint(st, def.act);
-  else { hint='Aucune action ici.'; can=false; }
-  if(t.k==='chateau') hint='Murailles : '+st.walls+'/'+st.limit+'. '+hint;
+  const pa=avPlaceAction(st, def, monsterHere);
+  const sub = t.k==='chateau' ? 'Murailles : '+st.walls+'/'+st.limit : (pa.info||'');
   z+='<div class="action-row"><span class="action-row-label">Lieu : '+def.ico+' '+escHtml(def.nom)+(t.sc?' '+AV_ICO.shortcut:'')+
-     ' <span class="action-row-sub">'+escHtml(hint)+'</span></span>'+
-     avBtn('btn-secondary','Action de lieu','avelTileAction(\''+esc+'\')', !can)+'</div>';
+     (sub?' <span class="action-row-sub">'+escHtml(sub)+'</span>':'')+'</span>'+
+     (pa.label ? avBtn('btn-secondary', escHtml(pa.label), 'avelTileAction(\''+esc+'\')', !(my && pa.ok), pa.why||'') : '')+'</div>';
   return z;
 }
-function avPlaceHint(st, act){
-  return ({
-    marche:'Acheter un objet ('+AV_PRICE.buy+' 🪙) ou en vendre un (+'+AV_PRICE.sell+' 🪙), 2 transactions max.',
-    atelier:'Améliorer un objet ('+AV_PRICE.upgrade+' 🪙).',
-    cercle: avClosed(st,'seal') ? 'Le druide est parti.' : 'Sceller un repaire ('+AV_PRICE.seal+' 🪙) · '+st.seals+' sceau(x) restant(s).',
-    carriere:'Bâtir une muraille ('+AV_PRICE.wall+' 🪙) · '+st.walls+'/'+st.limit+'.',
-    camp: avClosed(st,'trap') ? 'Les elfes sont partis.' : 'Poser un piège pour la Bête.',
-    lac:'Jeter '+AV_PRICE.lake+' pièce et lancer 2 dés verts.',
-  })[act]||'';
+// Libellé du bouton d'action de lieu (l'action précise) + petite info à gauche
+function avPlaceAction(st, def, monsterHere){
+  switch(def.act){
+    case 'coins':    return monsterHere ? { label:'Aider les habitants', ok:false, why:'Un monstre rôde ici', info:'Un monstre rôde ici' }
+                                        : { label:'Aider les habitants (+'+AV_COIN_GAIN+' 🪙)', ok:true };
+    case 'marche':   return { label:'Acheter / vendre', ok:true, info:'Achat '+AV_PRICE.buy+' 🪙 · vente +'+AV_PRICE.sell+' 🪙' };
+    case 'atelier':  return { label:'Améliorer un objet ('+AV_PRICE.upgrade+' 🪙)', ok:true };
+    case 'cercle':   return avClosed(st,'seal') ? { label:'Le druide est parti', ok:false }
+                          : { label:'Sceller un repaire ('+AV_PRICE.seal+' 🪙)', ok:st.seals>0, info:st.seals+' sceau(x) restant(s)' };
+    case 'carriere': return { label:'Bâtir une muraille ('+AV_PRICE.wall+' 🪙)', ok:st.walls<st.limit, info:'Murailles : '+st.walls+'/'+st.limit };
+    case 'camp':     return avClosed(st,'trap') ? { label:'Les elfes sont partis', ok:false }
+                          : { label:'Poser un piège', ok:st.traps.length<st.limit, info:'Pièges : '+st.traps.length+'/'+st.limit };
+    case 'lac':      return { label:'Lancer les dés ('+AV_PRICE.lake+' 🪙)', ok:true };
+    default:         return { label:'', ok:false, info:'Aucune action ici' };
+  }
 }
 function avInventoryHtml(h, pseudo){
   const esc=escAttr(pseudo);
@@ -1016,6 +1288,7 @@ function renderAvelViewer(pseudo){
   avFeedToast(st);
   const h=avHeroOf(st,pseudo);
   if(!h){
+    avSet('av-fight','');
     board.style.display='none'; lobby.style.display='block';
     avSet('av-instruction','');
     avSet('av-lobby','<div class="diamant-voted">👀 Une partie est en cours. Tu joueras à la prochaine ! Clique sur un joueur pour suivre son héros.</div>'+
@@ -1035,6 +1308,7 @@ function renderAvelViewer(pseudo){
   }
   avSet('av-instruction', ins);
   avKeepSelects('av-alert', ()=>avSet('av-alert', avAlertHtml(st,h,pseudo)));
+  avRenderFight(st, h, pseudo);
 
   const keys=[h.pos].concat(avNeighbors(st,h.pos).map(n=>n.key));
   avSet('av-map', avMapSvg(st, keys, h.pos, false)+avLegendHtml());
@@ -1046,6 +1320,161 @@ function renderAvelViewer(pseudo){
   avKeepSelects('av-actions', ()=>avSet('av-actions', avActionsHtml(st, pseudo)));
   avSet('av-inventory', avInventoryHtml(h, pseudo));
   avRefreshModal();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  RENDU : COMBAT (module en haut du jeu + modales Victoire / Défaite)
+// ═══════════════════════════════════════════════════════════════════════════
+const AV_DIE_IMG = {
+  hero:    { att:'images/avel/de-heros-attaque.png',   def:'images/avel/de-heros-defense.png' },
+  monster: { att:'images/avel/de-monstre-attaque.png', def:'images/avel/de-monstre-defense.png' },
+};
+const AV_FACE_LABEL = { att:'Attaque', def:'Défense', sort:'Sort', vide:'Face vide' };
+const AV_SPELL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/><circle cx="19" cy="4.5" r="1.6"/><circle cx="5" cy="18.5" r="1.3"/></svg>';
+function avFaceInner(side, face){
+  if(face==='sort') return AV_SPELL_SVG;
+  const src=AV_DIE_IMG[side][face];
+  return src ? '<img src="'+src+'" alt="">' : '';
+}
+function avDieHtml(side, d, i){
+  return '<span class="av-die die-'+d.c+(d.r?' is-reroll':'')+'" data-side="'+side+'" data-c="'+d.c+'" data-i="'+i+'" title="'+AV_FACE_LABEL[d.f]+(d.r?' (relancé)':'')+'" aria-label="'+AV_FACE_LABEL[d.f]+'">'+avFaceInner(side, d.f)+'</span>';
+}
+function avFightHtml(st, h, pseudo){
+  const f=h.fight; if(!f) return '';
+  const md=AV_MONSTERS[f.k]||{nom:'?',ico:'?',res:0}, r=f.rounds[f.rounds.length-1]; if(!r) return '';
+  const m=avFightMonster(st,f), esc=escAttr(pseudo), mine=f.by===pseudo;
+  const hn=avHeroDef(h.id).nom;
+  let cta='';
+  if(!f.over){
+    cta=(mine && f.clash<AV_CLASHES ? avBtn('btn-secondary','Combattre à nouveau ('+f.clash+'/'+AV_CLASHES+')','avelFightAgain(\''+esc+'\')',false) : '')+
+        avBtn('btn-secondary','Arrêter le combat','avelFightStop(\''+esc+'\')',false);
+    if(!mine) cta='<span class="action-row-sub">'+escHtml(f.by)+' mène ce combat.</span>'+cta;
+  } else {
+    cta=avBtn('btn-secondary','Fermer','avelFightStop(\''+esc+'\')',false);
+  }
+  const pv = m ? ' <span class="action-row-sub">❤️ '+(md.res-m.dmg)+'/'+md.res+'</span>' : '';
+  return '<div class="av-fight" id="av-fight-box" data-key="'+escHtml(f.id+'_'+f.clash)+'">'+
+    '<div class="av-fight-title">'+escHtml(hn)+' vs '+escHtml(md.nom)+pv+'</div>'+
+    '<div class="av-fight-rolls">'+
+      '<div class="av-roll"><div class="av-roll-title">Mon lancer</div><div class="av-dice">'+r.hd.map((d,i)=>avDieHtml('hero',d,i)).join('')+'</div></div>'+
+      '<div class="av-roll"><div class="av-roll-title">Lancer : '+escHtml(md.nom)+'</div><div class="av-dice">'+r.md.map((d,i)=>avDieHtml('monster',d,i)).join('')+'</div></div>'+
+    '</div>'+
+    '<div class="av-fight-res">'+
+      '<div class="av-fight-res-title">Résolution, '+AV_ORDINAL[f.clash-1]+' affrontement</div>'+
+      r.text.map(t=>'<p class="av-type">'+escHtml(t)+'</p>').join('')+
+      (r.notes.length ? '<p class="av-fight-notes av-type">'+escHtml(r.notes.join(' · '))+'</p>' : '')+
+    '</div>'+
+    '<div class="av-fight-cta">'+cta+'</div>'+
+  '</div>';
+}
+
+// Animation : dés du joueur puis du monstre (faces qui défilent), puis texte écrit lettre à lettre.
+// Jouée une seule fois par affrontement et par écran.
+const AV_DIE_STEP=170, AV_DIE_ROLL=650, AV_TYPE_MS=14;
+let avFightSeen={}, avFightTimers=[];
+function avFightAnimMs(el){
+  const nh=el.querySelectorAll('.av-die[data-side="hero"]').length, nm=el.querySelectorAll('.av-die[data-side="monster"]').length;
+  const typed=[...el.querySelectorAll('.av-type')].reduce((s,p)=>s+(p.getAttribute('data-full')||p.textContent).length,0);
+  return nh*AV_DIE_STEP + 250 + nm*AV_DIE_STEP + AV_DIE_ROLL + typed*AV_TYPE_MS;
+}
+function avAnimateFight(el, onDone){
+  avFightTimers.forEach(clearTimeout); avFightTimers=[];
+  const reduce = typeof matchMedia!=='undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduce){ if(onDone) onDone(); return; }
+  el.classList.add('is-rolling');
+  const later=(fn,ms)=>avFightTimers.push(setTimeout(fn,ms));
+  const dice=[...el.querySelectorAll('.av-die')];
+  const nh=dice.filter(d=>d.getAttribute('data-side')==='hero').length;
+  let tEnd=0;
+  dice.forEach((d,idx)=>{
+    const side=d.getAttribute('data-side'), c=d.getAttribute('data-c'), final=d.innerHTML;
+    const start = side==='hero' ? idx*AV_DIE_STEP : nh*AV_DIE_STEP + 250 + (idx-nh)*AV_DIE_STEP;
+    d.style.animationDelay=start+'ms';
+    const faces=AV_DICE[c]||['vide'];
+    for(let t=0;t<AV_DIE_ROLL;t+=90) later(()=>{ d.innerHTML=avFaceInner(side, faces[Math.floor(Math.random()*faces.length)]); }, start+t);
+    later(()=>{ d.innerHTML=final; d.classList.add('is-landed'); }, start+AV_DIE_ROLL);
+    tEnd=Math.max(tEnd, start+AV_DIE_ROLL);
+  });
+  // Texte de résolution écrit lettre à lettre
+  const ps=[...el.querySelectorAll('.av-type')];
+  ps.forEach(p=>{ p.setAttribute('data-full', p.textContent); p.textContent=''; });
+  let t=tEnd+200;
+  ps.forEach(p=>{
+    const full=p.getAttribute('data-full');
+    for(let i=1;i<=full.length;i++){ const n=i; later(()=>{ p.textContent=full.slice(0,n); }, t+n*AV_TYPE_MS); }
+    t+=full.length*AV_TYPE_MS+120;
+  });
+  later(()=>{ el.classList.remove('is-rolling'); if(onDone) onDone(); }, t);
+}
+function avRenderFight(st, h, pseudo){
+  const el=document.getElementById('av-fight'); if(!el) return;
+  const html=avFightHtml(st, h, pseudo);
+  const changed=el.__avHtml!==html;
+  avSet('av-fight', html);
+  const f=h.fight;
+  if(!changed || !f) return;
+  const box=document.getElementById('av-fight-box'); if(!box) return;
+  const key=f.id+'_'+f.clash;
+  const openEnd=()=>{ if(f.over==='win' || f.ko) avMaybeOpenFightEnd(f.id); };
+  if(avFightSeen[key]) { openEnd(); return; }
+  avFightSeen[key]=true;
+  if(typeof box.scrollIntoView==='function' && f.clash===1) box.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  avAnimateFight(box, openEnd);
+}
+let avFightEndShown={};
+function avMaybeOpenFightEnd(fid){
+  if(avFightEndShown[fid]) return;
+  avFightEndShown[fid]=true;
+  avOpenModal('fightEnd', fid);
+}
+// Contenu de la modale Victoire / Défaite
+function avFightEndHtml(st, pseudo){
+  const h=avHeroOf(st,pseudo); if(!h) return '';
+  const f=(h.fight && avModal && h.fight.id===avModal.id) ? h.fight : null;
+  const esc=escAttr(pseudo), md=f ? (AV_MONSTERS[f.k]||{nom:'le monstre'}) : null;
+  let z='';
+  if(f && f.over==='win'){
+    z+='<h2 class="rules-title">🎉 Victoire</h2>';
+    z+='<div class="av-end-sub">'+escHtml(md.nom)+' est vaincu. Récompense : '+escHtml((f.loot||[]).join(', ')||'aucune')+'.</div>';
+  }
+  if(h.pick){
+    z+='<div class="av-end-sub">Héros, choisissez votre récompense :</div>'+
+       '<div class="action-row-sub u-mt-sm">Temps restant : '+avTimerSpan(h.pick.until)+'</div>'+
+       '<div class="pick-grid u-mt-sm">'+avPickCards(h, pseudo)+'</div>';
+  } else if(h.upg>0){
+    const opts=avUpgradable(h).map(it=>avOpt(it.id, avItemDef(it).nom));
+    z+='<div class="av-end-sub">Choisissez l\'objet à améliorer :</div>'+
+       '<div class="action-row"><span class="action-row-label"><select class="dd" id="av-upg-sel">'+opts.join('')+'</select></span>'+
+       avBtn('btn-secondary','Améliorer','avelUpgChoiceFromUi(\''+esc+'\')',false)+'</div>';
+  }
+  if(h.ko || (f && f.ko)){
+    const hd=avHeroDef(h.id);
+    z+='<h2 class="rules-title'+(z?' u-mt-md':'')+'">💀 Défaite</h2>'+
+      '<div class="av-end-sub">'+(md?'Le monstre vous a défait…':'Votre héros est à terre…')+'</div>'+
+      '<p class="av-end-p">'+escHtml(hd.nom)+' est '+(hd.f?'évanouie':'évanoui')+' sur le sol.<br>Vous perdez toutes les pièces d\'or de votre sac à dos'+(f&&f.lost?' ('+f.lost+')':'')+'.'+
+        (h.discard>0?'<br>Vous devez choisir et défausser 1 équipement.':'')+'</p>'+
+      '<p class="av-end-p">Au début du prochain tour, votre héros se réveille : vous récupérez la totalité de vos PV, et vous êtes '+(hd.f?'téléportée':'téléporté')+' directement au château.</p>';
+    if(h.discard>0) z+='<div class="av-end-sub">Défausser 1 objet</div>'+avDiscardRows(h, pseudo);
+  }
+  if(!h.pick && !(h.upg>0) && !(h.discard>0)) z+='<div class="u-mt-md">'+avBtn('btn-primary','Continuer','avelHideModal()',false)+'</div>';
+  return z || '<p>Combat terminé.</p>';
+}
+function avPickCards(h, pseudo){
+  const esc=escAttr(pseudo);
+  return h.pick.opts.map((k,i)=>{
+    const d=AV_ITEMS[k]||{nom:'?',ico:'?',slot:'',base:''};
+    const v=d.slot==='elixir'?AV_VOL.elixir:AV_VOL.equip;
+    return '<button class="pick-card" onclick="avelPick(\''+esc+'\','+i+')">'+
+      '<span class="pick-card-ico">'+d.ico+'</span><span class="pick-card-name">'+escHtml(d.nom)+'</span>'+
+      '<span class="pick-card-slot">'+escHtml(avSlotLabel(d.slot))+' · '+v+' place'+(v>1?'s':'')+'</span>'+
+      '<span class="pick-card-fx">'+escHtml(d.base)+'</span></button>';
+  }).join('');
+}
+function avDiscardRows(h, pseudo){
+  const esc=escAttr(pseudo);
+  const rows=AV_SLOTS.filter(([s])=>h.eq[s]).map(([s,l])=>[l,h.eq[s]]).concat(h.bag.map(it=>['Sac à dos',it]));
+  return '<div class="discard-list">'+rows.map(([l,it])=>
+    '<button class="discard-row" onclick="avelDiscard(\''+esc+'\',\''+it.id+'\')"><span>'+escHtml(l)+'</span><strong>'+escHtml(avItemLabel(it))+'</strong></button>').join('')+'</div>';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1073,7 +1502,7 @@ function renderAvelAdmin(){
       const acts=h.players.map(ps=>escHtml(ps)+' ('+avActsLeft(st,ps)+')').join(', ');
       return '<div class="player-row">'+
         '<span class="player-name">'+escHtml(avHeroDef(h.id).nom)+' — '+acts+'</span>'+
-        '<span class="player-infos"><span class="player-info">PV '+h.pv+'/'+AV_PV_MAX+'</span><span class="player-info">Or '+h.coins+'</span><span class="player-info">Sac '+avBagVol(h)+'/'+AV_BAG_CAP+'</span><span class="player-info">'+escHtml(avTileDef(t).nom)+'</span></span></div>';
+        '<span class="player-infos">'+(h.ko?'<span class="player-info">KO</span>':'')+(avFighting(h)?'<span class="player-info">Combat</span>':'')+'<span class="player-info">PV '+h.pv+'/'+AV_PV_MAX+'</span><span class="player-info">Or '+h.coins+'</span><span class="player-info">Sac '+avBagVol(h)+'/'+AV_BAG_CAP+'</span><span class="player-info">'+escHtml(avTileDef(t).nom)+'</span></span></div>';
     }).join('');
     if(st.phase==='play'){
       ctrl='<div class="diamant-voted">Tour libre : entre parenthèses, les actions restantes de chaque joueur. Le tour se termine quand tout le monde a joué ou à la fin du minuteur.</div>'+
@@ -1116,6 +1545,7 @@ function avRefreshModal(){
   }
   else if(avModal.type==='hero') h=avHeroDetailHtml(avel, avModal.id);
   else if(avModal.type==='lieu') h=avPlaceHtml(avel, currentViewerPseudo);
+  else if(avModal.type==='fightEnd') h=avFightEndHtml(avel, currentViewerPseudo);
   avKeepSelects('avel-modal-content', ()=>avSet('avel-modal-content', h));
 }
 // Contenu de la modale « Action de lieu »
@@ -1142,7 +1572,7 @@ function avPlaceHtml(st, pseudo){
     else {
       body=coins+'<div class="stat-row"><span>Sceaux restants</span><strong>'+AV_ICO.seal+' '+st.seals+'</strong></div>'+
         (lairs.length ? row('Repaire à sceller ('+AV_PRICE.seal+' 🪙)', '<select class="dd" id="av-ce-sel">'+lairs.map(k=>avOpt(k, avTileDef(st.tiles[k]).nom)).join('')+'</select>')
-                      : '<div class="diamant-voted">Aucun repaire révélé et vide à sceller.</div>')+
+                      : '<div class="diamant-voted">Aucun repaire à sceller pour l\'instant : il faut un repaire déjà découvert et sans monstre dessus (tue d\'abord le monstre, ou explore pour en trouver un vide).</div>')+
         '<div class="action-row-sub">Un repaire scellé ne fait plus jamais apparaître de monstre.</div>';
       canGo=my && lairs.length>0 && st.seals>0;
     }
@@ -1215,7 +1645,7 @@ function avRulesHtml(){
     '<li>'+AV_ICO.shortcut+' <strong>Raccourci</strong> : depuis une tuile '+AV_ICO.shortcut+' révélée, va directement sur une autre tuile '+AV_ICO.shortcut+' révélée.</li>'+
     '<li>❤️ <strong>Repos</strong> : +'+AV_REST_HEAL+' PV (maximum '+AV_PV_MAX+').</li>'+
     '<li>🏠 <strong>Action de lieu</strong> : voir ci-dessous.</li>'+
-    '<li>⚔️ <strong>Combat</strong> : arrive bientôt.</li>'+
+    '<li>⚔️ <strong>Combattre</strong> un monstre de ta tuile : voir « Le combat ».</li>'+
     '<li>🤝 <strong>Don</strong> : gratuit, tant qu\'il te reste des actions ce tour. Donne une pièce ou un objet à un héros sur ta tuile, s\'il n\'y a pas de monstre.</li>'+
   '</ul></div>'+
   '<div class="rules-section"><h3>🏠 Les lieux (1 action)</h3><ul>'+
@@ -1227,6 +1657,16 @@ function avRulesHtml(){
     '<li>🏞️ <strong>Lac aux souhaits</strong> : '+AV_PRICE.lake+' 🪙, 2 dés verts. ⚔️⚔️ = '+AV_PRICE.lakeCoins+' 🪙 · ⚔️🛡️ = un objet · 🛡️🛡️ = une amélioration. ✨ compte comme ⚔️. Sinon une relance.</li>'+
     '<li>🏚️ <strong>Village abandonné</strong> et 🌾 <strong>Terres sauvages</strong> : +'+AV_COIN_GAIN+' 🪙, s\'il n\'y a pas de monstre.</li>'+
     '<li>À partir de 5 héros : 4 sceaux, 4 murailles et 4 pièges (le 4ᵉ coûte '+AV_TRAP_COSTS[3]+' 🪙).</li>'+
+  '</ul></div>'+
+  '<div class="rules-section"><h3>⚔️ Le combat</h3><ul>'+
+    '<li>Lancer un combat coûte <strong>1 action</strong>. Un combat dure jusqu\'à <strong>'+AV_CLASHES+' affrontements</strong> ; après chacun, tu choisis de continuer ou d\'arrêter.</li>'+
+    '<li>À chaque affrontement, tu lances '+AV_HERO_DICE+' dés verts + les dés de ton équipement (et de ton élixir, à boire avant le combat). Le monstre lance ses propres dés.</li>'+
+    '<li>Chaque ⚔️ non bloqué par une 🛡️ adverse inflige 1 blessure. ✨ compte comme ⚔️ ou 🛡️, au mieux pour toi.</li>'+
+    '<li>Les blessures du monstre restent si tu arrêtes : un autre héros peut l\'achever.</li>'+
+    '<li>Monstre vaincu : tu gagnes sa récompense (pièces, un objet à choisir parmi 3, ou une amélioration).</li>'+
+    '<li>Les <strong>grands monstres</strong> ont un malus : moins de dés, ou un emplacement d\'équipement bloqué, ou pas d\'élixir.</li>'+
+    '<li>À 0 PV, ton héros s\'évanouit : il perd toutes ses pièces et 1 objet de ton choix, et ses actions du tour. Il se réveille au château au début du tour suivant, PV au maximum.</li>'+
+    '<li>Un seul héros à la fois peut combattre un même monstre.</li>'+
   '</ul></div>'+
   '<div class="rules-section"><h3>🎒 Équipement et sac à dos</h3><ul>'+
     '<li>3 objets portés : arme, bouclier, casque. Ils ne prennent pas de place.</li>'+
@@ -1244,7 +1684,7 @@ function avRulesHtml(){
     '<li>❤️ <strong>Soin</strong> : chaque héros récupère 1 PV.</li>'+
     '<li>🗿 / 🏹 <strong>Fermetures</strong> : le cercle de pierres puis le camp des elfes ferment.</li>'+
     '<li>🌑 <strong>Lune Noire</strong> : la Bête apparaît.</li>'+
-  '</ul><p class="rules-note">Le combat et la Bête arrivent dans les prochaines versions.</p></div>';
+  '</ul><p class="rules-note">La Bête arrive dans la prochaine version.</p></div>';
 }
 if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('keydown', function(e){ if(e.key === 'Escape') avelHideModal(); });
