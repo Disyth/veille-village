@@ -13,6 +13,7 @@ const G_WOOD_WHITE     = 7;                   // ◀── LEVIER DE RISQUE : bo
 const G_MIN_PLAYERS    = 3;
 const G_MAX_PLAYERS    = 12;
 const G_FIRE_PER_SURVIVOR = 10;              // ◀── points de feu par naufragé sauvé (ajustable)
+const G_HURRICANE_WATER = 2;                  // ◀── eau récoltable pendant le tour de l'ouragan
 
 // ── Deck Épave (V2) — 54 cartes. cat : water/food/useless/obj (sub = objet précis) ──
 const G_EPAVE = [
@@ -163,8 +164,8 @@ function gStartTurn(st){
   // Tirage météo
   const card = st.weather.deck.length ? st.weather.deck.shift() : 'H';
   if(card==='H'){
-    st.weather.current=null; st.weather.isHurricane=true; st.weather.hurricaneDrawn=true;
-    gLog(st, '🌀 L\'OURAGAN approche ! Le radeau DOIT partir à la fin de ce tour, sinon tout le monde périt.');
+    st.weather.current=G_HURRICANE_WATER; st.weather.isHurricane=true; st.weather.hurricaneDrawn=true;
+    gLog(st, '🌀 L\'OURAGAN approche (+'+G_HURRICANE_WATER+' eau récoltable) ! Le radeau DOIT partir à la fin de ce tour, sinon tout le monde périt.');
   } else {
     st.weather.current=card; st.weather.isHurricane=false;
     gLog(st, 'Météo du tour '+st.turn+' : '+gWeatherLabel(card)+'.');
@@ -253,6 +254,9 @@ function galerapagosForceAction(action){
 // ── Survie des naufragés ──
 function gRunSurvival(st){
   st.phase='survival';
+  // Tour de l'ouragan : pas de distribution séparée. On vérifie d'un coup 2 eau + 2 nourriture
+  // par survivant (le tour + le voyage) et une place chacun ; sinon vote jusqu'à ce que ça tienne.
+  if(st.weather.hurricaneDrawn){ gTryEmbark(st,true); return; }
   gResolveResource(st,'water');
 }
 
@@ -482,7 +486,8 @@ function galerapagosPlayObject(pseudo, cardId){
   else if(sub==='sardines'){  c.food =Math.min(36,c.food +3); discard(); gLog(st, pseudo+' mange des Sardines 🐟 (+3 nourriture).'); gAfterCardPlay(st); }
   else if(sub==='moulin'){    if(c.food<2) return; c.food-=2; c.water=Math.min(36,c.water+2); discard(); gLog(st, pseudo+' passe 2 nourritures au Moulin à légumes 🥣 (→ +2 eau).'); gAfterCardPlay(st); }
   else if(sub==='placeradeau'){ c.slots+=1; discard(); gLog(st, pseudo+' ajoute une Planche de radeau 🪵 (+1 place).'); }
-  else if(sub==='kitbbq'){    const bonus=2*(st.deathsThisTurn||0); c.food=Math.min(36,c.food+bonus); discard(); gLog(st, pseudo+' allume le Kit BBQ Cannibale 🍖 (+'+bonus+' nourriture pour '+(st.deathsThisTurn||0)+' mort(s) ce tour).'); gAfterCardPlay(st); }
+  else if(sub==='kitbbq'){    const morts=Object.values(st.players).filter(q=>!q.alive).length; if(!morts) return;   // tous les morts de la partie
+    const bonus=2*morts; c.food=Math.min(36,c.food+bonus); discard(); gLog(st, pseudo+' allume le Kit BBQ Cannibale 🍖 (+'+bonus+' nourriture pour '+morts+' mort(s)).'); gAfterCardPlay(st); }
   else if(sub==='panier'){    // en cas de pénurie : personne ne meurt, le compteur concerné est remis à zéro
     if(st.phase!=='vote' || !st.vote || st.vote.context!=='penury') return;
     const res=st.vote.resource; c[res]=0; discard();
@@ -546,14 +551,14 @@ function galerapagosRespondTrade(tradeId, giveId){
   const offered=p.hand[oi];
   if(giveId==='gift'){
     p.hand.splice(oi,1); t.hand=t.hand||[]; t.hand.push(offered);
-    gLog(st, tr.from+' donne '+offered.name+' à '+tr.to+' 🤝.');
+    gLog(st, tr.from+' et '+tr.to+' concluent un troc 🤝.');   // public : on ne dévoile pas les cartes
   } else {
     const gi=(t.hand||[]).findIndex(c=>c.id===giveId);
     if(gi<0){ drop(); fbSetGalerapagos(st); return; }
     const given=t.hand[gi];
     p.hand.splice(oi,1); t.hand.splice(gi,1);
     p.hand.push(given); t.hand.push(offered);
-    gLog(st, tr.from+' troque '+offered.name+' contre '+given.name+' avec '+tr.to+' 🤝.');
+    gLog(st, tr.from+' et '+tr.to+' concluent un troc 🤝.');   // public : on ne dévoile pas les cartes
   }
   st.trades=st.trades.filter(x=>x.id!==tradeId && x.offer!==tr.offer);   // la carte a bougé → invalide les autres trocs dessus
   fbSetGalerapagos(st);
@@ -659,7 +664,7 @@ function galerapagosReveal(){
   fbSetGalerapagos(st);
 }
 
-function gVoteWeight(p){ return (gHasObj(p,'gourdin') || gHasObj(p,'revolver')) ? 2 : 1; } // gourdin OU revolver = 2 voix, sans cumul
+function gVoteWeight(p){ return gHasObj(p,'gourdin') ? 2 : 1; } // seul le gourdin donne 2 voix (le revolver sert à tirer, pas à voter)
 function gTally(st){
   const t={}; gAlive(st).forEach(p=>{ if(p.voteTarget){ const tp=st.players[p.voteTarget]; if(tp && tp.conque) return; t[p.voteTarget]=(t[p.voteTarget]||0)+gVoteWeight(p); } });   // Conque : immunisé au vote
   return t;
@@ -746,26 +751,27 @@ function galerapagosEliminate(target){
 function gTryEmbark(st, forced){
   const alive=gAlive(st), N=alive.length, c=st.counters;
   if(N===0){ gWipe(st); return; }
-  if(c.slots>=N && c.water>=N && c.food>=N){         // succès : tout le monde embarque
-    c.water-=N; c.food-=N; st.escaped=true; st.survivors=N;
+  const k = st.weather.hurricaneDrawn ? 2 : 1;       // ouragan : rations du tour + du voyage comptées ensemble
+  if(c.slots>=N && c.water>=k*N && c.food>=k*N){     // succès : tout le monde embarque
+    c.water-=k*N; c.food-=k*N; st.escaped=true; st.survivors=N;
     st.phase='gameEnd'; st.result='win';
     gLog(st, '🚣 '+N+' naufragé(s) quittent l\'île sur le radeau. VICTOIRE !');
     return;
   }
   if(forced){                                        // ouragan : il faut sacrifier pour que le radeau parte
-    const M=Math.min(c.slots, c.water, c.food);      // nombre max qui peut réellement embarquer
+    const M=Math.min(c.slots, Math.floor(c.water/k), Math.floor(c.food/k));   // nombre max qui peut réellement embarquer
     if(M<=0){                                         // personne ne peut partir → l'ouragan emporte tout le monde
       gAlive(st).forEach(p=>{ p.alive=false; });
       st.phase='gameEnd'; st.result='lose';
       gLog(st, '🌀 L\'ouragan frappe et le radeau n\'est pas prêt (pas de place ou pas de vivres). Personne ne s\'échappe. DÉFAITE.');
       return;
     }
-    let res; if(c.slots<N) res='raft'; else if(c.water<N) res='water'; else res='food';
+    let res; if(c.slots<N) res='raft'; else if(c.water<k*N) res='water'; else res='food';
     st.vote={ resource:res, context:'embark', capacity:M, revealed:false, round:1 };
     Object.values(st.players).forEach(p=>{ if(p.alive) p.voteTarget=null; });
     st.phase='vote';
     const rl={raft:'places sur le radeau',water:'eau pour le voyage',food:'nourriture pour le voyage'}[res];
-    gLog(st, '⚠️ Embarquement impossible pour tous ('+rl+' insuffisante). Seuls '+M+' peuvent partir — votez pour sacrifier un naufragé.');
+    gLog(st, '⚠️ Embarquement impossible pour tous ('+rl+' insuffisante'+(k>1?' — il faut '+k+' eau et '+k+' nourriture par naufragé':'')+'). Seuls '+M+' peuvent partir — votez pour sacrifier un naufragé.');
   } else {
     st.phase='turnEnd';                              // embarquement volontaire mais conditions non réunies (ne devrait pas arriver)
   }
@@ -846,7 +852,7 @@ function galerapagosEndToFire(){
 //  RENDUS (placeholder — réutilise les classes existantes, à re-styler aux maquettes)
 // ═══════════════════════════════════════════════════════════════════════════
 function gTurnPills(st){
-  const w = st.weather.isHurricane ? '🌀 OURAGAN' : (st.weather.current!=null ? gWeatherLabel(st.weather.current) : '—');
+  const w = st.weather.isHurricane ? '🌀 OURAGAN (+'+(st.weather.current||0)+' eau)' : (st.weather.current!=null ? gWeatherLabel(st.weather.current) : '—');
   return '<div class="dpill">Tour <strong>'+st.turn+'</strong></div><div class="dpill">Météo <strong>'+w+'</strong></div>';
 }
 function gCounterPills(st){
@@ -859,8 +865,12 @@ function gCounterPills(st){
          '<div class="dpill">🚣 Places <strong>'+c.slots+'</strong></div>';
 }
 function gPlayersList(st, highlight){
-  return st.turnOrder.map(ps=>{
+  const lobby = st.phase==='lobby';
+  const order = (lobby || !st.turnOrder.length) ? Object.keys(st.players||{}) : st.turnOrder;   // lobby : pas encore d'ordre de tour
+  if(lobby && !order.length) return '<div class="t-warm-sm">Personne n\'a encore rejoint le radeau.</div>';
+  return order.map(ps=>{
     const p=st.players[ps]; if(!p) return '';
+    if(lobby) return '<div class="player-row'+((ps===highlight)?' is-current':'')+'"><span class="player-name">'+escHtml(ps)+'</span><span class="player-infos"></span><span class="player-status">prêt</span></div>';
     const dead=!p.alive;
     const isCur = st.phase==='action' && st.turnOrder[st.currentIdx]===ps && !dead;
     let status;
@@ -979,7 +989,8 @@ function gHandHtml(st, pseudo){
           else if(s==='sardines')  act='<button class="btn-secondary" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">Manger (+3 nourriture)</button>';
           else if(s==='moulin')    act='<button class="btn-secondary" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">2 nourriture → 2 eau</button>';
           else if(s==='placeradeau') act='<button class="btn-secondary" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">Ajouter au radeau (+1 place)</button>';
-          else if(s==='kitbbq')    act='<button class="btn-secondary" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">🍖 Cuisiner les morts</button>';
+          else if(s==='kitbbq'){   const nm=Object.values(st.players).filter(q=>!q.alive).length;
+            act = nm ? '<button class="btn-secondary" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">🍖 Cuisiner les morts (+'+(2*nm)+' nourriture)</button>' : '<span class="t-warm-sm">aucun mort à cuisiner</span>'; }
           else if(s==='panier')    act = inPenury ? '<button class="btn-secondary" onclick="galerapagosPlayObject(\''+esc+'\',\''+c.id+'\')">🧺 Personne ne meurt</button>' : '<span class="t-warm-sm">en cas de pénurie</span>';
           else if(s==='eaucroupie'||s==='poissonpourri'){
             const gain=(s==='eaucroupie')?'+1 eau':'+1 nourriture';
@@ -1181,7 +1192,7 @@ function gRulesHtml(){
       row('🪓','Hache','2 bois sûrs')+
       row('🔮','Boule de cristal','Vote en dernier')+
       row('🏏','Gourdin','Voix double')+
-      row('🔫','Revolver','Voix double ; avec une • Cartouche, abat un joueur')
+      row('🔫','Revolver','Avec une • Cartouche, abat un joueur (à tout moment, même pendant un vote)')
     )+'</div>'+
     '<div class="rules-half"><h4>Consommables — défaussés à l\'usage</h4>'+
     table('Objet','Effet',
@@ -1191,7 +1202,7 @@ function gRulesHtml(){
       row('🥣','Moulin','2 nourriture → 2 eau')+
       row('🪵','Planche','+1 place sur le radeau')+
       row('🧺','Panier garni','En cas de pénurie : personne ne meurt, le stock est vidé')+
-      row('🍖','Kit BBQ','+2 nourriture par mort du tour')+
+      row('🍖','Kit BBQ','+2 nourriture par naufragé mort depuis le début de la partie')+
       row('🛡️','Plaque de tôle','Bloque un tir')+
       row('☕','Café','2 actions ce tour (à jouer pendant ton tour, avant d\'agir)')+
       row('🐚','Conque','Tu deviens chef ce tour : personne ne peut voter contre toi')+
@@ -1210,7 +1221,8 @@ function gRulesHtml(){
 
   '<div class="rules-section"><h3>🚣 Fin de partie</h3><ul>'+
     '<li>Dès qu\'il y a assez de <strong>places</strong> sur le radeau et des <strong>vivres</strong> pour le voyage, vous pouvez embarquer.</li>'+
-    '<li>Si l\'ouragan 🌀 arrive, le radeau doit partir <strong>immédiatement</strong>… ou tout le monde périt !</li>'+
+    '<li>Si l\'ouragan 🌀 arrive, le radeau doit partir <strong>à la fin du tour</strong>… ou tout le monde périt ! Ce tour-là, on peut récolter <strong>+'+G_HURRICANE_WATER+' eau</strong>.</li>'+
+    '<li>À la fin du tour de l\'ouragan, pas de distribution séparée : il faut <strong>2 eau + 2 nourriture</strong> (le tour + le voyage) et <strong>1 place</strong> par naufragé. Sinon, on vote jusqu\'à ce qu\'il reste assez pour ceux qui restent.</li>'+
   '</ul></div>';
 }
 function galerapagosShowRules(){ const b=document.getElementById('galerapagos-rules-content'), m=document.getElementById('galerapagos-rules-modal'); if(!b||!m) return; b.innerHTML=gRulesHtml(); m.style.display='flex'; }

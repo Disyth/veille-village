@@ -1,14 +1,18 @@
 // ── DIAMANT ENGINE + UI ──────────────────────────────────────────────────────
-const D_HAZARDS = ['serpent','araignee','eboulement','feu'];
+const D_HAZARDS = ['serpent','araignee','eboulement','feu','momie'];   // 5 types × 3 exemplaires (deck officiel)
+const D_HAZ_COPIES = 3;
+// Reliques du vrai jeu (5, 7, 8, 10, 12) : volontairement NON intégrées pour l'instant (décision de Damien).
 const D_TREASURES = [1,2,3,4,5,5,7,7,9,11,11,13,14,15,17];
 const D_MAXROUNDS = 5;
 let __dseq = 0;
 function dCardId(){ return 'c'+Date.now()+'_'+(__dseq++); }
 function dShuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
-function dNewDeck(){
+// removed = { type: nb de cartes retirées } — la carte piège qui a tué une manche sort du jeu pour la suite
+function dNewDeck(removed){
+  removed = removed || {};
   const cards=[];
   D_TREASURES.forEach(v=>cards.push({id:dCardId(),type:'treasure',value:v}));
-  D_HAZARDS.forEach(t=>{ for(let i=0;i<3;i++) cards.push({id:dCardId(),type:'hazard',hazard:t}); });
+  D_HAZARDS.forEach(t=>{ const n=Math.max(0, D_HAZ_COPIES-(removed[t]||0)); for(let i=0;i<n;i++) cards.push({id:dCardId(),type:'hazard',hazard:t}); });
   return dShuffle(cards);
 }
 // Certains emoji récents (ex. 🪨 Unicode 13) ne s'affichent pas sur Windows 10 : on teste le rendu
@@ -25,9 +29,9 @@ function emojiSupported(ch){
     return cache[ch] = (draw(ch) !== tofu);
   } catch(e){ return cache[ch] = true; }   // pas de canvas (ex. tests) → on garde l'emoji
 }
-const D_HAZ_ICON = { serpent:'🐍', araignee:'🕷️', eboulement:'🪨', feu:'🌋' };
+const D_HAZ_ICON = { serpent:'🐍', araignee:'🕷️', eboulement:'🪨', feu:'🌋', momie:'🧟' };
 const D_HAZ_FALLBACK = { eboulement:'⛰️' };   // repli d'icône si l'emoji n'est pas rendu (🪨 → ⛰️ sur Win10)
-const D_HAZ_NAME = { serpent:'Serpent', araignee:'Araignée', eboulement:'Éboulement', feu:'Puits de lave' };
+const D_HAZ_NAME = { serpent:'Serpent', araignee:'Araignée', eboulement:'Éboulement', feu:'Puits de lave', momie:'Momie' };
 function dHazIcon(h){ const ic = D_HAZ_ICON[h]; if(!ic) return '⚠️'; return emojiSupported(ic) ? ic : (D_HAZ_FALLBACK[h] || '⚠️'); }
 function dHazLabel(h){ return D_HAZ_NAME[h] ? (dHazIcon(h)+' '+D_HAZ_NAME[h]) : h; }
 function dInPlayers(st){ return Object.values(st.players).filter(p=>p.status==='in'); }
@@ -38,6 +42,7 @@ function dNormalize(st){
   st.board       = Array.isArray(st.board) ? st.board : (st.board ? Object.values(st.board) : []);
   st.deck        = Array.isArray(st.deck)  ? st.deck  : (st.deck  ? Object.values(st.deck)  : []);
   st.hazardsSeen = (st.hazardsSeen && typeof st.hazardsSeen==='object') ? st.hazardsSeen : {};
+  st.removedHazards = (st.removedHazards && typeof st.removedHazards==='object') ? st.removedHazards : {};
   st.players     = (st.players && typeof st.players==='object') ? st.players : {};
   st.pathTreasure= (typeof st.pathTreasure==='number') ? st.pathTreasure : 0;
   return st;
@@ -48,7 +53,7 @@ function startDiamant(){
   // Ouvre un lobby vide : les joueurs volontaires rejoignent, le meneur lance quand il veut
   fbSetDiamant({
     active:true, round:1, maxRounds:D_MAXROUNDS, phase:'lobby',
-    deck:[], board:[], pathTreasure:0, hazardsSeen:{}, players:{},
+    deck:[], board:[], pathTreasure:0, hazardsSeen:{}, removedHazards:{}, players:{},
     lastEvent:'Lobby ouvert — les explorateurs peuvent rejoindre la partie.'
   });
   toast('💎 Lobby de Diamant ouvert !');
@@ -79,7 +84,8 @@ function diamantLaunch(){
   Object.values(st.players).forEach(p=>{ p.status='in'; p.held=0; p.banked=0; p.vote=null; });
   st.phase='exploring';
   st.round=1;
-  st.deck=dNewDeck(); st.board=[]; st.pathTreasure=0; st.hazardsSeen={};
+  st.removedHazards={};   // nouvelle partie : deck complet
+  st.deck=dNewDeck(st.removedHazards); st.board=[]; st.pathTreasure=0; st.hazardsSeen={};
   st.lastEvent='La partie commence avec '+n+' explorateur(s) ! Révèle la première carte.';
   fbSetDiamant(st);
   toast('💎 Partie lancée avec '+n+' joueur(s) !');
@@ -111,7 +117,8 @@ function diamantDraw(){
     if(seen>=1){
       const lost = dInPlayers(st).reduce((s,p)=>s+p.held,0)+st.pathTreasure;
       dInPlayers(st).forEach(p=>p.held=0); st.pathTreasure=0; st.hazardsSeen[card.hazard]=seen+1;
-      st.lastEvent='💥 Double '+dHazLabel(card.hazard)+' ! Manche perdue. '+lost+' trésor'+(lost>1?'s':'')+' non sécurisé'+(lost>1?'s':'')+' perdu'+(lost>1?'s':'')+'.';
+      st.removedHazards[card.hazard]=(st.removedHazards[card.hazard]||0)+1;   // la carte fatale sort du jeu pour les manches suivantes
+      st.lastEvent='💥 Double '+dHazLabel(card.hazard)+' ! Manche perdue. '+lost+' trésor'+(lost>1?'s':'')+' non sécurisé'+(lost>1?'s':'')+' perdu'+(lost>1?'s':'')+'. Cette carte '+dHazLabel(card.hazard)+' est retirée du jeu.';
       dEndRound(st); fbSetDiamant(st); return;
     } else {
       st.hazardsSeen[card.hazard]=1;
@@ -170,7 +177,7 @@ function diamantNextRound(){
     st.lastEvent='🏁 Partie terminée ! Trésor total sécurisé : '+dTotalBanked(st)+'.';
     fbSetDiamant(st); return;
   }
-  st.round+=1; st.deck=dNewDeck(); st.board=[]; st.pathTreasure=0; st.hazardsSeen={};
+  st.round+=1; st.deck=dNewDeck(st.removedHazards); st.board=[]; st.pathTreasure=0; st.hazardsSeen={};
   Object.values(st.players).forEach(p=>{ p.status='in'; p.held=0; p.vote=null; });
   st.phase='exploring';
   st.lastEvent='Manche '+st.round+' ! Tous repartent dans la grotte.';
@@ -346,6 +353,19 @@ function renderDiamantViewer(pseudo){
 }
 
 // ── RÈGLES DU JEU (popin) ──
+// Composition du deck, générée depuis les constantes (se met à jour toute seule si le deck change)
+function dDeckRulesHtml(){
+  const nT=D_TREASURES.length, nH=D_HAZARDS.length*D_HAZ_COPIES, tot=nT+nH;
+  const sum=D_TREASURES.reduce((a,v)=>a+v,0);
+  const vals={}; D_TREASURES.forEach(v=>{ vals[v]=(vals[v]||0)+1; });
+  const valList=Object.keys(vals).map(Number).sort((a,b)=>a-b).map(v=>v+(vals[v]>1?' (×'+vals[v]+')':'')).join(', ');
+  const pct=Math.round(nH/tot*100);
+  return '<div class="rules-section"><h3>🃏 Le deck ('+tot+' cartes au départ, remélangé à chaque manche)</h3><ul>'+
+    '<li><strong>'+nT+' trésors</strong> 💎 — valeurs : '+valList+' (total '+sum+').</li>'+
+    '<li><strong>'+nH+' dangers</strong> — '+D_HAZ_COPIES+' de chaque : '+D_HAZARDS.map(h=>dHazLabel(h)).join(', ')+'.</li>'+
+    '<li>Quand un double danger fait perdre une manche, <strong>la carte qui a tué est retirée du jeu</strong> pour les manches suivantes : la grotte devient un peu moins dangereuse.</li>'+
+  '</ul><p class="rules-note">Au départ, chaque carte a environ '+pct+' % de chances d\'être un danger.</p></div>';
+}
 function dRulesHtml(){
   return ''+
   '<h2 class="rules-title">💎 Diamant — La Grotte aux Trésors — Comment jouer</h2>'+
@@ -354,6 +374,7 @@ function dRulesHtml(){
     '<li><strong>Carte trésor</strong> : sa valeur est partagée à parts égales entre les explorateurs encore dans la grotte. Le reste non divisible est déposé <em>sur le chemin</em>.</li>'+
     '<li><strong>Carte danger</strong> : la première d\'un type est un avertissement. Un <strong>deuxième danger du même type</strong> et la manche est perdue — tout le trésor non sécurisé s\'envole.</li>'+
   '</ul></div>'+
+  dDeckRulesHtml()+
   '<div class="rules-section"><h3>🎒 Continuer ou rentrer ?</h3>'+
     '<p>Après un danger, chacun choisit : <strong>continuer</strong> pour révéler la carte suivante (plus de trésor, mais plus de risque), ou <strong>rentrer</strong> au camp.</p>'+
     '<p class="rules-note">Ceux qui rentrent ensemble se partagent le trésor <em>resté sur le chemin</em> en plus de leur butin, puis le sécurisent. Un trésor sécurisé ne peut plus être perdu.</p></div>'+
