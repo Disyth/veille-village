@@ -758,3 +758,14 @@
 .av-end-card.is-lose { border-color:var(--danger); box-shadow:0 0 0 1px var(--danger-line), 0 0 24px var(--danger-soft); }
 .modal-box .av-end-card { border:none; box-shadow:none; background:none; padding:0; margin:0; }
 @media (prefers-reduced-motion: reduce){ .av-announce-moon { animation:none; } }
+
+/* Pastille cliquable (Fin du tour → piste lunaire) */
+.dpill-btn { cursor:pointer; font:inherit; font-size:.9rem; transition:all .15s; }
+.dpill-btn:hover { border-color:var(--text-body); background:var(--hover-wash-2); }
+/* Piste lunaire détaillée */
+.moon-row { display:grid; grid-template-columns:9rem 11rem 1fr; gap:.4rem 1rem; align-items:baseline; padding:.55rem .7rem; border-radius:6px; background:var(--surface-sunken-soft); margin-bottom:.35rem; font-size:.92rem; color:var(--text-body); }
+.moon-row.is-next { border:1px solid var(--text-hover); background:var(--fire-soft); }
+.moon-row.is-moon { border:1px solid var(--danger); background:var(--danger-soft); }
+.moon-when { font-family:'Marcellus',serif; color:var(--text-title); }
+.moon-sym { font-family:'Marcellus',serif; color:var(--text-title); }
+@media(max-width:640px){ .moon-row { grid-template-columns:1fr 1fr; } .moon-fx { grid-column:1 / -1; } }

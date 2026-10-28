@@ -25,12 +25,12 @@ const AV_PICK_COUNT  = 3;
 const AV_STALL_SIZE  = 4;     // objets exposés sur l'étal du marché
 
 // Sac à dos : capacité et volume de chaque chose (les objets PORTÉS ne prennent pas de place)
-const AV_BAG_CAP = 6;
+const AV_BAG_CAP = 8;   // 8 places : assez pour payer le 3ᵉ piège (7 pièces)
 const AV_VOL = { coin:1, equip:2, elixir:1 };
 
 // Prix des lieux
 const AV_PRICE = { buy:3, sell:2, upgrade:3, seal:3, wall:3, lake:1, lakeCoins:4 };
-const AV_TRAP_COSTS = [3, 5, 7, 9];   // 3 pièges (4 à partir de 5 héros)
+const AV_TRAP_COSTS = [3, 5, 7, 8];   // 3 pièges (4 à partir de 5 héros) — jamais plus que la capacité du sac
 // Effet des pièges sur la Bête : dés lancés quand elle entre sur la tuile + blessures fixes en plus
 // (chaque ⚔️ ou ✨ obtenu = 1 blessure)
 const AV_TRAPS = [
@@ -60,7 +60,7 @@ function avLimit(nHeroes){ return nHeroes>=5 ? 4 : 3; }
 // Piste lunaire : on avance d'une case à chaque fin de tour, puis on applique le symbole.
 //   lair = apparition des monstres · heart = +1 PV pour tous · seal / trap = fermeture du
 //   cercle de pierres / du camp des elfes · moon = la Lune Noire se lève · none = rien
-const AV_MOON_TRACK = ['start','lair','heart','lair','none','lair','heart','lair','seal','lair','trap','moon'];
+const AV_MOON_TRACK = ['start','lair','heart','none','lair','heart','none','lair','seal','none','trap','moon'];   // 3 cases « Apparition »
 function avMoonStart(nHeroes){ return nHeroes<=2 ? 0 : (nHeroes<=4 ? 1 : 2); }
 
 // ── DÉS (6 faces) : att = attaque · def = défense · sort (= attaque au lac, au choix en combat) · vide ──
@@ -133,8 +133,8 @@ const AV_TILES = {
   atelier:  { nom:'Atelier de Babayaga', ico:'⚗️', act:'atelier' },
   foret:    { nom:'Les Bois Perdus',     ico:'🌲', lair:'petit' },
   marais:   { nom:'Marais',              ico:'🌿', lair:'petit', lairs:2 },   // 2 repaires (comme la tuile violette de départ)
-  grotte:   { nom:'Nid-Profond',         ico:'🕳️', lair:'petit' },
-  collines: { nom:'Station Céleste',     ico:'🔭', lair:'petit' },
+  grotte:   { nom:'Nid-Profond',         ico:'🕳️' },
+  collines: { nom:'Station Céleste',     ico:'🔭' },
   ruines:   { nom:'Ruines maudites',     ico:'🏛️', lair:'grand' },
   antre:    { nom:'Caverne du crâne',    ico:'🦴', lair:'grand' },
   gouffre:  { nom:'Asphodel',            ico:'🥀', lair:'grand' },
@@ -1257,8 +1257,56 @@ function avStatusPills(st){
   return '<div class="dpill">Tour <strong>'+st.round+'</strong></div>'+
          '<div class="dpill">'+moon+'</div>'+
          '<div class="dpill">Difficulté <strong>'+(AV_DIFFS[st.diff]||AV_DIFFS[AV_DIFF_DEFAULT]).nom+'</strong></div>'+
-         (st.phase==='play' ? '<div class="dpill">Fin du tour <strong>'+(AV_SYM_LABEL[next]||'—')+'</strong></div>'+
+         (st.phase==='play' ? '<button class="dpill dpill-btn" onclick="avelShowMoon()" title="Voir les prochaines fins de tour">Fin du tour <strong>'+(AV_SYM_LABEL[next]||'—')+'</strong> ▾</button>'+
                               '<div class="dpill av-timer-pill">⏱ <strong>'+avTimerSpan(st.deadline)+'</strong></div>' : '');
+}
+// Piste lunaire : ce qui arrivera aux prochaines fins de tour (pour s'organiser)
+function avMoonTrackHtml(st){
+  let z='<h2 class="rules-title">🌙 Piste lunaire</h2>';
+  if(st.dark){
+    // Après la Lune Noire : chaque fin de tour, la marche. On liste les monstres les plus proches du Village.
+    const dist=avDistances(st), list=[], rank={ petit:0, grand:1, bete:2 };
+    Object.keys(st.tiles).forEach(k=>st.tiles[k].monsters.forEach(m=>list.push({ k, m, d:dist[k] })));
+    // On rejoue la marche dans son ordre réel (petits, grands, Bête) pour savoir qui brise une muraille et qui entre
+    list.sort((a,b)=>(rank[(AV_MONSTERS[a.m.k]||{}).taille]||0)-(rank[(AV_MONSTERS[b.m.k]||{}).taille]||0) || a.d-b.d);
+    let walls=st.walls, breached=false;
+    list.forEach(x=>{
+      if(x.d>1) return;
+      if(breached){ x.out='entrerait aussi '+AV_HOME.dans; return; }
+      if(walls>0){ if(x.m.k==='bete'){ x.out='détruit toutes les murailles'; walls=0; } else { x.out='brise une muraille'; walls--; } }
+      else { x.out='⚠️ entre '+AV_HOME.dans+' : défaite !'; breached=true; }
+    });
+    list.sort((a,b)=>a.d-b.d);
+    z+='<p class="av-end-p">La Lune Noire est levée : à <strong>chaque fin de tour</strong>, tous les monstres avancent d\'une tuile vers '+AV_HOME.nom+'.</p>'+
+      '<div class="stat-row"><span>'+AV_ICO.wall+' Murailles</span><strong>'+st.walls+'</strong></div>'+
+      '<div class="section-title u-mt-md">À la prochaine fin de tour</div>'+
+      (list.length ? list.slice(0,8).map(x=>{
+        const md=AV_MONSTERS[x.m.k]||{nom:'?',ico:'?'};
+        const what = x.d<=1 ? x.out : 'avance (encore '+avPlural(x.d-1,'tuile')+' après)';
+        return '<div class="stat-row"><span>'+md.ico+' '+escHtml(md.nom)+' <span class="action-row-sub">'+escHtml(avTileDef(st.tiles[x.k]).nom)+'</span></span><strong>'+escHtml(what)+'</strong></div>';
+      }).join('') : '<p class="av-end-p">Plus aucun monstre en marche.</p>')+
+      (list.length>8 ? '<div class="action-row-sub">… et '+(list.length-8)+' autre(s), plus loin.</div>' : '');
+    return z;
+  }
+  const lairs=Object.keys(st.tiles).filter(k=>{ const t=st.tiles[k]; return t.rev && avTileDef(t).lair && !t.seal && !t.monsters.length; });
+  const spots=lairs.reduce((n,k)=>n+(avTileDef(st.tiles[k]).lairs||1),0);
+  const fx={
+    lair:'Un monstre surgit sur chaque repaire découvert, vide et non scellé (aujourd\'hui : '+avPlural(spots,'monstre')+(lairs.length?' — '+lairs.map(k=>avTileDef(st.tiles[k]).nom).join(', '):'')+').',
+    heart:'Chaque héros récupère 1 PV.',
+    seal:'Le '+AV_TILES.cercle.nom+' ferme : plus de sceaux.',
+    trap:'Le '+AV_TILES.camp.nom+' ferme : plus de pièges.',
+    moon:'La Lune Noire se lève : les terres se révèlent, les repaires se remplissent et la Bête sort du '+AV_TILES.cratere.nom+'.',
+    none:'Rien ne se passe.',
+  };
+  z+='<p class="av-end-p">À chaque fin de tour, la lune avance d\'une case. Voici les prochaines :</p>';
+  for(let i=st.moon+1, n=1; i<AV_MOON_TRACK.length; i++, n++){
+    const sym=AV_MOON_TRACK[i];
+    z+='<div class="moon-row'+(n===1?' is-next':'')+(sym==='moon'?' is-moon':'')+'">'+
+      '<span class="moon-when">'+(n===1?'Fin de ce tour':'Fin du tour '+(st.round+n-1))+'</span>'+
+      '<span class="moon-sym">'+(AV_SYM_LABEL[sym]||sym)+'</span>'+
+      '<span class="moon-fx">'+escHtml(fx[sym]||'')+'</span></div>';
+  }
+  return z;
 }
 // Jauge de la Bête (sous les pastilles, une fois la Lune Noire levée)
 function avBossHtml(st){
@@ -1791,6 +1839,7 @@ function avelHideModal(){
 function avelShowRules(){ avOpenModal('rules'); }
 function avelShowHistory(){ avOpenModal('history'); }
 function avelShowMap(){ avOpenModal('map'); }
+function avelShowMoon(){ avOpenModal('moon'); }
 function avelShowHero(id){ avOpenModal('hero', id); }
 function avRefreshModal(){
   if(!avModal) return;
@@ -1808,6 +1857,7 @@ function avRefreshModal(){
   else if(avModal.type==='lieu') h=avPlaceHtml(avel, currentViewerPseudo);
   else if(avModal.type==='fightEnd') h=avFightEndHtml(avel, currentViewerPseudo);
   else if(avModal.type==='blackmoon') h=avBlackMoonHtml(avel);
+  else if(avModal.type==='moon') h=avMoonTrackHtml(avel);
   else if(avModal.type==='gameEnd') h=avEndHtml(avel, false)+'<div class="u-mt-md">'+avBtn('btn-primary','Fermer','avelHideModal()',false)+'</div>';
   avKeepSelects('avel-modal-content', ()=>avSet('avel-modal-content', h));
 }
