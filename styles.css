@@ -769,3 +769,27 @@
 .moon-when { font-family:'Marcellus',serif; color:var(--text-title); }
 .moon-sym { font-family:'Marcellus',serif; color:var(--text-title); }
 @media(max-width:640px){ .moon-row { grid-template-columns:1fr 1fr; } .moon-fx { grid-column:1 / -1; } }
+/* Relances au choix : objet sélectionné + dés cliquables */
+.reroll-list { display:flex; flex-wrap:wrap; gap:.5rem; }
+.reroll-list .btn-secondary { text-transform:none; letter-spacing:.02em; font-size:.85rem; }
+.reroll-list .btn-secondary.is-active { border-color:var(--text-hover); color:var(--text-title); background:var(--btn-fill-hover); }
+.av-die.is-pickable { cursor:pointer; outline:2px solid var(--text-hover); outline-offset:3px; animation:avDiePulse 1.2s ease-in-out infinite; }
+.av-die.is-pickable:hover { transform:translateY(-2px); }
+@keyframes avDiePulse { 0%,100%{ outline-color:var(--text-hover); } 50%{ outline-color:transparent; } }
+.av-die.just-rerolled { animation:avDieIn .6s cubic-bezier(.2,.8,.3,1.2); }
+.av-fight.is-rolling.no-dice-anim .av-die { opacity:1; animation:none; }
+/* Choix d'objet : équipement actuel + destination de l'objet */
+.gear-summary { display:flex; flex-wrap:wrap; gap:.35rem .6rem; margin:0 0 .7rem; font-size:.85rem; color:var(--text-title); }
+.gear-item { background:var(--surface-sunken-soft); border:1px solid var(--border-soft); border-radius:6px; padding:.3rem .55rem; }
+.gear-item em { color:var(--text-out); }
+.gear-slot { font-family:'Marcellus',serif; font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text-body); }
+.pick-card-dest { font-size:.78rem; color:var(--text-title); margin-top:.15rem; }
+.pick-card-warn { font-size:.75rem; color:var(--danger); font-family:'Marcellus',serif; letter-spacing:.04em; }
+/* Carte complète : zoom + défilement (mobile) */
+.map-zoom { display:flex; align-items:center; gap:.5rem; margin-bottom:.6rem; }
+.map-zoom .btn-secondary { padding:.35rem .8rem; min-width:2.4rem; }
+.map-zoom-val { font-family:'Marcellus',serif; color:var(--text-title); min-width:3.5rem; text-align:center; }
+.map-scroll { width:100%; max-height:62vh; overflow:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+.map-canvas { min-width:100%; margin:0 auto; }
+.map-scroll .av-map-svg.is-full { width:100%; max-width:none; }
+.av-map.is-full { display:block; }
