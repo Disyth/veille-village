@@ -736,3 +736,25 @@
 .lake-roll { display:flex; align-items:center; gap:.6rem; margin-bottom:.4rem; }
 /* L'épée brisée (parade du monstre) est dessinée en noir : on l'inverse sur le dé noir pour qu'elle reste visible */
 .av-die.die-noir img[src*="image%208"], .av-die.die-noir img[src*="image 8"] { filter:invert(1); }
+
+/* ── Lot 6 : jauge de la Bête, annonce de la Lune Noire, fin de partie ── */
+.boss-bar { border:1px solid var(--danger-line); background:var(--danger-soft); border-radius:8px; padding:.6rem .9rem .7rem; margin:-.2rem 0 1rem; }
+.boss-bar.is-down { border-color:var(--success-line); background:var(--success-soft); }
+.boss-head { display:flex; align-items:baseline; gap:.4rem .9rem; flex-wrap:wrap; margin-bottom:.45rem; }
+.boss-bar.is-down .boss-head { margin-bottom:0; }
+.boss-name { font-family:'Marcellus',serif; color:var(--text-title); font-size:1.05rem; }
+.boss-info { flex:1; font-size:.85rem; font-style:italic; color:var(--text-body); min-width:12rem; }
+.boss-pv { font-family:'Marcellus',serif; color:var(--text-title); white-space:nowrap; }
+.boss-track { height:10px; border-radius:5px; background:var(--scrim); overflow:hidden; border:1px solid var(--danger-line); }
+.boss-fill { height:100%; background:linear-gradient(90deg, var(--danger), var(--fire)); transition:width .6s ease; }
+.av-hex .av-beast { font-size:24px; }
+.av-announce { text-align:center; }
+.av-announce .rules-title { padding-right:0; }
+.av-announce .stat-row { text-align:left; }
+.av-announce-moon { font-size:4rem; line-height:1; margin-bottom:.4rem; animation:avMoonRise 1.6s ease-out both; filter:drop-shadow(0 0 18px var(--danger-glow)); }
+@keyframes avMoonRise { 0%{ transform:translateY(30px) scale(.6); opacity:0; } 100%{ transform:none; opacity:1; } }
+.av-end-card { border:1px solid var(--text-body); border-radius:10px; padding:1.2rem 1.4rem; margin-bottom:1rem; background:var(--surface-sunken-soft); }
+.av-end-card.is-win { border-color:var(--success); box-shadow:0 0 0 1px var(--success-line), 0 0 24px var(--success-soft); }
+.av-end-card.is-lose { border-color:var(--danger); box-shadow:0 0 0 1px var(--danger-line), 0 0 24px var(--danger-soft); }
+.modal-box .av-end-card { border:none; box-shadow:none; background:none; padding:0; margin:0; }
+@media (prefers-reduced-motion: reduce){ .av-announce-moon { animation:none; } }

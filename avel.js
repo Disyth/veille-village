@@ -31,6 +31,29 @@ const AV_VOL = { coin:1, equip:2, elixir:1 };
 // Prix des lieux
 const AV_PRICE = { buy:3, sell:2, upgrade:3, seal:3, wall:3, lake:1, lakeCoins:4 };
 const AV_TRAP_COSTS = [3, 5, 7, 9];   // 3 pièges (4 à partir de 5 héros)
+// Effet des pièges sur la Bête : dés lancés quand elle entre sur la tuile + blessures fixes en plus
+// (chaque ⚔️ ou ✨ obtenu = 1 blessure)
+const AV_TRAPS = [
+  { dice:['vert','vert'],                      bonus:0 },
+  { dice:['orange','orange'],                  bonus:1 },
+  { dice:['orange','orange','orange'],         bonus:2 },
+  { dice:['orange','orange','orange'],         bonus:3 },
+];
+
+// ── LA BÊTE ET LA FIN DE PARTIE (lot 6) ──
+// Résistance de la Bête : 14 (1-2 héros), 17 (3), 20 (4), puis +3 par héros
+function avBeastRes(nHeroes){ return nHeroes<=2 ? 14 : 17 + 3*(nHeroes-3); }
+// Difficulté (choisie au lobby) : monstres en plus qui surgissent à la Lune Noire,
+// sur des tuiles SANS repaire (comme le jeton cratère du jeu)
+const AV_DIFFS = {
+  facile:    { nom:'Facile',    petit:n=>Math.ceil(n/2), grand:n=>0 },
+  normal:    { nom:'Normal',    petit:n=>n,              grand:n=>1 },
+  difficile: { nom:'Difficile', petit:n=>n+1,            grand:n=>2 },
+};
+const AV_DIFF_DEFAULT = 'facile';
+// Points pour le feu commun
+const AV_FIRE_WIN      = 50;   // victoire
+const AV_FIRE_PER_KILL = 10;   // par monstre vaincu (Bête comprise), victoire ou défaite
 // Sceaux, murailles et pièges disponibles : 3 (4 à partir de 5 héros)
 function avLimit(nHeroes){ return nHeroes>=5 ? 4 : 3; }
 
@@ -157,6 +180,9 @@ const AV_MONSTERS = {
   liche:     { nom:'Liche',                ico:'☠️', res:5, taille:'grand', fam:'maudit' },
   minotaure: { nom:'Minotaure',            ico:'🐂', res:5, taille:'grand', fam:'brute' },
   basilic:   { nom:'Basilic',              ico:'🦎', res:4, taille:'grand', fam:'bete' },
+  // La Bête : sa résistance dépend du nombre de héros (stockée sur le monstre). Elle appartient
+  // aux 3 familles : tous les objets « contre une famille » marchent contre elle.
+  bete:      { nom:'La Bête',              ico:'👿', res:14, taille:'bete', fam:'all' },
 };
 const AV_MONSTER_COPIES = 2;
 
@@ -179,6 +205,7 @@ const AV_MON_COMBAT = {
   liche:     { dice:['noir','noir','violet'],           loot:{ upg:1, coins:2 },  malus:'elixir' },
   minotaure: { dice:['noir','noir','noir'],             loot:{ item:1, coins:2 }, malus:'casque' },
   wyverne:   { dice:['noir','noir','noir','violet'],    loot:{ item:1, coins:4 }, malus:'couleur' },
+  bete:      { dice:['noir','noir','violet','violet','violet'], loot:{} },
 };
 const AV_MALUS_LABEL = { vert:'1 dé vert en moins', couleur:'1 dé orange, bleu et jaune en moins', arme:'tes effets d\'arme sont bloqués', bouclier:'tes effets de bouclier sont bloqués', casque:'tes effets de casque sont bloqués', elixir:'élixirs interdits' };
 const AV_CLASHES = 3;                 // affrontements maximum par combat
@@ -256,6 +283,10 @@ function avNormalize(st){
   st.traps   = avArr(st.traps).filter(t=>t && typeof t.type==='number');   // pièges posés { type, tile }
   ['round','moon','seq','deadline','walls','seals','limit'].forEach(k=>{ if(typeof st[k]!=='number') st[k]=0; });
   if(typeof st.roundSecs!=='number') st.roundSecs=AV_ROUND_SECS;
+  if(!AV_DIFFS[st.diff]) st.diff=AV_DIFF_DEFAULT;
+  if(typeof st.dark!=='boolean') st.dark=false;
+  if(st.phase==='blackMoon'){ st.phase='play'; }   // partie lancée avant le lot 6 : la suite continue
+  ['kills','darkRound','beastMax','points'].forEach(k=>{ if(typeof st[k]!=='number') st[k]=0; });
   if(st.round<1) st.round=1;
   Object.values(st.players).forEach(p=>{ if(typeof p.acts!=='number') p.acts=0; if(typeof p.hero!=='number') p.hero=null; });
   st.heroes.forEach((h,i)=>{
@@ -273,6 +304,7 @@ function avNormalize(st){
     if(!h.dice) h.dice=null;
     if(typeof h.ko!=='boolean') h.ko=false;
     if(typeof h.discard!=='number') h.discard=0;
+    if(typeof h.kills!=='number') h.kills=0;
     if(h.fight){
       const f=h.fight;
       f.rounds=avArr(f.rounds).map(r=>{ r.hd=avArr(r.hd); r.md=avArr(r.md); r.text=avArr(r.text); r.notes=avArr(r.notes); return r; });
@@ -337,7 +369,7 @@ function avBuildMap(){
 }
 function avBuildDecks(){
   const deck={ petit:[], grand:[] };
-  Object.keys(AV_MONSTERS).forEach(k=>{ for(let i=0;i<AV_MONSTER_COPIES;i++) deck[AV_MONSTERS[k].taille].push(k); });
+  Object.keys(AV_MONSTERS).forEach(k=>{ const tz=AV_MONSTERS[k].taille; if(!deck[tz]) return; for(let i=0;i<AV_MONSTER_COPIES;i++) deck[tz].push(k); });
   deck.petit=avShuffle(deck.petit); deck.grand=avShuffle(deck.grand);
   return deck;
 }
@@ -466,8 +498,16 @@ function avEndRound(st){
       avLog(st, '🌅 '+avHeroDef(h.id).nom+' se réveille '+AV_HOME.au+', PV au maximum.');
     }
   });
+  const R=st.round;
+  if(st.dark){
+    avMarch(st);
+    if(st.phase!=='play') return;   // un monstre est entré dans le Village (ou la Bête est tombée dans un piège fatal)
+    st.round++;
+    st.deadline=avNow()+st.roundSecs*1000;
+    return;
+  }
   st.moon=Math.min(st.moon+1, AV_MOON_TRACK.length-1);
-  const sym=AV_MOON_TRACK[st.moon], R=st.round;
+  const sym=AV_MOON_TRACK[st.moon];
   if(sym==='lair'){
     const spawned=[]; let big=false;
     Object.keys(st.tiles).forEach(key=>{ avSpawn(st,key).forEach(m=>{ spawned.push(m.ico+' '+m.nom+' ('+avTileDef(st.tiles[key]).nom+')'); if(m.taille==='grand') big=true; }); });
@@ -480,9 +520,7 @@ function avEndRound(st){
   } else if(sym==='trap'){
     avLog(st, '🌙 Fin du tour '+R+' — les elfes quittent leur camp : plus de pièges possibles.');
   } else if(sym==='moon'){
-    st.phase='blackMoon';
-    avLog(st, '🌑 La Lune Noire se lève ! Un éclat s\'écrase sur Avel…', true);
-    return;
+    avRaiseBlackMoon(st);
   } else {
     avLog(st, '🌙 Fin du tour '+R+'.');
   }
@@ -490,8 +528,112 @@ function avEndRound(st){
   st.deadline=avNow()+st.roundSecs*1000;
 }
 function avMoonLeft(st){ return Math.max(0, AV_MOON_TRACK.indexOf('moon') - st.moon); }
+
+// ── La Lune Noire se lève ──
+function avDrawMonster(st, size){
+  if(!st.deck[size] || !st.deck[size].length){
+    const pile=[];
+    Object.keys(AV_MONSTERS).filter(k=>AV_MONSTERS[k].taille===size).forEach(k=>{ for(let j=0;j<AV_MONSTER_COPIES;j++) pile.push(k); });
+    st.deck[size]=avShuffle(pile);
+  }
+  return st.deck[size].shift();
+}
+function avCraterKey(st){ return Object.keys(st.tiles).find(k=>st.tiles[k].k==='cratere') || AV_CRATER_POS; }
+function avRaiseBlackMoon(st){
+  st.dark=true; st.darkRound=st.round+1; st.darkAt=avNow();
+  // 1. Toutes les terres se révèlent, et les repaires vides se remplissent
+  let n=0;
+  Object.keys(st.tiles).forEach(k=>{ st.tiles[k].rev=true; });
+  Object.keys(st.tiles).forEach(k=>{ n+=avSpawn(st,k).length; });
+  // 2. Monstres du cratère (difficulté), sur des tuiles sans repaire
+  const dif=AV_DIFFS[st.diff]||AV_DIFFS[AV_DIFF_DEFAULT], nH=st.heroes.length;
+  // (jamais sur une tuile collée au Village : les héros ont au moins un tour pour réagir)
+  const dist=avDistances(st);
+  const spots=avShuffle(Object.keys(st.tiles).filter(k=>{ const t=st.tiles[k]; return dist[k]>=2 && t.k!=='cratere' && !avTileDef(t).lair; }));
+  let i=0;
+  [['petit',dif.petit(nH)],['grand',dif.grand(nH)]].forEach(([size,cnt])=>{
+    for(let c=0;c<cnt && spots.length;c++){
+      const key=spots[(i++)%spots.length];
+      st.tiles[key].monsters.push({ id:avNewId('m'), k:avDrawMonster(st,size), dmg:0 });
+      n++;
+    }
+  });
+  // 3. La Bête sort du Cratère
+  const res=avBeastRes(nH);
+  st.tiles[avCraterKey(st)].monsters.push({ id:avNewId('m'), k:'bete', dmg:0, res });
+  st.beastMax=res;
+  avLog(st, '🌑 LA LUNE NOIRE SE LÈVE ! Toutes les terres se révèlent, '+avPlural(n,'monstre')+' surgissent, et 👿 la Bête ('+res+' PV) sort du '+AV_TILES.cratere.nom+'. Tous marchent sur '+AV_HOME.nom+' !', true);
+}
+// Distance (en tuiles) de chaque tuile au Village
+function avDistances(st){
+  const d={ '0,0':0 }, q=['0,0'];
+  while(q.length){ const k=q.shift(); avNeighbors(st,k).forEach(n=>{ if(d[n.key]===undefined){ d[n.key]=d[k]+1; q.push(n.key); } }); }
+  return d;
+}
+// Où se trouve la Bête (null si vaincue)
+function avBeast(st){
+  for(const k of Object.keys(st.tiles)){ const m=st.tiles[k].monsters.find(x=>x.k==='bete'); if(m) return { key:k, m }; }
+  return null;
+}
+function avMonstersLeft(st){ return Object.values(st.tiles).reduce((s,t)=>s+t.monsters.length,0); }
+// Victoire : après la Lune Noire, plus aucun monstre (Bête comprise)
+function avCheckWin(st){
+  if(st.dark && st.phase==='play' && !avMonstersLeft(st)){
+    st.phase='end'; st.result='win'; st.points=avPoints(st); st.endAt=avNow();
+    avLog(st, '🏆 VICTOIRE ! Tous les monstres sont vaincus : '+AV_HOME.nom+' est sauvé !', true);
+  }
+}
+function avPoints(st){ return (st.result==='win' ? AV_FIRE_WIN : 0) + AV_FIRE_PER_KILL*(st.kills||0); }
+// Fin de tour après la Lune Noire : chaque monstre avance d'une tuile vers le Village par le plus
+// court chemin (petits, puis grands, puis la Bête). Murailles, pièges, et défaite si l'un d'eux entre.
+function avMarch(st){
+  const dist=avDistances(st), rank={ petit:0, grand:1, bete:2 };
+  const list=[];
+  Object.keys(st.tiles).forEach(k=>st.tiles[k].monsters.forEach(m=>list.push({ k, m })));
+  list.sort((a,b)=>(rank[(AV_MONSTERS[a.m.k]||{}).taille]||0)-(rank[(AV_MONSTERS[b.m.k]||{}).taille]||0) || dist[a.k]-dist[b.k]);
+  const moved=[];
+  for(const { k, m } of list){
+    const md=AV_MONSTERS[m.k]||{nom:'?',ico:'?'};
+    delete m.fighter;
+    // tuile suivante : le voisin le plus proche du Village (en cas d'égalité, le premier dans l'ordre des directions)
+    const next=avNeighbors(st,k).map(n=>n.key).filter(n=>dist[n]===dist[k]-1)[0];
+    if(!next) continue;
+    if(next==='0,0'){
+      if(st.walls>0){
+        if(m.k==='bete'){ avLog(st, '🧱 '+md.ico+' La Bête pulvérise toutes les murailles '+AV_HOME.du+' ('+st.walls+') !', true); st.walls=0; }
+        else { st.walls--; avLog(st, '🧱 '+md.ico+' '+md.nom+' brise une muraille '+AV_HOME.du+' ('+st.walls+' restante'+(st.walls>1?'s':'')+').'); }
+        continue;   // il reste devant la porte et réessaiera au prochain tour
+      }
+      st.phase='end'; st.result='lose'; st.breach=md.nom; st.points=avPoints(st); st.endAt=avNow();
+      avLog(st, '💀 DÉFAITE… '+md.ico+' '+md.nom+' entre dans '+AV_HOME.nom+'.', true);
+      return;
+    }
+    st.tiles[k].monsters=st.tiles[k].monsters.filter(x=>x.id!==m.id);
+    st.tiles[next].monsters.push(m);
+    moved.push(md.ico);
+    // Piège : seule la Bête le déclenche
+    const ti=st.traps.findIndex(x=>x.tile===next);
+    if(m.k==='bete' && ti>=0){
+      const tr=AV_TRAPS[st.traps[ti].type]||AV_TRAPS[0];
+      const faces=tr.dice.map(c=>avRoll(c)), dmg=faces.filter(f=>f==='att'||f==='sort').length+tr.bonus;
+      m.dmg=Math.min(avMonRes(m), m.dmg+dmg);
+      st.traps.splice(ti,1);
+      avLog(st, '⛓️ La Bête tombe dans le piège elfique ('+avTileDef(st.tiles[next]).nom+') : '+faces.map(f=>AV_FACE_ICO[f]).join(' ')+(tr.bonus?' +'+tr.bonus:'')+' → '+avPlural(dmg,'blessure')+' ! Il lui reste '+(avMonRes(m)-m.dmg)+' PV.', dmg>=3);
+      if(m.dmg>=avMonRes(m)){
+        st.tiles[next].monsters=st.tiles[next].monsters.filter(x=>x.id!==m.id);
+        st.kills=(st.kills||0)+1;
+        avLog(st, '⛓️ Le piège achève la Bête !', true);
+        avCheckWin(st);
+        if(st.phase!=='play') return;
+      }
+    }
+  }
+  avLog(st, '👣 Fin du tour '+st.round+' — les monstres avancent vers '+AV_HOME.nom+(moved.length?' '+moved.join(''):'')+'.');
+}
+
 function avClosed(st, sym){ return st.moon >= AV_MOON_TRACK.indexOf(sym); }   // cercle (seal) / camp (trap) fermés
-const AV_SYM_LABEL = { lair:'👹 Apparition', heart:'❤️ Soin', seal:'🗿 Fin des sceaux', trap:'🏹 Fin des pièges', moon:'🌑 Lune Noire', none:'Rien', start:'—' };
+function avWallsClosed(st){ return !!st.dark && st.round > (st.darkRound||0); }    // carrière fermée le tour après l'arrivée de la Bête
+const AV_SYM_LABEL = { march:'👣 Les monstres avancent', lair:'👹 Apparition', heart:'❤️ Soin', seal:'🗿 Fin des sceaux', trap:'🏹 Fin des pièges', moon:'🌑 Lune Noire', none:'Rien', start:'—' };
 
 // Squelette d'une action qui coûte 1 action : vérifie, applique fn, décompte.
 // fn(st, h, t, def) renvoie un message d'erreur pour annuler.
@@ -515,7 +657,7 @@ function avAction(pseudo, fn){
 // Squelette d'une action gratuite (gestion du sac, choix d'objet…)
 function avFree(pseudo, fn){
   return avTx(st=>{
-    if(st.phase!=='play' && st.phase!=='blackMoon') return 'La partie n\'est pas en cours.';
+    if(st.phase!=='play') return 'La partie n\'est pas en cours.';
     const h=avHeroOf(st,pseudo); if(!h) return 'Tu ne joues pas dans cette partie.';
     return fn(st, h);
   });
@@ -611,6 +753,7 @@ function avelSeal(pseudo, key){
 function avelWall(pseudo){
   return avAction(pseudo, (st,h,t,def)=>{
     if(def.act!=='carriere') return 'Tu n\'es pas à la carrière.';
+    if(avWallsClosed(st)) return 'Les maçons se sont réfugiés '+AV_HOME.dans+' : plus de murailles possibles.';
     if(st.walls>=st.limit) return 'Toutes les murailles sont déjà construites.';
     if(h.coins<AV_PRICE.wall) return 'Il faut '+AV_PRICE.wall+' pièces.';
     h.coins-=AV_PRICE.wall; st.walls++;
@@ -730,6 +873,7 @@ function avelDrink(pseudo, id){
 //  « Combattre à nouveau » et « Arrêter le combat » sont compris dans cette action.
 // ═══════════════════════════════════════════════════════════════════════════
 function avPlural(n, w){ return n+' '+w+(n>1?'s':''); }
+function avMonRes(m){ return (m && m.res) || ((AV_MONSTERS[m && m.k]||{}).res) || 1; }
 function avFightMonster(st, f){ const t=st.tiles[f.tile]; return t ? t.monsters.find(x=>x.id===f.mid) : null; }
 function avUnlockMonster(st, f){ const m=avFightMonster(st,f); if(m) delete m.fighter; }
 function avMonCombat(k){ return AV_MON_COMBAT[k] || { dice:['violet'], loot:{ coins:1 } }; }
@@ -788,11 +932,11 @@ function avClash(st, h, f, pseudo){
   // Bonus +1 ⚔️ / +1 🛡️ une fois par combat
   fx.forEach(e=>{
     const ka='a_'+e.slot, kd='d_'+e.slot;
-    if(e.fx.att && !f.used[ka] && (e.fx.att==='*' || e.fx.att===md.fam)){ att++; f.used[ka]=1; notes.push(avItemDef(e.it).nom+' : +1 ⚔️'); }
-    if(e.fx.def && !f.used[kd] && e.fx.def===md.fam && mAtt>def){ def++; f.used[kd]=1; notes.push(avItemDef(e.it).nom+' : +1 🛡️'); }
+    if(e.fx.att && !f.used[ka] && (e.fx.att==='*' || e.fx.att===md.fam || md.fam==='all')){ att++; f.used[ka]=1; notes.push(avItemDef(e.it).nom+' : +1 ⚔️'); }
+    if(e.fx.def && !f.used[kd] && (e.fx.def===md.fam || md.fam==='all') && mAtt>def){ def++; f.used[kd]=1; notes.push(avItemDef(e.it).nom+' : +1 🛡️'); }
   });
   // Sorts ✨ : en attaque s'ils permettent d'achever le monstre, sinon d'abord en défense
-  const left=md.res-m.dmg;
+  const RES=avMonRes(m), left=RES-m.dmg;
   let sa=0, sd=0;
   if(spells){
     const needKill=Math.max(0, left+mDef-att);
@@ -803,9 +947,9 @@ function avClash(st, h, f, pseudo){
   }
   att+=sa; def+=sd;
   const blocked=Math.min(mDef, att), wounds=att-blocked, saved=Math.min(def, mAtt), hurt=mAtt-saved;
-  m.dmg=Math.min(md.res, m.dmg+wounds);
+  m.dmg=Math.min(RES, m.dmg+wounds);
   h.pv=Math.max(0, h.pv-hurt);
-  const R=md.res-m.dmg;
+  const R=RES-m.dmg;
   // Textes de résolution
   let t1;
   if(att===0) t1='Vous ne portez aucun coup.';
@@ -821,7 +965,7 @@ function avClash(st, h, f, pseudo){
   f.rounds.push({ hd, md:mdice, text:['Attaque du héros : '+t1, 'Attaque du monstre : '+t2], notes });
   f.clash++;
   // Conséquences
-  const dead=m.dmg>=md.res, ko=h.pv<=0, who=avWho(pseudo,h);
+  const dead=m.dmg>=RES, ko=h.pv<=0, who=avWho(pseudo,h);
   if(dead){
     const loot=mc.loot||{}, got=[];
     st.tiles[f.tile].monsters=st.tiles[f.tile].monsters.filter(x=>x.id!==m.id);
@@ -832,7 +976,10 @@ function avClash(st, h, f, pseudo){
     if(heal && !ko){ h.pv=Math.min(AV_PV_MAX, h.pv+heal); got.push('+'+heal+' PV'); }
     f.loot=got;
     f.over='win';
-    avLog(st, '🏆 '+who+' terrasse '+md.ico+' '+md.nom+' ! Récompense : '+got.join(', ')+'.', md.taille==='grand');
+    st.kills=(st.kills||0)+1; h.kills=(h.kills||0)+1;
+    if(m.k==='bete') avLog(st, '⚔️ '+who+' porte le coup fatal : '+md.ico+' LA BÊTE EST TERRASSÉE !', true);
+    else avLog(st, '🏆 '+who+' terrasse '+md.ico+' '+md.nom+' !'+(got.length?' Récompense : '+got.join(', ')+'.':''), md.taille==='grand');
+    avCheckWin(st);
   }
   if(ko){
     const lost=h.coins;
@@ -884,7 +1031,7 @@ function avelFightStop(pseudo){
     if(avFighting(h)){
       const m=avFightMonster(st,h.fight), md=AV_MONSTERS[h.fight.k]||{nom:'?'};
       h.fight.over='stop'; avUnlockMonster(st,h.fight);
-      avLog(st, '🏃 '+avWho(pseudo,h)+' bat en retraite face à '+md.nom+(m?' (il lui reste '+(md.res-m.dmg)+' PV)':'')+'.');
+      avLog(st, '🏃 '+avWho(pseudo,h)+' bat en retraite face à '+md.nom+(m?' (il lui reste '+(avMonRes(m)-m.dmg)+' PV)':'')+'.');
       avAfterFight(st);
     }
     h.fight=null;   // ferme le module
@@ -935,7 +1082,7 @@ function avelTileAction(pseudo){
 //  MENEUR : lobby, lancement, secours, clôture
 // ═══════════════════════════════════════════════════════════════════════════
 function startAvel(){
-  fbSetAvel({ active:true, phase:'lobby', players:{}, heroes:[], tiles:{}, round:1, moon:0, seq:0, history:[], roundSecs:AV_ROUND_SECS,
+  fbSetAvel({ active:true, phase:'lobby', players:{}, heroes:[], tiles:{}, round:1, moon:0, seq:0, history:[], roundSecs:AV_ROUND_SECS, diff:AV_DIFF_DEFAULT,
     lastEvent:'Les portes '+AV_HOME.du+' sont ouvertes : les héros peuvent rejoindre la partie.' });
   toast('Lobby des Chroniques d\'Avel ouvert !');
 }
@@ -954,6 +1101,7 @@ function avelLeave(pseudo){
     st.lastEvent=Object.keys(st.players).length+' héros prêt(s) à partir.';
   });
 }
+function avelSetDiff(v){ if(!AV_DIFFS[v]) return; avTx(st=>{ if(st.phase!=='lobby') return 'silent'; st.diff=v; }); }
 function avelSetRoundSecs(v){
   const secs=parseInt(v,10); if(!secs) return;
   avTx(st=>{ st.roundSecs=secs; });
@@ -975,6 +1123,7 @@ function avelLaunch(){
     st.tiles=avBuildMap(); st.deck=avBuildDecks();
     st.stall=avDraw(st, AV_STALL_SIZE);   // étal du marché (après les objets de départ)
     st.limit=avLimit(nH); st.seals=st.limit; st.walls=0; st.traps=[];
+    st.dark=false; st.darkRound=0; st.kills=0; st.beastMax=avBeastRes(nH); st.result=null; st.points=0; st.breach=null;
     st.round=1; st.moon=avMoonStart(nH); st.phase='play'; st.history=[]; st.seq=0; st.startedAt=avNow();
     st.deadline=avNow()+st.roundSecs*1000;
     const sp=[];
@@ -984,6 +1133,14 @@ function avelLaunch(){
 }
 function avelEndRoundNow(){
   avTx(st=>{ if(st.phase!=='play') return 'silent'; avLog(st, '⏱️ Le meneur termine le tour.'); avEndRound(st); });
+}
+function avelEndToFire(){
+  if(!avel || avel.phase!=='end') return;
+  const pts=avel.points||0;
+  if(!confirm('Ajouter '+pts+' points au feu de camp et clôturer la partie ?')) return;
+  fbSetFire(Object.assign({}, fire, { points:(fire.points||0)+pts }));
+  fbSetAvel(null);
+  toast('🔥 +'+pts+' points au feu ! Partie clôturée.');
 }
 function avelCancel(){
   if(!confirm('Clôturer la partie des Chroniques d\'Avel ?')) return;
@@ -1056,11 +1213,13 @@ function avMapSvg(st, keys, here, names){
       if(t.seal) g+='<text class="av-hex-badge" x="'+(cx-s*.5)+'" y="'+(cy-s*.42)+'">'+AV_ICO.seal+'</text>';
       if(st.traps.some(x=>x.tile===k)) g+='<text class="av-hex-badge" x="'+(cx-s*.5)+'" y="'+(cy+s*.62)+'">'+AV_ICO.trap+'</text>';
       if(t.k==='chateau' && st.walls) g+='<text class="av-hex-badge" x="'+(cx+s*.48)+'" y="'+(cy+s*.62)+'">'+AV_ICO.wall+st.walls+'</text>';
-      if(t.monsters.length){
-        const my=cy+s*.56, d=s*.15;
-        g+='<polygon class="av-mon" points="'+cx+','+(my-d)+' '+(cx+d)+','+my+' '+cx+','+(my+d)+' '+(cx-d)+','+my+'"/>';
-        if(t.monsters.length>1) g+='<text class="av-mon-n" x="'+cx+'" y="'+(my+4)+'">'+t.monsters.length+'</text>';
+      const beastHere=t.monsters.some(m=>m.k==='bete'), nm=t.monsters.length-(beastHere?1:0);
+      if(nm){
+        const my=cy+s*.56, d=s*.15, mx=cx-(beastHere?s*.24:0);
+        g+='<polygon class="av-mon" points="'+mx+','+(my-d)+' '+(mx+d)+','+my+' '+mx+','+(my+d)+' '+(mx-d)+','+my+'"/>';
+        if(nm>1) g+='<text class="av-mon-n" x="'+mx+'" y="'+(my+4)+'">'+nm+'</text>';
       }
+      if(beastHere) g+='<text class="av-beast" x="'+(cx+(nm?s*.24:0))+'" y="'+(cy+s*.7)+'">'+AV_MONSTERS.bete.ico+'</text>';
     }
     const hs=avHeroesAt(st,k);
     if(hs.length){
@@ -1080,6 +1239,7 @@ function avLegendHtml(){
   return '<div class="av-legend">'+
     it('<span class="av-legend-dot"></span>','Héros')+
     it('<span class="av-legend-mon"></span>','Monstre')+
+    it('<span class="av-legend-sc">'+AV_MONSTERS.bete.ico+'</span>','La Bête')+
     it('<span class="av-legend-sc">'+AV_ICO.shortcut+'</span>','Raccourci')+
     it('<span class="av-legend-sc">'+AV_ICO.seal+'</span>','Sceau')+
     it('<span class="av-legend-sc">'+AV_ICO.trap+'</span>','Piège')+
@@ -1092,12 +1252,68 @@ function avLegendHtml(){
 // ═══════════════════════════════════════════════════════════════════════════
 function avTimerSpan(until){ return '<span class="av-timer" data-av-until="'+until+'">'+avFmt(until-avNow())+'</span>'; }
 function avStatusPills(st){
-  const left=avMoonLeft(st), next=AV_MOON_TRACK[Math.min(st.moon+1, AV_MOON_TRACK.length-1)];
-  const moon = st.phase==='blackMoon' ? 'Lune Noire <strong>levée</strong>' : ('Lune Noire dans <strong>'+left+' tour'+(left>1?'s':'')+'</strong>');
+  const left=avMoonLeft(st), next=st.dark ? 'march' : AV_MOON_TRACK[Math.min(st.moon+1, AV_MOON_TRACK.length-1)];
+  const moon = st.dark ? 'Lune Noire <strong>levée</strong>' : ('Lune Noire dans <strong>'+left+' tour'+(left>1?'s':'')+'</strong>');
   return '<div class="dpill">Tour <strong>'+st.round+'</strong></div>'+
          '<div class="dpill">'+moon+'</div>'+
+         '<div class="dpill">Difficulté <strong>'+(AV_DIFFS[st.diff]||AV_DIFFS[AV_DIFF_DEFAULT]).nom+'</strong></div>'+
          (st.phase==='play' ? '<div class="dpill">Fin du tour <strong>'+(AV_SYM_LABEL[next]||'—')+'</strong></div>'+
                               '<div class="dpill av-timer-pill">⏱ <strong>'+avTimerSpan(st.deadline)+'</strong></div>' : '');
+}
+// Jauge de la Bête (sous les pastilles, une fois la Lune Noire levée)
+function avBossHtml(st){
+  if(!st.dark) return '';
+  const b=avBeast(st), left=avMonstersLeft(st);
+  if(!b) return '<div class="boss-bar is-down"><div class="boss-head"><span class="boss-name">'+AV_MONSTERS.bete.ico+' La Bête est vaincue</span><span class="boss-info">'+avPlural(left,'monstre')+' encore en marche</span></div></div>';
+  const res=avMonRes(b.m), pv=res-b.m.dmg, d=avDistances(st)[b.key];
+  return '<div class="boss-bar"><div class="boss-head">'+
+      '<span class="boss-name">'+AV_MONSTERS.bete.ico+' La Bête</span>'+
+      '<span class="boss-info">'+escHtml(avTileDef(st.tiles[b.key]).nom)+' · à '+avPlural(d,'tuile')+' '+AV_HOME.du+' · '+avPlural(left,'monstre')+' en marche · '+AV_ICO.wall+' '+st.walls+'</span>'+
+      '<span class="boss-pv">❤️ '+pv+'/'+res+'</span></div>'+
+    '<div class="boss-track"><div class="boss-fill" style="width:'+Math.round(pv/res*100)+'%"></div></div></div>';
+}
+function avBlackMoonHtml(st){
+  const b=avBeast(st), dif=AV_DIFFS[st.diff]||AV_DIFFS[AV_DIFF_DEFAULT];
+  return '<div class="av-announce">'+
+    '<div class="av-announce-moon">🌑</div>'+
+    '<h2 class="rules-title">La Lune Noire se lève !</h2>'+
+    '<p class="av-end-p">Un éclat de la Lune Noire s\'écrase sur le '+escHtml(AV_TILES.cratere.nom)+'. Toutes les terres se révèlent et les monstres surgissent : ils marchent sur '+AV_HOME.nom+' avec la Bête.</p>'+
+    '<div class="stat-row"><span>'+AV_MONSTERS.bete.ico+' La Bête</span><strong>❤️ '+(b?avMonRes(b.m)-b.m.dmg:0)+' PV · lance 5 dés</strong></div>'+
+    '<div class="stat-row"><span>Monstres en marche</span><strong>'+avMonstersLeft(st)+'</strong></div>'+
+    '<div class="stat-row"><span>Difficulté</span><strong>'+dif.nom+'</strong></div>'+
+    '<div class="stat-row"><span>'+AV_ICO.wall+' Murailles · '+AV_ICO.trap+' Pièges</span><strong>'+st.walls+' · '+st.traps.length+'</strong></div>'+
+    '<p class="av-end-p u-mt-sm">À chaque fin de tour, tous les monstres avancent d\'une tuile vers '+AV_HOME.nom+'. Si un seul y entre, tout est perdu. Les murailles se construisent encore ce tour-ci seulement.</p>'+
+    '<div class="u-mt-md">'+avBtn('btn-primary','Aux armes !','avelHideModal()',false)+'</div></div>';
+}
+function avEndHtml(st, compact){
+  const win=st.result==='win';
+  let z='<div class="av-end-card'+(win?' is-win':' is-lose')+'">'+
+    '<h2 class="rules-title">'+(win?'🏆 Victoire !':'💀 Défaite')+'</h2>'+
+    '<div class="av-end-sub">'+(win ? 'Tous les monstres sont vaincus : '+AV_HOME.nom+' est sauvé !' : escHtml(st.breach||'Un monstre')+' est entré dans '+AV_HOME.nom+'…')+'</div>'+
+    '<div class="stat-row"><span>Tours joués</span><strong>'+st.round+'</strong></div>'+
+    '<div class="stat-row"><span>Monstres vaincus</span><strong>'+(st.kills||0)+'</strong></div>'+
+    '<div class="stat-row"><span>🔥 Points pour le feu</span><strong>'+(st.points||0)+'</strong></div>'+
+    '<div class="action-row-sub">'+(win?AV_FIRE_WIN+' pour la victoire + ':'')+AV_FIRE_PER_KILL+' par monstre vaincu. Le meneur les ajoute au feu.</div>';
+  if(!compact){
+    z+='<div class="section-title u-mt-md">Tableau des héros</div>'+
+      st.heroes.slice().sort((a,b)=>(b.kills||0)-(a.kills||0)).map(h=>
+        '<div class="stat-row"><span>'+avHeroDot(h.id)+' '+escHtml(avHeroDef(h.id).nom)+' <span class="action-row-sub">'+escHtml(h.players.join(', '))+'</span></span><strong>'+avPlural(h.kills||0,'monstre')+'</strong></div>').join('');
+  }
+  return z+'</div>';
+}
+// Annonces plein écran, une fois par écran et seulement « à chaud »
+let avAnnounced={};
+function avMaybeAnnounce(st){
+  const id=st.startedAt||0;
+  if(st.phase==='end' && !avAnnounced['end'+id]){
+    avAnnounced['end'+id]=true;
+    if(avNow()-(st.endAt||0) < 10*60000) avOpenModal('gameEnd');
+    return;
+  }
+  if(st.dark && st.phase==='play' && !avAnnounced['bm'+id]){
+    avAnnounced['bm'+id]=true;
+    if(avNow()-(st.darkAt||0) < 2*60000 && !(avModal && avModal.type==='fightEnd')) avOpenModal('blackmoon');
+  }
 }
 function avHeroDot(id){ return '<span class="av-dot" style="background:var(--hero-'+(id+1)+')">'+avHeroDef(id).ini+'</span>'; }
 function avPlayersHtml(st, mePseudo){
@@ -1236,8 +1452,8 @@ function avActionsHtml(st, pseudo){
     const md=AV_MONSTERS[m.k]||{nom:'?',ico:'?',res:0,fam:''}, fam=AV_FAMS[md.fam], mc=avMonCombat(m.k);
     const busy=typeof m.fighter==='number' && m.fighter!==h.id;
     const elix=mc.malus==='elixir' ? [] : h.bag.filter(it=>AV_COMBAT_ELIXIRS[it.k]);
-    const sub=[(fam?fam.ico+' '+fam.nom:''), (mc.malus?'⚠️ '+AV_MALUS_LABEL[mc.malus]:''), (busy?'en combat avec '+avHeroDef(m.fighter).nom:'')].filter(Boolean).join(' · ');
-    z+='<div class="action-row"><span class="action-row-label">'+md.ico+' '+escHtml(md.nom)+' <span class="av-mon-pv">❤️ '+(md.res-(m.dmg||0))+'/'+md.res+'</span>'+
+    const sub=[(md.fam==='all'?'les 3 familles · 5 dés':(fam?fam.ico+' '+fam.nom:'')), (mc.malus?'⚠️ '+AV_MALUS_LABEL[mc.malus]:''), (busy?'en combat avec '+avHeroDef(m.fighter).nom:'')].filter(Boolean).join(' · ');
+    z+='<div class="action-row"><span class="action-row-label">'+md.ico+' '+escHtml(md.nom)+' <span class="av-mon-pv">❤️ '+(avMonRes(m)-(m.dmg||0))+'/'+avMonRes(m)+'</span>'+
        (sub?' <span class="action-row-sub">'+escHtml(sub)+'</span>':'')+'</span>'+
        '<span class="action-row-ctrl">'+
        (elix.length ? '<select class="dd" id="av-elx-'+m.id+'"><option value="">Sans élixir</option>'+elix.map(it=>avOpt(it.id, avItemDef(it).nom)).join('')+'</select>' : '')+
@@ -1259,7 +1475,8 @@ function avPlaceAction(st, def, monsterHere){
     case 'atelier':  return { label:'Améliorer un objet ('+AV_PRICE.upgrade+' 🪙)', ok:true };
     case 'cercle':   return avClosed(st,'seal') ? { label:'Le druide est parti', ok:false }
                           : { label:'Sceller un repaire ('+AV_PRICE.seal+' 🪙)', ok:st.seals>0, info:st.seals+' sceau(x) restant(s)' };
-    case 'carriere': return { label:'Bâtir une muraille ('+AV_PRICE.wall+' 🪙)', ok:st.walls<st.limit, info:'Murailles : '+st.walls+'/'+st.limit };
+    case 'carriere': return avWallsClosed(st) ? { label:'Les maçons sont partis', ok:false, info:'Murailles : '+st.walls+'/'+st.limit }
+                          : { label:'Bâtir une muraille ('+AV_PRICE.wall+' 🪙)', ok:st.walls<st.limit, info:'Murailles : '+st.walls+'/'+st.limit };
     case 'camp':     return avClosed(st,'trap') ? { label:'Les elfes sont partis', ok:false }
                           : { label:'Poser un piège', ok:st.traps.length<st.limit, info:'Pièges : '+st.traps.length+'/'+st.limit };
     case 'lac':      return { label:'Lancer les dés ('+AV_PRICE.lake+' 🪙)', ok:true };
@@ -1301,7 +1518,7 @@ function renderAvelViewer(pseudo){
   const st=avel, esc=escAttr(pseudo), lobby=document.getElementById('av-lobby'), board=document.getElementById('av-board');
 
   if(st.phase==='lobby'){
-    avSet('av-status',''); avSet('av-instruction','');
+    avSet('av-status',''); avSet('av-instruction',''); avSet('av-boss','');
     const lp=Object.values(st.players).sort((a,b)=>(a.at||0)-(b.at||0));
     avSet('av-players', lp.length ? lp.map(p=>'<div class="player-row'+(p.pseudo===pseudo?' is-current':'')+'"><span class="player-name">'+escHtml(p.pseudo)+'</span><span class="player-infos"></span><span class="player-status">prêt</span></div>').join('')
                                    : '<div class="t-warm-sm">Personne n\'a encore rejoint l\'expédition.</div>');
@@ -1322,15 +1539,17 @@ function renderAvelViewer(pseudo){
     avSet('av-fight','');
     board.style.display='none'; lobby.style.display='block';
     avSet('av-instruction','');
-    avSet('av-lobby','<div class="diamant-voted">👀 Une partie est en cours. Tu joueras à la prochaine ! Clique sur un joueur pour suivre son héros.</div>'+
+    avSet('av-boss', avBossHtml(st));
+    avSet('av-lobby', (st.phase==='end' ? avEndHtml(st, true) : '<div class="diamant-voted">👀 Une partie est en cours. Tu joueras à la prochaine ! Clique sur un joueur pour suivre son héros.</div>')+
       '<button class="btn-secondary u-full" onclick="avelShowMap()">Voir toute la carte</button>');
     avRefreshModal();
+    avMaybeAnnounce(st);
     return;
   }
   lobby.style.display='none'; board.style.display='block';
 
   let ins;
-  if(st.phase==='blackMoon') ins='🌑 La Lune Noire s\'est levée. La suite de l\'aventure arrive bientôt…';
+  if(st.phase==='end') ins='';
   else {
     const left=avActsLeft(st,pseudo), mates=h.players.filter(p=>p!==pseudo);
     const waiting=Object.keys(st.players).filter(ps=>avHeroOf(st,ps) && avActsLeft(st,ps)>0).length;
@@ -1338,7 +1557,8 @@ function renderAvelViewer(pseudo){
     else ins='✓ Tu as joué tes actions. En attente de '+waiting+' joueur'+(waiting>1?'s':'')+'…';
   }
   avSet('av-instruction', ins);
-  avKeepSelects('av-alert', ()=>avSet('av-alert', avAlertHtml(st,h,pseudo)));
+  avSet('av-boss', avBossHtml(st));
+  avKeepSelects('av-alert', ()=>avSet('av-alert', st.phase==='end' ? avEndHtml(st, true) : avAlertHtml(st,h,pseudo)));
   avRenderFight(st, h, pseudo);
 
   const keys=[h.pos].concat(avNeighbors(st,h.pos).map(n=>n.key));
@@ -1351,6 +1571,7 @@ function renderAvelViewer(pseudo){
   avKeepSelects('av-actions', ()=>avSet('av-actions', avActionsHtml(st, pseudo)));
   avSet('av-inventory', avInventoryHtml(h, pseudo));
   avRefreshModal();
+  avMaybeAnnounce(st);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1385,7 +1606,7 @@ function avFightHtml(st, h, pseudo){
   } else {
     cta=avBtn('btn-secondary','Fermer','avelFightStop(\''+esc+'\')',false);
   }
-  const pv = m ? ' <span class="action-row-sub">❤️ '+(md.res-m.dmg)+'/'+md.res+'</span>' : '';
+  const pv = m ? ' <span class="action-row-sub">❤️ '+(avMonRes(m)-m.dmg)+'/'+avMonRes(m)+'</span>' : '';
   return '<div class="av-fight" id="av-fight-box" data-key="'+escHtml(f.id+'_'+f.clash)+'">'+
     '<div class="av-fight-title">'+escHtml(hn)+' vs '+escHtml(md.nom)+pv+'</div>'+
     '<div class="av-fight-rolls">'+
@@ -1526,6 +1747,7 @@ function renderAvelAdmin(){
     const nH=Math.min(nP,AV_MAX_HEROES);
     ctrl='<div class="diamant-voted">'+nP+' joueur(s) : '+nH+' héros'+(nP>AV_MAX_HEROES?' (certains héros seront partagés à 2)':'')+'. Maximum '+AV_MAX_PLAYERS+' joueurs.</div>'+
       '<div class="dd-row u-mt-sm"><span class="dd-label">Durée d\'un tour</span>'+secsSel+'</div>'+
+      '<div class="dd-row u-mt-sm"><span class="dd-label">Difficulté</span><select class="dd" onchange="avelSetDiff(this.value)">'+Object.keys(AV_DIFFS).map(k=>'<option value="'+k+'"'+(k===st.diff?' selected':'')+'>'+AV_DIFFS[k].nom+'</option>').join('')+'</select></div>'+
       '<button class="btn-primary u-mt-sm" onclick="avelLaunch()"'+(nP?'':' disabled')+'>Lancer la partie'+(nP?' ('+nP+')':'')+'</button>'+
       '<button class="btn-primary-danger u-mt-sm" onclick="avelCancel()">Fermer le lobby</button>';
   } else {
@@ -1543,10 +1765,12 @@ function renderAvelAdmin(){
         '<button class="btn-primary u-mt-sm" onclick="avelEndRoundNow()">Terminer le tour maintenant</button>'+
         '<button class="btn-primary-danger u-mt-sm" onclick="avelCancel()">Abandonner la partie</button>';
     } else {
-      ctrl='<div class="diamant-voted">La Lune Noire s\'est levée : fin du contenu disponible pour l\'instant (la Bête arrive au lot 6).</div>'+
-        '<button class="btn-primary-danger" onclick="avelCancel()">Clôturer la partie</button>';
+      ctrl='<div class="diamant-voted">'+(st.result==='win'?'Victoire':'Défaite')+' : '+(st.kills||0)+' monstre(s) vaincu(s), '+(st.points||0)+' points pour le feu.</div>'+
+        '<button class="btn-primary" onclick="avelEndToFire()">Ajouter '+(st.points||0)+' points au feu et clôturer</button>'+
+        '<button class="btn-primary-danger u-mt-sm" onclick="avelCancel()">Clôturer sans ajouter</button>';
     }
   }
+  if(st.phase!=='lobby') status+=avBossHtml(st);
   avSet('aa-status', avNoEmoji(status));
   avSet('aa-event', avNoEmoji(escHtml(st.lastEvent||'')));
   avSet('aa-players', avNoEmoji(players));
@@ -1583,6 +1807,8 @@ function avRefreshModal(){
   else if(avModal.type==='hero') h=avHeroDetailHtml(avel, avModal.id);
   else if(avModal.type==='lieu') h=avPlaceHtml(avel, currentViewerPseudo);
   else if(avModal.type==='fightEnd') h=avFightEndHtml(avel, currentViewerPseudo);
+  else if(avModal.type==='blackmoon') h=avBlackMoonHtml(avel);
+  else if(avModal.type==='gameEnd') h=avEndHtml(avel, false)+'<div class="u-mt-md">'+avBtn('btn-primary','Fermer','avelHideModal()',false)+'</div>';
   avKeepSelects('avel-modal-content', ()=>avSet('avel-modal-content', h));
 }
 // Contenu de la modale « Action de lieu »
@@ -1743,12 +1969,21 @@ function avRulesHtml(){
     '<tr><td><strong>Bleu</strong> (défense)</td><td>'+faces('bleu')+'</td></tr><tr><td><strong>Jaune</strong> (magie)</td><td>'+faces('jaune')+'</td></tr>'+
     '<tr><td><strong>Violet</strong> (monstre faible)</td><td>'+faces('violet')+'</td></tr><tr><td><strong>Noir</strong> (monstre fort)</td><td>'+faces('noir')+'</td></tr>'+
   '</tbody></table><p class="rules-note">Familles de monstres : '+Object.values(AV_FAMS).map(f=>f.ico+' '+f.nom).join(' · ')+'.</p></div>'+
+  '<div class="rules-section"><h3>🌑 La Lune Noire et la Bête</h3><ul>'+
+    '<li>Quand la lune atteint la Lune Noire : toutes les terres se révèlent, les repaires se remplissent, et des monstres en plus surgissent selon la difficulté ('+Object.values(AV_DIFFS).map(d=>d.nom).join(' / ')+').</li>'+
+    '<li>'+AV_MONSTERS.bete.ico+' <strong>La Bête</strong> sort du '+AV_TILES.cratere.nom+' : '+avBeastRes(2)+' PV (1-2 héros), '+avBeastRes(3)+' (3), '+avBeastRes(4)+' (4), +3 par héros en plus. Elle lance 5 dés (2 noirs, 3 violets) et appartient aux 3 familles. Ses blessures restent d\'un combat à l\'autre.</li>'+
+    '<li>À chaque fin de tour, <strong>tous les monstres avancent d\'une tuile</strong> vers '+AV_HOME.nom+' par le plus court chemin : les petits, puis les grands, puis la Bête.</li>'+
+    '<li>'+AV_ICO.wall+' Une muraille arrête un monstre (elle est détruite et il réessaie au tour suivant). La Bête détruit toutes les murailles d\'un coup. On peut encore en bâtir pendant le tour où la Bête apparaît.</li>'+
+    '<li>'+AV_ICO.trap+' Un piège blesse la Bête quand elle entre sur sa tuile (les autres monstres l\'ignorent).</li>'+
+    '<li>🏆 <strong>Victoire</strong> : tous les monstres et la Bête sont vaincus. 💀 <strong>Défaite</strong> : un seul monstre entre '+AV_HOME.dans+'.</li>'+
+    '<li>🔥 Feu de camp : '+AV_FIRE_WIN+' points pour la victoire + '+AV_FIRE_PER_KILL+' par monstre vaincu (en cas de défaite, seulement les monstres vaincus).</li>'+
+  '</ul></div>'+
   '<div class="rules-section"><h3>🌙 La piste lunaire</h3><p>À la fin de chaque tour, la lune avance d\'une case :</p><ul>'+
     '<li>👹 <strong>Apparition</strong> : un monstre surgit sur chaque repaire révélé, vide et non scellé.</li>'+
     '<li>❤️ <strong>Soin</strong> : chaque héros récupère 1 PV.</li>'+
     '<li>🗿 / 🏹 <strong>Fermetures</strong> : le cercle de pierres puis le camp des elfes ferment.</li>'+
     '<li>🌑 <strong>Lune Noire</strong> : la Bête apparaît.</li>'+
-  '</ul><p class="rules-note">La Bête arrive dans la prochaine version.</p></div>';
+  '</ul></div>';
 }
 if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('keydown', function(e){ if(e.key === 'Escape') avelHideModal(); });
