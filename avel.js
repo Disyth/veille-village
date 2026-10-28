@@ -22,6 +22,7 @@ const AV_ROUND_SECS  = 180;   // durée par défaut d'un tour (le meneur peut la
 const AV_ROUND_CHOICES = [60, 120, 180, 300];
 const AV_PICK_SECS   = 10;    // temps pour choisir 1 objet parmi 3
 const AV_PICK_COUNT  = 3;
+const AV_STALL_SIZE  = 4;     // objets exposés sur l'étal du marché
 
 // Sac à dos : capacité et volume de chaque chose (les objets PORTÉS ne prennent pas de place)
 const AV_BAG_CAP = 6;
@@ -280,6 +281,7 @@ function avNormalize(st){
       st.heroes.forEach(h=>avAllItems(h).forEach(it=>{ const i=pool.indexOf(it.k); if(i>=0) pool.splice(i,1); }));
       st.pool=pool; st.poolInit=true;
     }
+    if(!Array.isArray(st.stall)) st.stall = st.stall ? Object.values(st.stall) : avDraw(st, AV_STALL_SIZE);
   }
   return st;
 }
@@ -388,10 +390,11 @@ function avUpgradable(h){ return avAllItems(h).filter(it=>!avIsElixir(it) && !it
 function avItemLabel(it){ const d=avItemDef(it); return d.ico+' '+d.nom+(it.up?' ✦':''); }
 function avItemEffect(it){ const d=avItemDef(it); return (it.up && d.up) ? d.up : d.base; }
 // Lance un tirage « 3 objets, on en garde 1 » (count = nombre de tirages à la suite)
-function avStartPick(st, h, count){
+// delayMs : le minuteur ne démarre qu'après ce délai (ex. animation des dés d'un combat)
+function avStartPick(st, h, count, delayMs){
   const opts=avDraw(st, AV_PICK_COUNT);
   if(!opts.length){ avLog(st, '🎁 La pioche d\'objets est vide.'); h.pick=null; return; }
-  h.pick={ opts, until:avNow()+AV_PICK_SECS*1000, left:count||1 };
+  h.pick={ opts, until:avNow()+(delayMs||0)+AV_PICK_SECS*1000, left:count||1 };
 }
 function avResolvePick(st, h, idx, auto){
   const p=h.pick; if(!p) return;
@@ -541,29 +544,30 @@ function avelCoins(pseudo){
     avLog(st, '🪙 '+avWho(pseudo,h)+' aide les habitants ('+def.nom+') : +'+AV_COIN_GAIN+' pièces d\'or.');
   });
 }
-// Marché : 1 ou 2 transactions (ops = 'buy' ou 'sell:ID'), ventes d'abord
-function avelMarket(pseudo, ops){
-  ops=(ops||[]).filter(Boolean);
+// Marché : un étal de 4 objets. Acheter = 1 action (l'objet est remplacé par un nouveau),
+// vendre = 1 action.
+function avelBuy(pseudo, idx){
   return avAction(pseudo, (st,h,t,def)=>{
     if(def.act!=='marche') return 'Tu n\'es pas au marché.';
-    if(!ops.length || ops.length>2) return 'Choisis 1 ou 2 transactions.';
-    const sells=ops.filter(o=>o.indexOf('sell:')===0).map(o=>o.slice(5)), buys=ops.filter(o=>o==='buy').length;
-    if(new Set(sells).size!==sells.length) return 'Tu ne peux pas vendre deux fois le même objet.';
-    const sold=[];
-    for(const id of sells){
-      const it=avTakeItem(h,id); if(!it) return 'Objet introuvable.';
-      st.pool.push(it.k); h.coins+=AV_PRICE.sell; sold.push(avItemLabel(it));
-    }
-    if(h.coins < buys*AV_PRICE.buy) return 'Pas assez de pièces : il en faut '+(buys*AV_PRICE.buy)+'.';
-    if(buys && !st.pool.length) return 'La pioche d\'objets est vide : le marchand n\'a plus rien à vendre.';
-    h.coins-=buys*AV_PRICE.buy;
-    const parts=[];
-    if(sold.length) parts.push('vend '+sold.join(' et ')+' (+'+(sold.length*AV_PRICE.sell)+' 🪙)');
-    if(buys) parts.push('achète '+(buys>1?buys+' objets':'un objet')+' (−'+(buys*AV_PRICE.buy)+' 🪙)');
-    avLog(st, '🛒 '+avWho(pseudo,h)+' '+parts.join(', puis ')+'.');
-    if(buys) avStartPick(st, h, buys);
+    const k=st.stall[idx]; if(!k) return 'Cet objet n\'est plus sur l\'étal.';
+    if(h.coins<AV_PRICE.buy) return 'Pas assez de pièces : il en faut '+AV_PRICE.buy+'.';
+    h.coins-=AV_PRICE.buy;
+    const it=avNewItem(k);
+    avGain(h, it);
+    const next=avDraw(st,1)[0];
+    if(next) st.stall[idx]=next; else st.stall.splice(idx,1);
+    avLog(st, '🛒 '+avWho(pseudo,h)+' achète '+avItemLabel(it)+' (−'+AV_PRICE.buy+' 🪙).'+(next?' Le marchand expose '+AV_ITEMS[next].ico+' '+AV_ITEMS[next].nom+'.':''));
   });
 }
+function avelSell(pseudo, id){
+  return avAction(pseudo, (st,h,t,def)=>{
+    if(def.act!=='marche') return 'Tu n\'es pas au marché.';
+    const it=avTakeItem(h,id); if(!it) return 'Objet introuvable.';
+    st.pool.push(it.k); h.coins+=AV_PRICE.sell;
+    avLog(st, '🛒 '+avWho(pseudo,h)+' vend '+avItemLabel(it)+' (+'+AV_PRICE.sell+' 🪙).');
+  });
+}
+function avelSellFromUi(pseudo){ const v=avSel('av-sell-sel'); if(!v){ toast('Choisis un objet à vendre.'); return; } avelSell(pseudo, v); }
 // Atelier d'alchimie : 3 pièces → 1 objet sur sa face améliorée
 function avelUpgrade(pseudo, id){
   return avAction(pseudo, (st,h,t,def)=>{
@@ -632,7 +636,7 @@ function avelLake(pseudo){
       if(avUpgradable(h).length){ h.upg++; out='une amélioration !'; }
       else out='une amélioration… mais aucun objet à améliorer.';
     } else out='rien cette fois.';
-    h.dice={ faces, out, round:st.round };
+    h.dice={ faces, rolls, out, round:st.round };
     avLog(st, '🏞️ '+avWho(pseudo,h)+' jette une pièce dans le lac : '+faces+' — '+out);
   });
 }
@@ -733,6 +737,13 @@ function avHeroDicePool(h, malus, elixir){
   return pool;
 }
 const AV_ORDINAL = ['premier','deuxième','troisième','quatrième'];
+// Durée de l'animation d'un affrontement (mêmes réglages que avAnimateFight) + ouverture de la modale
+function avClashAnimMs(r){
+  if(!r) return 0;
+  const texts=avArr(r.text).concat(avArr(r.notes).length ? [avArr(r.notes).join(' · ')] : []);
+  const typed=texts.reduce((s,t)=>s+String(t).length*14+120, 0);
+  return avArr(r.hd).length*170 + 250 + avArr(r.md).length*170 + 650 + 200 + typed + 800;
+}
 
 // Un affrontement : lancers, effets, résolution, conséquences
 function avClash(st, h, f, pseudo){
@@ -799,7 +810,7 @@ function avClash(st, h, f, pseudo){
     const loot=mc.loot||{}, got=[];
     st.tiles[f.tile].monsters=st.tiles[f.tile].monsters.filter(x=>x.id!==m.id);
     if(loot.coins){ h.coins+=loot.coins; got.push('+'+loot.coins+' 🪙'); }
-    if(loot.item){ avStartPick(st, h, loot.item); got.push('un objet'); }
+    if(loot.item){ avStartPick(st, h, loot.item, avClashAnimMs(f.rounds[f.rounds.length-1])); got.push('un objet'); }
     if(loot.upg){ if(avUpgradable(h).length){ h.upg+=loot.upg; got.push('une amélioration'); } else got.push('une amélioration (aucun objet à améliorer)'); }
     const heal=fx.reduce((s,e)=>s+(e.fx.heal||0),0);
     if(heal && !ko){ h.pv=Math.min(AV_PV_MAX, h.pv+heal); got.push('+'+heal+' PV'); }
@@ -887,11 +898,7 @@ function avelPlaceFromUi(pseudo){
   const me=avHeroOf(avel,pseudo); if(!me) return;
   const act=avTileDef(avel.tiles[me.pos]).act;
   let p=null;
-  if(act==='marche'){
-    const ops=[avSel('av-mk-1'), avSel('av-mk-2')].filter(Boolean);
-    if(!ops.length){ toast('Choisis au moins une transaction.'); return; }
-    p=avelMarket(pseudo, ops);
-  } else if(act==='atelier'){ const v=avSel('av-at-sel'); if(!v){ toast('Choisis un objet.'); return; } p=avelUpgrade(pseudo, v); }
+  if(act==='atelier'){ const v=avSel('av-at-sel'); if(!v){ toast('Choisis un objet.'); return; } p=avelUpgrade(pseudo, v); }
   else if(act==='cercle'){ const v=avSel('av-ce-sel'); if(!v){ toast('Choisis un repaire.'); return; } p=avelSeal(pseudo, v); }
   else if(act==='carriere'){ p=avelWall(pseudo); }
   else if(act==='camp'){
@@ -941,7 +948,7 @@ function avelLaunch(){
     const order=Object.values(st.players).sort((a,b)=>(a.at||0)-(b.at||0)).map(p=>p.pseudo);
     if(!order.length) return 'Il faut au moins 1 joueur.';
     const nH=Math.min(order.length, AV_MAX_HEROES);
-    st.pool=avBuildPool(); st.poolInit=true;
+    st.pool=avBuildPool(); st.poolInit=true; st.stall=null;
     st.heroes=[];
     for(let i=0;i<nH;i++){
       const h={ id:i, pv:AV_PV_MAX, coins:AV_START_COINS, pos:'0,0', eq:{ arme:null, bouclier:null, casque:null }, bag:[], upg:0, pick:null, dice:null, players:[] };
@@ -950,6 +957,7 @@ function avelLaunch(){
     }
     order.forEach((ps,i)=>{ st.heroes[i%nH].players.push(ps); st.players[ps].hero=i%nH; st.players[ps].acts=0; });
     st.tiles=avBuildMap(); st.deck=avBuildDecks();
+    st.stall=avDraw(st, AV_STALL_SIZE);   // étal du marché (après les objets de départ)
     st.limit=avLimit(nH); st.seals=st.limit; st.walls=0; st.traps=[];
     st.round=1; st.moon=avMoonStart(nH); st.phase='play'; st.history=[]; st.seq=0; st.startedAt=avNow();
     st.deadline=avNow()+st.roundSecs*1000;
@@ -1157,6 +1165,10 @@ function avSlotLabel(slot){ return slot==='elixir' ? 'Élixir' : ((AV_SLOTS.find
 // Bandeau bloquant au-dessus de la carte : objet à choisir, amélioration à placer, sac qui déborde
 function avAlertHtml(st, h, pseudo){
   const esc=escAttr(pseudo);
+  // Récompense de combat : elle se choisit dans la modale Victoire (pas de doublon ici),
+  // y compris pendant l'animation des dés qui précède son ouverture
+  const winning = h.fight && h.fight.over==='win' && (!avFightEndShown[h.fight.id] || (avModal && avModal.type==='fightEnd'));
+  if(winning && (h.pick || h.upg>0)) return '';
   if(h.pick){
     const cards=avPickCards(h, pseudo);
     return '<div class="av-alert"><div class="av-alert-title">🎁 Choisis ton objet'+((h.pick.left||1)>1?' ('+h.pick.left+' à choisir)':'')+' — '+avTimerSpan(h.pick.until)+'</div>'+
@@ -1227,7 +1239,7 @@ function avPlaceAction(st, def, monsterHere){
   switch(def.act){
     case 'coins':    return monsterHere ? { label:'Aider les habitants', ok:false, why:'Un monstre rôde ici', info:'Un monstre rôde ici' }
                                         : { label:'Aider les habitants (+'+AV_COIN_GAIN+' 🪙)', ok:true };
-    case 'marche':   return { label:'Acheter / vendre', ok:true, info:'Achat '+AV_PRICE.buy+' 🪙 · vente +'+AV_PRICE.sell+' 🪙' };
+    case 'marche':   return { label:'Voir l\'étal', ok:true, info:'Achat '+AV_PRICE.buy+' 🪙 · vente +'+AV_PRICE.sell+' 🪙' };
     case 'atelier':  return { label:'Améliorer un objet ('+AV_PRICE.upgrade+' 🪙)', ok:true };
     case 'cercle':   return avClosed(st,'seal') ? { label:'Le druide est parti', ok:false }
                           : { label:'Sceller un repaire ('+AV_PRICE.seal+' 🪙)', ok:st.seals>0, info:st.seals+' sceau(x) restant(s)' };
@@ -1273,7 +1285,10 @@ function renderAvelViewer(pseudo){
   const st=avel, esc=escAttr(pseudo), lobby=document.getElementById('av-lobby'), board=document.getElementById('av-board');
 
   if(st.phase==='lobby'){
-    avSet('av-status',''); avSet('av-instruction',''); avSet('av-players','');
+    avSet('av-status',''); avSet('av-instruction','');
+    const lp=Object.values(st.players).sort((a,b)=>(a.at||0)-(b.at||0));
+    avSet('av-players', lp.length ? lp.map(p=>'<div class="player-row'+(p.pseudo===pseudo?' is-current':'')+'"><span class="player-name">'+escHtml(p.pseudo)+'</span><span class="player-infos"></span><span class="player-status">prêt</span></div>').join('')
+                                   : '<div class="t-warm-sm">Personne n\'a encore rejoint l\'expédition.</div>');
     board.style.display='none'; lobby.style.display='block';
     const me=st.players[pseudo], n=Object.keys(st.players).length;
     avSet('av-lobby', me
@@ -1325,9 +1340,11 @@ function renderAvelViewer(pseudo){
 // ═══════════════════════════════════════════════════════════════════════════
 //  RENDU : COMBAT (module en haut du jeu + modales Victoire / Défaite)
 // ═══════════════════════════════════════════════════════════════════════════
+// Icônes exportées de Figma (images/avel/) : épées = attaque du héros, bouclier = défense du héros,
+// griffes = attaque du monstre, épée brisée = parade du monstre
 const AV_DIE_IMG = {
-  hero:    { att:'images/avel/de-heros-attaque.png',   def:'images/avel/de-heros-defense.png' },
-  monster: { att:'images/avel/de-monstre-attaque.png', def:'images/avel/de-monstre-defense.png' },
+  hero:    { att:'images/avel/image%203.png',     def:'images/avel/image%205.png' },
+  monster: { att:'images/avel/Mask%20group.png',  def:'images/avel/image%208.png' },
 };
 const AV_FACE_LABEL = { att:'Attaque', def:'Défense', sort:'Sort', vide:'Face vide' };
 const AV_SPELL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/><circle cx="19" cy="4.5" r="1.6"/><circle cx="5" cy="18.5" r="1.3"/></svg>';
@@ -1337,7 +1354,7 @@ function avFaceInner(side, face){
   return src ? '<img src="'+src+'" alt="">' : '';
 }
 function avDieHtml(side, d, i){
-  return '<span class="av-die die-'+d.c+(d.r?' is-reroll':'')+'" data-side="'+side+'" data-c="'+d.c+'" data-i="'+i+'" title="'+AV_FACE_LABEL[d.f]+(d.r?' (relancé)':'')+'" aria-label="'+AV_FACE_LABEL[d.f]+'">'+avFaceInner(side, d.f)+'</span>';
+  return '<span class="av-die die-'+d.c+' face-'+d.f+(d.r?' is-reroll':'')+'" data-side="'+side+'" data-c="'+d.c+'" data-i="'+i+'" title="'+AV_FACE_LABEL[d.f]+(d.r?' (relancé)':'')+'" aria-label="'+AV_FACE_LABEL[d.f]+'">'+avFaceInner(side, d.f)+'</span>';
 }
 function avFightHtml(st, h, pseudo){
   const f=h.fight; if(!f) return '';
@@ -1526,7 +1543,11 @@ function renderAvelAdmin(){
 // ═══════════════════════════════════════════════════════════════════════════
 let avModal=null;   // { type:'rules'|'history'|'map'|'hero'|'lieu', id }
 function avOpenModal(type, id){ avModal={ type, id }; avRefreshModal(); const m=document.getElementById('avel-modal'); if(m) m.style.display='flex'; }
-function avelHideModal(){ avModal=null; const m=document.getElementById('avel-modal'); if(m) m.style.display='none'; }
+function avelHideModal(){
+  const was=avModal; avModal=null;
+  const m=document.getElementById('avel-modal'); if(m) m.style.display='none';
+  if(was && was.type==='fightEnd' && avel && currentViewerPseudo) renderAvelViewer(currentViewerPseudo);   // réaffiche le choix en attente dans le bandeau
+}
 function avelShowRules(){ avOpenModal('rules'); }
 function avelShowHistory(){ avOpenModal('history'); }
 function avelShowMap(){ avOpenModal('map'); }
@@ -1556,10 +1577,25 @@ function avPlaceHtml(st, pseudo){
   const row=(lbl, ctrl)=>'<div class="action-row"><span class="action-row-label">'+lbl+'</span><span class="action-row-ctrl">'+ctrl+'</span></div>';
   const coins='<div class="stat-row"><span>Tes pièces d\'or</span><strong>🪙 '+h.coins+'</strong></div>';
   if(def.act==='marche'){
-    const items=avAllItems(h).map(it=>avOpt('sell:'+it.id, 'Vendre '+avItemDef(it).nom+' (+'+AV_PRICE.sell+')'));
-    const sel=(id,first)=>'<select class="dd" id="'+id+'">'+first+avOpt('buy','Acheter un objet (−'+AV_PRICE.buy+')')+items.join('')+'</select>';
-    body=coins+row('Transaction 1', sel('av-mk-1',''))+row('Transaction 2', sel('av-mk-2','<option value="">Aucune</option>'))+
-      '<div class="action-row-sub">Les ventes passent avant les achats. Chaque achat te propose '+AV_PICK_COUNT+' objets : tu en gardes 1.</div>';
+    const rich=h.coins>=AV_PRICE.buy;
+    const cards=st.stall.map((k,i)=>{
+      const d=AV_ITEMS[k]||{nom:'?',ico:'?',slot:'',base:''}, v=d.slot==='elixir'?AV_VOL.elixir:AV_VOL.equip;
+      return '<div class="stall-card">'+
+        '<span class="pick-card-ico">'+d.ico+'</span><span class="pick-card-name">'+escHtml(d.nom)+'</span>'+
+        '<span class="pick-card-slot">'+escHtml(avSlotLabel(d.slot))+' · '+v+' place'+(v>1?'s':'')+'</span>'+
+        '<span class="pick-card-fx">'+escHtml(d.base)+'</span>'+
+        avBtn('btn-secondary', 'Acheter · '+AV_PRICE.buy+' 🪙', 'avelBuy(\''+esc+'\','+i+')', !(my && rich), !rich?'Pas assez de pièces':'')+'</div>';
+    }).join('');
+    const items=avAllItems(h);
+    body=coins+'<div class="section-title u-mt-sm">L\'étal</div>'+
+      (cards ? '<div class="stall-grid">'+cards+'</div>' : '<div class="diamant-voted">L\'étal est vide : le marchand n\'a plus rien à vendre.</div>')+
+      '<div class="action-row-sub">Chaque achat coûte 1 action ; le marchand remplace aussitôt l\'objet vendu.</div>'+
+      '<div class="section-title u-mt-md">Vendre</div>'+
+      (items.length
+        ? '<div class="action-row"><span class="action-row-label"><select class="dd" id="av-sell-sel">'+items.map(it=>avOpt(it.id, avItemDef(it).nom)).join('')+'</select></span>'+
+          avBtn('btn-secondary','Vendre (+'+AV_PRICE.sell+' 🪙) — 1 action','avelSellFromUi(\''+esc+'\')',!my)+'</div>'
+        : '<div class="action-row-sub">Tu n\'as rien à vendre.</div>');
+    label=null;
   } else if(def.act==='atelier'){
     const ups=avUpgradable(h);
     body=coins+(ups.length ? row('Objet à améliorer ('+AV_PRICE.upgrade+' 🪙)', '<select class="dd" id="av-at-sel">'+ups.map(it=>avOpt(it.id, avItemDef(it).nom)).join('')+'</select>')+
@@ -1595,15 +1631,25 @@ function avPlaceHtml(st, pseudo){
     }
     label='Poser le piège';
   } else if(def.act==='lac'){
-    const last=(h.dice && h.dice.round===st.round) ? '<div class="diamant-voted">Dernier lancer : '+h.dice.faces+' — '+escHtml(h.dice.out)+'</div>' : '';
-    body=coins+'<div class="rules-section"><ul>'+
-      '<li>⚔️ ⚔️ : +'+AV_PRICE.lakeCoins+' pièces d\'or</li><li>⚔️ 🛡️ : un objet</li><li>🛡️ 🛡️ : une amélioration</li>'+
-      '<li>✨ compte comme ⚔️. Sinon, une relance automatique.</li></ul></div>'+last;
+    const D=f=>avDieHtml('hero',{c:'vert',f},0);
+    let last='';
+    if(h.dice && h.dice.round===st.round && Array.isArray(h.dice.rolls)){
+      last='<div class="lake-result"><div class="av-roll-title">Ton lancer</div>'+
+        h.dice.rolls.map((r,i)=>'<div class="lake-roll">'+(i?'<span class="action-row-sub">Relance :</span>':'')+'<span class="av-dice">'+avArr(r).map(D).join('')+'</span></div>').join('')+
+        '<div class="av-end-sub u-mt-sm">Résultat : '+escHtml(h.dice.out)+'</div></div>';
+    }
+    body=coins+'<p class="av-end-p">Jette '+AV_PRICE.lake+' pièce dans le lac et lance 2 dés verts. Les esprits de l\'eau te récompensent selon la combinaison :</p>'+
+      '<div class="lake-table">'+
+        '<div class="lake-row"><span class="av-dice">'+D('att')+D('att')+'</span><span>'+AV_PRICE.lakeCoins+' pièces d\'or</span></div>'+
+        '<div class="lake-row"><span class="av-dice">'+D('att')+D('def')+'</span><span>1 objet (3 au choix)</span></div>'+
+        '<div class="lake-row"><span class="av-dice">'+D('def')+D('def')+'</span><span>1 amélioration d\'objet</span></div>'+
+      '</div>'+
+      '<div class="action-row-sub">'+'✨ compte comme une épée. Avec une face vide, les dés sont relancés une fois automatiquement ; si la combinaison ne donne toujours rien, ta pièce est perdue.</div>'+last;
     canGo=my && h.coins>=AV_PRICE.lake; label='Lancer les dés ('+AV_PRICE.lake+' 🪙)';
   }
   const warn = !my ? '<div class="action-row-sub u-mt-sm">'+(avActsLeft(st,pseudo)>0?'Termine d\'abord ce qui est en attente (objet, sac…).':'Tu as déjà joué tes actions ce tour-ci.')+'</div>' : '';
   return '<h2 class="rules-title">'+def.ico+' '+escHtml(def.nom)+'</h2>'+body+
-    '<div class="u-mt-md">'+avBtn('btn-primary', label+' — 1 action', 'avelPlaceFromUi(\''+esc+'\')', !canGo)+'</div>'+warn;
+    (label ? '<div class="u-mt-md">'+avBtn('btn-primary', label+' — 1 action', 'avelPlaceFromUi(\''+esc+'\')', !canGo)+'</div>' : '')+warn;
 }
 function avHeroDetailHtml(st, id){
   const x=st.heroes[id]; if(!x) return '';
@@ -1649,7 +1695,7 @@ function avRulesHtml(){
     '<li>🤝 <strong>Don</strong> : gratuit, tant qu\'il te reste des actions ce tour. Donne une pièce ou un objet à un héros sur ta tuile, s\'il n\'y a pas de monstre.</li>'+
   '</ul></div>'+
   '<div class="rules-section"><h3>🏠 Les lieux (1 action)</h3><ul>'+
-    '<li>🛒 <strong>Marché</strong> : acheter un objet ('+AV_PRICE.buy+' 🪙, '+AV_PICK_COUNT+' objets proposés, tu en gardes 1 en '+AV_PICK_SECS+' s) ou en vendre un (+'+AV_PRICE.sell+' 🪙). Jusqu\'à 2 transactions.</li>'+
+    '<li>🛒 <strong>Marché</strong> : '+AV_STALL_SIZE+' objets sur l\'étal. Acheter un objet ('+AV_PRICE.buy+' 🪙) ou en vendre un (+'+AV_PRICE.sell+' 🪙) coûte 1 action. Le marchand remplace aussitôt l\'objet acheté.</li>'+
     '<li>⚗️ <strong>Atelier d\'alchimie</strong> : '+AV_PRICE.upgrade+' 🪙 pour passer un objet sur sa face améliorée ✦.</li>'+
     '<li>🗿 <strong>Cercle de pierres</strong> : '+AV_PRICE.seal+' 🪙 pour sceller '+AV_ICO.seal+' un repaire révélé et vide. Ferme à « Fin des sceaux ».</li>'+
     '<li>⛏️ <strong>Carrière</strong> : '+AV_PRICE.wall+' 🪙 pour une muraille '+AV_ICO.wall+' au château.</li>'+

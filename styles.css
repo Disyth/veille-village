@@ -717,3 +717,22 @@
   .av-die { width:40px; height:40px; }
   .av-die img { width:26px; height:26px; }
 }
+
+/* ── Marché : étal (4 objets exposés) ── */
+.stall-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.6rem; margin-bottom:.6rem; }
+.stall-card { display:flex; flex-direction:column; align-items:center; gap:.3rem; text-align:center; padding:.9rem .6rem .7rem; background:var(--surface-sunken); border:1px solid var(--border); border-radius:8px; }
+.stall-card .pick-card-fx { flex:1; }
+.stall-card .btn-secondary { width:100%; padding:.45rem .4rem; font-size:.75rem; margin-top:.3rem; }
+@media(max-width:760px){ .stall-grid { grid-template-columns:repeat(2,1fr); } }
+
+/* ── Lac aux souhaits : combinaisons et résultat en dés ── */
+.lake-table { display:flex; flex-direction:column; gap:.4rem; margin:.2rem 0 .7rem; }
+.lake-row { display:flex; align-items:center; gap:1rem; background:var(--surface-sunken-soft); border-radius:6px; padding:.45rem .7rem; color:var(--text-title); font-size:.95rem; }
+.lake-row .av-dice, .lake-roll .av-dice { min-height:0; gap:.4rem; }
+.lake-row .av-die, .lake-roll .av-die { width:36px; height:36px; }
+.lake-row .av-die img, .lake-roll .av-die img { width:24px; height:24px; }
+.lake-row .av-die svg, .lake-roll .av-die svg { width:20px; height:20px; }
+.lake-result { border:1px solid var(--text-hover); border-radius:8px; background:var(--fire-soft); padding:.8rem 1rem; margin-top:.8rem; }
+.lake-roll { display:flex; align-items:center; gap:.6rem; margin-bottom:.4rem; }
+/* L'épée brisée (parade du monstre) est dessinée en noir : on l'inverse sur le dé noir pour qu'elle reste visible */
+.av-die.die-noir img[src*="image%208"], .av-die.die-noir img[src*="image 8"] { filter:invert(1); }
