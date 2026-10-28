@@ -16,7 +16,7 @@ const AV_MAX_HEROES  = 6;     // au-delà, 2 joueurs se partagent un héros (1 a
 const AV_PV_MAX      = 5;     // points de vie d'un héros
 const AV_REST_HEAL   = 2;     // PV rendus par l'action Repos
 const AV_START_COINS = 1;     // pièces d'or au départ
-const AV_COIN_GAIN   = 2;     // pièces gagnées au village / dans les terres sauvages
+const AV_COIN_GAIN   = 2;     // pièces gagnées à Nidhiver / à la Clairière de la Source
 const AV_ACTIONS     = 2;     // actions par héros et par tour
 const AV_ROUND_SECS  = 180;   // durée par défaut d'un tour (le meneur peut la changer)
 const AV_ROUND_CHOICES = [60, 120, 180, 300];
@@ -98,28 +98,46 @@ const AV_COPIES = { equip:2, elixir:3 };   // exemplaires de chaque objet dans l
 // ── TUILES ──
 // lair : repaire de monstres (petit / grand) · act : action de lieu
 const AV_TILES = {
-  chateau:  { nom:'Château',             ico:'🏰' },
+  chateau:  { nom:'Le Village',          ico:'🏘️' },
   marche:   { nom:'Marché',              ico:'🛒', act:'marche' },
-  village:  { nom:'Village abandonné',   ico:'🏚️', act:'coins' },
+  village:  { nom:'Nidhiver',            ico:'🏚️', act:'coins' },
   lisiere:  { nom:'Lisière',             ico:'🌳', lair:'petit' },
-  sauvage:  { nom:'Terres sauvages',     ico:'🌾', lair:'petit', act:'coins' },
+  sauvage:  { nom:'Clairière de la Source', ico:'🌾', lair:'petit', act:'coins' },
   cercle:   { nom:'Cercle de pierres',   ico:'🗿', act:'cercle' },
   carriere: { nom:'Carrière',            ico:'⛏️', act:'carriere' },
   camp:     { nom:'Camp des elfes',      ico:'🏹', act:'camp' },
   lac:      { nom:'Lac aux souhaits',    ico:'🏞️', act:'lac' },
-  atelier:  { nom:'Atelier d\'alchimie', ico:'⚗️', act:'atelier' },
-  foret:    { nom:'Forêt sombre',        ico:'🌲', lair:'petit' },
-  marais:   { nom:'Marais',              ico:'🌿', lair:'petit' },
-  grotte:   { nom:'Grotte',              ico:'🕳️', lair:'petit' },
-  collines: { nom:'Collines',            ico:'⛰️', lair:'petit' },
+  atelier:  { nom:'Atelier de Babayaga', ico:'⚗️', act:'atelier' },
+  foret:    { nom:'Les Bois Perdus',     ico:'🌲', lair:'petit' },
+  marais:   { nom:'Marais',              ico:'🌿', lair:'petit', lairs:2 },   // 2 repaires (comme la tuile violette de départ)
+  grotte:   { nom:'Nid-Profond',         ico:'🕳️', lair:'petit' },
+  collines: { nom:'Station Céleste',     ico:'🔭', lair:'petit' },
   ruines:   { nom:'Ruines maudites',     ico:'🏛️', lair:'grand' },
-  antre:    { nom:'Antre',               ico:'🦴', lair:'grand' },
-  gouffre:  { nom:'Gouffre',             ico:'🌋', lair:'grand' },
+  antre:    { nom:'Caverne du crâne',    ico:'🦴', lair:'grand' },
+  gouffre:  { nom:'Asphodel',            ico:'🥀', lair:'grand' },
   cratere:  { nom:'Cratère',             ico:'🌑' },
   plaine:   { nom:'Plaine',              ico:'🌼' },
 };
-const AV_START_TILES = { '0,-1':'marche', '1,0':'village', '-1,1':'lisiere' };
-const AV_HIDDEN_BAG  = ['cercle','carriere','camp','lac','atelier','sauvage','foret','marais','grotte','collines','ruines','antre','gouffre','cratere','plaine'];
+// Le lieu à défendre (ex-« château ») : formes utilisées dans les textes
+const AV_HOME = { nom:'le Village', au:'au Village', du:'du Village', dans:'dans le Village' };
+
+// ── MISE EN PLACE (d'après le livret) ──
+// Le Village est posé en BAS du plateau (au-dessus de la piste lunaire) ; les terres s'étendent vers le haut.
+// Coordonnées axiales q,r d'hexagones « pointe sur le côté » : r-1 = case du dessus.
+const AV_LAYOUT = [
+  '0,0',                                  // le Village
+  '-1,0', '0,-1', '1,-1',                 // tuiles de départ, autour du Village
+  '-2,0', '-2,-1', '-2,-2',               // colonne de gauche
+  '-1,-1', '-1,-2', '-1,-3',
+  '0,-2', '0,-3', '0,-4',
+  '1,-2', '1,-3', '1,-4',
+  '2,-2', '2,-3', '2,-4',                 // colonne de droite
+];
+// 3 tuiles de départ face visible : Lisière (gauche), Marché (au-dessus), Marais à 2 repaires (droite)
+// → 3 petits monstres au départ, comme dans le jeu
+const AV_START_TILES = { '-1,0':'lisiere', '0,-1':'marche', '1,-1':'marais' };
+const AV_CRATER_POS  = '0,-4';            // le Cratère est visible dès le début, tout en haut, loin du Village
+const AV_HIDDEN_BAG  = ['cercle','carriere','camp','lac','atelier','village','sauvage','foret','grotte','collines','ruines','antre','gouffre','plaine'];
 const AV_SHORTCUTS   = 3;
 const AV_ICO = { shortcut:'🌀', seal:'🔒', trap:'⛓️', wall:'🧱' };
 
@@ -303,24 +321,16 @@ function avTx(fn){
 // ═══════════════════════════════════════════════════════════════════════════
 //  CARTE
 // ═══════════════════════════════════════════════════════════════════════════
-function avPositions(){
-  const out=[];
-  for(let q=-2;q<=2;q++) for(let r=-2;r<=2;r++){ if(avRing(q,r)<=2) out.push(avKey(q,r)); }
-  return out;
-}
+function avPositions(){ return AV_LAYOUT.slice(); }
 function avBuildMap(){
   const tiles={};
   const mk=k=>({ k, rev:false, sc:false, seal:false, monsters:[] });
   tiles['0,0']=Object.assign(mk('chateau'),{ rev:true });
   Object.keys(AV_START_TILES).forEach(key=>{ tiles[key]=Object.assign(mk(AV_START_TILES[key]),{ rev:true }); });
+  tiles[AV_CRATER_POS]=Object.assign(mk('cratere'),{ rev:true });
   const free=avPositions().filter(key=>!tiles[key]);
   const bag=avShuffle(AV_HIDDEN_BAG);
   free.forEach((key,i)=>{ tiles[key]=mk(bag[i]); });
-  const crat=Object.keys(tiles).find(key=>tiles[key].k==='cratere');   // cratère toujours sur l'anneau extérieur
-  if(crat && avRing(...avQR(crat))<2){
-    const swap=avShuffle(Object.keys(tiles).filter(key=>avRing(...avQR(key))===2 && !tiles[key].rev))[0];
-    const tmp=tiles[swap].k; tiles[swap].k='cratere'; tiles[crat].k=tmp;
-  }
   avShuffle(Object.keys(tiles).filter(key=>key!=='0,0' && tiles[key].k!=='cratere'))
     .slice(0, AV_SHORTCUTS).forEach(key=>{ tiles[key].sc=true; });
   return tiles;
@@ -348,18 +358,24 @@ function avShortcutTargets(st, key){
 }
 let __avId=0;
 function avNewId(p){ return p+Date.now().toString(36)+'_'+(__avId++)+Math.floor(Math.random()*1e4); }
+// Un repaire révélé, vide et non scellé se remplit : 1 monstre par repaire (2 pour le Marais).
+// Renvoie la liste des monstres apparus.
 function avSpawn(st, key){
-  const t=st.tiles[key]; if(!t) return null;
+  const t=st.tiles[key]; if(!t) return [];
   const def=avTileDef(t);
-  if(!def.lair || !t.rev || t.seal || t.monsters.length) return null;
-  if(!st.deck[def.lair].length){
-    const pile=[];
-    Object.keys(AV_MONSTERS).filter(k=>AV_MONSTERS[k].taille===def.lair).forEach(k=>{ for(let i=0;i<AV_MONSTER_COPIES;i++) pile.push(k); });
-    st.deck[def.lair]=avShuffle(pile);
+  if(!def.lair || !t.rev || t.seal || t.monsters.length) return [];
+  const out=[];
+  for(let i=0;i<(def.lairs||1);i++){
+    if(!st.deck[def.lair].length){
+      const pile=[];
+      Object.keys(AV_MONSTERS).filter(k=>AV_MONSTERS[k].taille===def.lair).forEach(k=>{ for(let j=0;j<AV_MONSTER_COPIES;j++) pile.push(k); });
+      st.deck[def.lair]=avShuffle(pile);
+    }
+    const k=st.deck[def.lair].shift();
+    t.monsters.push({ id:avNewId('m'), k, dmg:0 });
+    out.push(AV_MONSTERS[k]);
   }
-  const k=st.deck[def.lair].shift();
-  t.monsters.push({ id:avNewId('m'), k, dmg:0 });
-  return AV_MONSTERS[k];
+  return out;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -447,14 +463,14 @@ function avEndRound(st){
     if(avFighting(h)){ h.fight.over='timeout'; avUnlockMonster(st, h.fight); }
     if(h.ko){
       h.ko=false; h.pv=AV_PV_MAX; h.pos='0,0';
-      avLog(st, '🌅 '+avHeroDef(h.id).nom+' se réveille au château, PV au maximum.');
+      avLog(st, '🌅 '+avHeroDef(h.id).nom+' se réveille '+AV_HOME.au+', PV au maximum.');
     }
   });
   st.moon=Math.min(st.moon+1, AV_MOON_TRACK.length-1);
   const sym=AV_MOON_TRACK[st.moon], R=st.round;
   if(sym==='lair'){
     const spawned=[]; let big=false;
-    Object.keys(st.tiles).forEach(key=>{ const m=avSpawn(st,key); if(m){ spawned.push(m.ico+' '+m.nom+' ('+avTileDef(st.tiles[key]).nom+')'); if(m.taille==='grand') big=true; } });
+    Object.keys(st.tiles).forEach(key=>{ avSpawn(st,key).forEach(m=>{ spawned.push(m.ico+' '+m.nom+' ('+avTileDef(st.tiles[key]).nom+')'); if(m.taille==='grand') big=true; }); });
     avLog(st, spawned.length ? '🌙 Fin du tour '+R+' — des monstres surgissent des repaires : '+spawned.join(', ')+'.' : '🌙 Fin du tour '+R+' — les repaires restent calmes.', big);
   } else if(sym==='heart'){
     st.heroes.forEach(h=>{ h.pv=Math.min(AV_PV_MAX, h.pv+1); });
@@ -519,8 +535,8 @@ function avelMove(pseudo, dest){
     if(!t.rev){
       t.rev=true;
       msg='🧭 '+avWho(pseudo,h)+' explore et découvre : '+def.ico+' '+def.nom+(t.sc?' '+AV_ICO.shortcut:'')+'.';
-      const m=avSpawn(st,dest);
-      if(m){ msg+=' Un monstre en sort : '+m.ico+' '+m.nom+' !'; big=m.taille==='grand'; }
+      const ms=avSpawn(st,dest);
+      if(ms.length){ msg+=(ms.length>1?' Des monstres en sortent : ':' Un monstre en sort : ')+ms.map(m=>m.ico+' '+m.nom).join(' et ')+' !'; big=ms.some(m=>m.taille==='grand'); }
     } else {
       msg='🚶 '+avWho(pseudo,h)+' '+(sc.includes(dest)?'emprunte un raccourci '+AV_ICO.shortcut+' vers ':'se rend à : ')+def.ico+' '+def.nom+'.';
     }
@@ -535,7 +551,7 @@ function avelRest(pseudo){
     avLog(st, '❤️ '+avWho(pseudo,h)+' se repose. Les PV passent à '+h.pv+'/'+AV_PV_MAX+'.');
   });
 }
-// Village abandonné / Terres sauvages
+// Nidhiver / Clairière de la Source
 function avelCoins(pseudo){
   return avAction(pseudo, (st,h,t,def)=>{
     if(def.act!=='coins') return 'Pas d\'habitants à aider ici.';
@@ -591,14 +607,14 @@ function avelSeal(pseudo, key){
     avLog(st, '🔒 '+avWho(pseudo,h)+' scelle le repaire : '+avTileDef(tt).ico+' '+avTileDef(tt).nom+'. Plus aucun monstre n\'en sortira.');
   });
 }
-// Carrière : 3 pièces → 1 muraille devant le château
+// Carrière : 3 pièces → 1 muraille devant le Village
 function avelWall(pseudo){
   return avAction(pseudo, (st,h,t,def)=>{
     if(def.act!=='carriere') return 'Tu n\'es pas à la carrière.';
     if(st.walls>=st.limit) return 'Toutes les murailles sont déjà construites.';
     if(h.coins<AV_PRICE.wall) return 'Il faut '+AV_PRICE.wall+' pièces.';
     h.coins-=AV_PRICE.wall; st.walls++;
-    avLog(st, '🧱 '+avWho(pseudo,h)+' fait bâtir une muraille au château ('+st.walls+'/'+st.limit+').');
+    avLog(st, '🧱 '+avWho(pseudo,h)+' fait bâtir une muraille '+AV_HOME.au+' ('+st.walls+'/'+st.limit+').');
   });
 }
 // Camp des elfes : piège n° type (coût croissant) sur une tuile révélée (1 piège par tuile)
@@ -610,7 +626,7 @@ function avelTrap(pseudo, type, key){
     const cost=AV_TRAP_COSTS[type];
     if(h.coins<cost) return 'Il faut '+cost+' pièces.';
     const tt=st.tiles[key];
-    if(!tt || !tt.rev || key==='0,0' || st.traps.some(x=>x.tile===key)) return 'Choisis une tuile révélée sans piège (hors château).';
+    if(!tt || !tt.rev || key==='0,0' || st.traps.some(x=>x.tile===key)) return 'Choisis une tuile révélée sans piège (hors '+AV_HOME.nom+').';
     h.coins-=cost; st.traps.push({ type, tile:key });
     avLog(st, '⛓️ '+avWho(pseudo,h)+' pose un piège elfique ('+cost+' 🪙) : '+avTileDef(tt).ico+' '+avTileDef(tt).nom+'.');
   });
@@ -920,7 +936,7 @@ function avelTileAction(pseudo){
 // ═══════════════════════════════════════════════════════════════════════════
 function startAvel(){
   fbSetAvel({ active:true, phase:'lobby', players:{}, heroes:[], tiles:{}, round:1, moon:0, seq:0, history:[], roundSecs:AV_ROUND_SECS,
-    lastEvent:'Les portes du château sont ouvertes : les héros peuvent rejoindre la partie.' });
+    lastEvent:'Les portes '+AV_HOME.du+' sont ouvertes : les héros peuvent rejoindre la partie.' });
   toast('Lobby des Chroniques d\'Avel ouvert !');
 }
 function avelJoin(pseudo){
@@ -962,7 +978,7 @@ function avelLaunch(){
     st.round=1; st.moon=avMoonStart(nH); st.phase='play'; st.history=[]; st.seq=0; st.startedAt=avNow();
     st.deadline=avNow()+st.roundSecs*1000;
     const sp=[];
-    Object.keys(st.tiles).forEach(key=>{ const m=avSpawn(st,key); if(m) sp.push(m.ico+' '+m.nom); });
+    Object.keys(st.tiles).forEach(key=>{ avSpawn(st,key).forEach(m=>sp.push(m.ico+' '+m.nom)); });
     avLog(st, '🏰 La partie commence avec '+nH+' héros ! La Lune Noire se lèvera dans '+avMoonLeft(st)+' tours.'+(sp.length?' Déjà aux portes : '+sp.join(', ')+'.':''), true);
   }).then(r=>{ if(r && r.committed) toast('Partie des Chroniques d\'Avel lancée !'); });
 }
@@ -1185,7 +1201,7 @@ function avAlertHtml(st, h, pseudo){
   }
   if(h.ko){
     return '<div class="av-alert is-danger"><div class="av-alert-title">💫 '+escHtml(avHeroDef(h.id).nom)+' est '+(avHeroDef(h.id).f?'évanouie':'évanoui')+'</div>'+
-      '<div class="action-row-sub">Réveil au château au début du prochain tour, avec tous ses PV.</div></div>';
+      '<div class="action-row-sub">Réveil '+AV_HOME.au+' au début du prochain tour, avec tous ses PV.</div></div>';
   }
   if(avOverflow(h)){
     return '<div class="av-alert is-danger"><div class="av-alert-title">🎒 Ton sac déborde ('+avBagVol(h)+'/'+AV_BAG_CAP+' places)</div>'+
@@ -1470,7 +1486,7 @@ function avFightEndHtml(st, pseudo){
       '<div class="av-end-sub">'+(md?'Le monstre vous a défait…':'Votre héros est à terre…')+'</div>'+
       '<p class="av-end-p">'+escHtml(hd.nom)+' est '+(hd.f?'évanouie':'évanoui')+' sur le sol.<br>Vous perdez toutes les pièces d\'or de votre sac à dos'+(f&&f.lost?' ('+f.lost+')':'')+'.'+
         (h.discard>0?'<br>Vous devez choisir et défausser 1 équipement.':'')+'</p>'+
-      '<p class="av-end-p">Au début du prochain tour, votre héros se réveille : vous récupérez la totalité de vos PV, et vous êtes '+(hd.f?'téléportée':'téléporté')+' directement au château.</p>';
+      '<p class="av-end-p">Au début du prochain tour, votre héros se réveille : vous récupérez la totalité de vos PV, et vous êtes '+(hd.f?'téléportée':'téléporté')+' directement '+AV_HOME.au+'.</p>';
     if(h.discard>0) z+='<div class="av-end-sub">Défausser 1 objet</div>'+avDiscardRows(h, pseudo);
   }
   if(!h.pick && !(h.upg>0) && !(h.discard>0)) z+='<div class="u-mt-md">'+avBtn('btn-primary','Continuer','avelHideModal()',false)+'</div>';
@@ -1614,8 +1630,8 @@ function avPlaceHtml(st, pseudo){
     }
     label='Sceller';
   } else if(def.act==='carriere'){
-    body=coins+'<div class="stat-row"><span>Murailles au château</span><strong>'+AV_ICO.wall+' '+st.walls+'/'+st.limit+'</strong></div>'+
-      '<div class="action-row-sub">Chaque muraille arrêtera un monstre devant le château (la Bête les détruit toutes d\'un coup).</div>';
+    body=coins+'<div class="stat-row"><span>Murailles '+AV_HOME.au+'</span><strong>'+AV_ICO.wall+' '+st.walls+'/'+st.limit+'</strong></div>'+
+      '<div class="action-row-sub">Chaque muraille arrêtera un monstre devant '+AV_HOME.nom+' (la Bête les détruit toutes d\'un coup).</div>';
     canGo=my && st.walls<st.limit; label='Bâtir ('+AV_PRICE.wall+' 🪙)';
   } else if(def.act==='camp'){
     const types=[]; for(let i=0;i<st.limit;i++) if(!st.traps.some(x=>x.type===i)) types.push(i);
@@ -1626,7 +1642,7 @@ function avPlaceHtml(st, pseudo){
         ? row('Piège', '<select class="dd" id="av-ca-type">'+types.map(i=>avOpt(String(i), 'Piège '+(i+1)+' ('+AV_TRAP_COSTS[i]+' 🪙)')).join('')+'</select>')+
           row('Tuile', '<select class="dd" id="av-ca-tile">'+tiles.map(k=>avOpt(k, avTileDef(st.tiles[k]).nom)).join('')+'</select>')
         : '<div class="diamant-voted">Tous les pièges sont posés.</div>')+
-        '<div class="action-row-sub">Les pièges blesseront la Bête quand elle passera dessus : elle suit toujours le plus court chemin vers le château.</div>';
+        '<div class="action-row-sub">Les pièges blesseront la Bête quand elle passera dessus : elle suit toujours le plus court chemin vers '+AV_HOME.nom+'.</div>';
       canGo=my && types.length>0 && tiles.length>0;
     }
     label='Poser le piège';
@@ -1677,12 +1693,13 @@ function avRulesHtml(){
   return '<h2 class="rules-title">Chroniques d\'Avel — Comment jouer</h2>'+
   '<div class="rules-section"><h3>🎯 Le but</h3><ul>'+
     '<li>Jeu <strong>coopératif</strong> : tous les héros gagnent ou perdent ensemble.</li>'+
-    '<li>Explorez les terres autour du château, équipez-vous et préparez-vous : quand la <strong>Lune Noire</strong> se lèvera, la Bête marchera sur le château avec tous les monstres.</li>'+
-    '<li>Si un seul monstre entre dans le château, la partie est perdue.</li>'+
+    '<li>Explorez les terres autour '+AV_HOME.du+', équipez-vous et préparez-vous : quand la <strong>Lune Noire</strong> se lèvera, la Bête marchera sur '+AV_HOME.nom+' avec tous les monstres.</li>'+
+    '<li>Si un seul monstre entre '+AV_HOME.dans+', la partie est perdue.</li>'+
   '</ul></div>'+
   '<div class="rules-section"><h3>🧙 Les héros</h3><ul>'+
     '<li>Jusqu\'à '+AV_MAX_HEROES+' héros. Au-delà de '+AV_MAX_HEROES+' joueurs, deux joueurs se partagent un héros : chacun a <strong>1 des 2 actions</strong>.</li>'+
-    '<li>Chaque héros a '+AV_PV_MAX+' PV et commence au château avec '+AV_START_COINS+' pièce d\'or et 1 équipement tiré au hasard.</li>'+
+    '<li>Le plateau part '+AV_HOME.du+', en bas ; trois lieux l\'entourent dès le départ (Lisière, Marché, Marais) et le reste des terres est à découvrir. Le '+AV_TILES.cratere.nom+' '+AV_TILES.cratere.ico+', tout en haut, est visible dès le début : c\'est de là que sortira la Bête.</li>'+
+    '<li>Chaque héros a '+AV_PV_MAX+' PV et commence '+AV_HOME.au+' avec '+AV_START_COINS+' pièce d\'or et 1 équipement tiré au hasard.</li>'+
   '</ul></div>'+
   '<div class="rules-section"><h3>🔄 Un tour (tour libre)</h3><ul>'+
     '<li>Chaque héros a <strong>'+AV_ACTIONS+' actions</strong> par tour, à jouer <strong>quand il veut</strong> avant la fin du minuteur ⏱. Les actions non jouées sont perdues.</li>'+
@@ -1696,22 +1713,23 @@ function avRulesHtml(){
   '</ul></div>'+
   '<div class="rules-section"><h3>🏠 Les lieux (1 action)</h3><ul>'+
     '<li>🛒 <strong>Marché</strong> : '+AV_STALL_SIZE+' objets sur l\'étal. Acheter un objet ('+AV_PRICE.buy+' 🪙) ou en vendre un (+'+AV_PRICE.sell+' 🪙) coûte 1 action. Le marchand remplace aussitôt l\'objet acheté.</li>'+
-    '<li>⚗️ <strong>Atelier d\'alchimie</strong> : '+AV_PRICE.upgrade+' 🪙 pour passer un objet sur sa face améliorée ✦.</li>'+
+    '<li>'+AV_TILES.atelier.ico+' <strong>'+AV_TILES.atelier.nom+'</strong> : '+AV_PRICE.upgrade+' 🪙 pour passer un objet sur sa face améliorée ✦.</li>'+
     '<li>🗿 <strong>Cercle de pierres</strong> : '+AV_PRICE.seal+' 🪙 pour sceller '+AV_ICO.seal+' un repaire révélé et vide. Ferme à « Fin des sceaux ».</li>'+
-    '<li>⛏️ <strong>Carrière</strong> : '+AV_PRICE.wall+' 🪙 pour une muraille '+AV_ICO.wall+' au château.</li>'+
+    '<li>⛏️ <strong>Carrière</strong> : '+AV_PRICE.wall+' 🪙 pour une muraille '+AV_ICO.wall+' '+AV_HOME.au+'.</li>'+
     '<li>🏹 <strong>Camp des elfes</strong> : un piège '+AV_ICO.trap+' contre la Bête ('+AV_TRAP_COSTS.slice(0,3).join(' / ')+' 🪙, un de chaque, un par tuile). Ferme à « Fin des pièges ».</li>'+
     '<li>🏞️ <strong>Lac aux souhaits</strong> : '+AV_PRICE.lake+' 🪙, 2 dés verts. ⚔️⚔️ = '+AV_PRICE.lakeCoins+' 🪙 · ⚔️🛡️ = un objet · 🛡️🛡️ = une amélioration. ✨ compte comme ⚔️. Sinon une relance.</li>'+
-    '<li>🏚️ <strong>Village abandonné</strong> et 🌾 <strong>Terres sauvages</strong> : +'+AV_COIN_GAIN+' 🪙, s\'il n\'y a pas de monstre.</li>'+
+    '<li>'+AV_TILES.village.ico+' <strong>'+AV_TILES.village.nom+'</strong> et '+AV_TILES.sauvage.ico+' <strong>'+AV_TILES.sauvage.nom+'</strong> : +'+AV_COIN_GAIN+' 🪙, s\'il n\'y a pas de monstre.</li>'+
     '<li>À partir de 5 héros : 4 sceaux, 4 murailles et 4 pièges (le 4ᵉ coûte '+AV_TRAP_COSTS[3]+' 🪙).</li>'+
   '</ul></div>'+
   '<div class="rules-section"><h3>⚔️ Le combat</h3><ul>'+
     '<li>Lancer un combat coûte <strong>1 action</strong>. Un combat dure jusqu\'à <strong>'+AV_CLASHES+' affrontements</strong> ; après chacun, tu choisis de continuer ou d\'arrêter.</li>'+
     '<li>À chaque affrontement, tu lances '+AV_HERO_DICE+' dés verts + les dés de ton équipement (et de ton élixir, à boire avant le combat). Le monstre lance ses propres dés.</li>'+
     '<li>Chaque ⚔️ non bloqué par une 🛡️ adverse inflige 1 blessure. ✨ compte comme ⚔️ ou 🛡️, au mieux pour toi.</li>'+
+    '<li>Le héros et le monstre frappent <strong>en même temps</strong> : tu peux vaincre le monstre et t\'évanouir dans le même affrontement (tu gagnes alors la récompense avant de t\'évanouir).</li>'+
     '<li>Les blessures du monstre restent si tu arrêtes : un autre héros peut l\'achever.</li>'+
     '<li>Monstre vaincu : tu gagnes sa récompense (pièces, un objet à choisir parmi 3, ou une amélioration).</li>'+
     '<li>Les <strong>grands monstres</strong> ont un malus : moins de dés, ou un emplacement d\'équipement bloqué, ou pas d\'élixir.</li>'+
-    '<li>À 0 PV, ton héros s\'évanouit : il perd toutes ses pièces et 1 objet de ton choix, et ses actions du tour. Il se réveille au château au début du tour suivant, PV au maximum.</li>'+
+    '<li>À 0 PV, ton héros s\'évanouit : il perd toutes ses pièces et 1 objet de ton choix, et ses actions du tour. Il se réveille '+AV_HOME.au+' au début du tour suivant, PV au maximum.</li>'+
     '<li>Un seul héros à la fois peut combattre un même monstre.</li>'+
   '</ul></div>'+
   '<div class="rules-section"><h3>🎒 Équipement et sac à dos</h3><ul>'+
