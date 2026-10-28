@@ -803,3 +803,17 @@
 .map-canvas { min-width:100%; margin:0 auto; }
 .map-scroll .av-map-svg.is-full { width:100%; max-width:none; }
 .av-map.is-full { display:block; }
+
+/* ═══ CLASSEMENT GLOBAL (accueil joueur, aucun jeu lancé) — réutilise onglets, pastilles, lignes joueur ═══ */
+.lb-rank { flex:0 0 1.6rem; text-align:center; color:var(--text-body); }
+.player-row.is-top .lb-rank { color:var(--fire); }
+.lb-list { display:flex; flex-direction:column; gap:.45rem; }
+.lb-gap { margin-top:1.2rem; }
+.lb-me-sep { text-align:center; color:var(--text-body); font-size:.85rem; font-style:italic; margin:.6rem 0 .45rem; }
+.lb-note { margin-top:1rem; font-size:.8rem; color:var(--text-body); font-style:italic; text-align:center; opacity:.85; }
+@media (max-width:600px){
+  .lb-card .tabs { overflow-x:auto; gap:1rem; scrollbar-width:none; }
+  .lb-card .tab-btn { white-space:nowrap; flex-shrink:0; }
+  .lb-card .player-info.lb-time { display:none; }       /* le temps de jeu se lit dans la pastille du haut */
+  .lb-card .lb-record .player-infos { display:none; }   /* record : on garde le score + l'issue */
+}

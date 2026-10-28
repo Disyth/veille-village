@@ -82,6 +82,7 @@ function diamantLaunch(){
   const st = dNormalize(JSON.parse(JSON.stringify(diamant)));
   // (re)initialise l'état des joueurs présents et démarre la première manche
   Object.values(st.players).forEach(p=>{ p.status='in'; p.held=0; p.banked=0; p.vote=null; });
+  st.startedAt = lbNow();   // temps de jeu (classement global)
   st.phase='exploring';
   st.round=1;
   st.removedHazards={};   // nouvelle partie : deck complet
@@ -190,6 +191,9 @@ function diamantEndToFire(){
   const fireGain = Math.round(total/10);   // Diamant contribue au feu à l'échelle des autres jeux (trésor ÷10)
   if(!confirm('Clôturer la partie : '+total+' de trésor → +'+fireGain+' points au feu de camp ?')) return;
   const records = dUpdateRecords(diamant, total);
+  const ps = Object.values(diamant.players);
+  lbRecord('diamant', { fire:fireGain, label:total+' 💎', pseudos:ps.map(p=>p.pseudo),
+    scores:Object.fromEntries(ps.map(p=>[p.pseudo, p.banked||0])), startedAt:diamant.startedAt });
   fbSetFire(Object.assign({}, fire, { points:(fire.points||0)+fireGain, diamantRecords: records }));
   fbSetDiamant(null);
   toast('🔥 +'+fireGain+' points au feu ! Partie clôturée.');

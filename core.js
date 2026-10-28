@@ -66,6 +66,11 @@ function attachListeners(){
   // Décalage entre l'horloge de cet appareil et celle du serveur (minuteurs communs à tous)
   onValue(ref(db, '.info/serverTimeOffset'), (snap) => { window.FB_OFFSET = snap.val() || 0; });
 
+  onValue(ref(db, 'stats'), (snap) => {
+    lbStats = snap.val() || {};
+    renderLeaderboard();
+  });
+
   onValue(ref(db, 'avel'), (snap) => {
     avel = snap.val() ? avNormalize(snap.val()) : null;
     renderAvelAdmin();
@@ -79,7 +84,8 @@ function attachListeners(){
 function fbSetViewer(pseudo, tw){
   if (ONLINE){
     const { db, ref, set, serverTimestamp } = window.FB;
-    set(ref(db, 'viewers/' + fbKey(pseudo)), tw ? { pseudo, tw:true, joined: serverTimestamp() } : { pseudo, joined: serverTimestamp() });
+    const uid = window.FB.user && window.FB.user.uid;   // uid Twitch : sert au classement global
+    set(ref(db, 'viewers/' + fbKey(pseudo)), tw ? { pseudo, tw:true, uid, joined: serverTimestamp() } : { pseudo, joined: serverTimestamp() });
   } else {
     if(!viewers[pseudo]) viewers[pseudo] = tw ? { pseudo, tw:true, joined: Date.now() } : { pseudo, joined: Date.now() };
     renderViewerList(); updateStats();

@@ -68,6 +68,7 @@ function renderViewerIdle(){
   const el = document.getElementById('viewer-idle');
   if(!el) return;
   el.style.display = (currentViewerPseudo && !gameActive()) ? 'block' : 'none';
+  renderLeaderboard();
 }
 
 // ── CONNEXION MENEUR ─────────────────────────────────────────────────────────

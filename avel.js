@@ -1204,6 +1204,10 @@ function avelEndToFire(){
   const pts=avel.points||0;
   if(!confirm('Ajouter '+pts+' points au feu de camp et clôturer la partie ?')) return;
   fbSetFire(Object.assign({}, fire, { points:(fire.points||0)+pts }));
+  const ak = {}; (avel.heroes||[]).forEach(h=>(h.players||[]).forEach(p=>{ ak[p]=(ak[p]||0)+(h.kills||0); }));   // héros partagé : chaque joueur compte ses monstres
+  const k = avel.kills||0;
+  lbRecord('avel', { fire:pts, label:(avel.result==='win'?'Victoire':'Défaite')+' · '+k+' monstre'+(k>1?'s':''), pseudos:Object.keys(avel.players||{}),
+    scores:ak, startedAt:avel.startedAt });
   fbSetAvel(null);
   toast('🔥 +'+pts+' points au feu ! Partie clôturée.');
 }

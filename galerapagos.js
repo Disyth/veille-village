@@ -824,6 +824,7 @@ function galerapagosLaunch(){
   if(order.length<G_MIN_PLAYERS){ toast('Il faut au moins '+G_MIN_PLAYERS+' naufragés.'); return; }
   const st=gNormalize(gClone(galerapagos));
   st.turnOrder=gShuffle(order);
+  st.startedAt=lbNow();   // temps de jeu (classement global)
   Object.values(st.players).forEach(p=>{ p.alive=true; p.sick=false; p.acted=false; p.action=null; p.voteTarget=null; p.hand=[]; p.objects=[]; });
   st.counters=gInitCounters(order.length);
   st.weather={ deck:gBuildWeatherDeck(), current:null, isHurricane:false, hurricaneDrawn:false };
@@ -844,6 +845,9 @@ function galerapagosEndToFire(){
   const n=galerapagos.survivors||0, pts=n*G_FIRE_PER_SURVIVOR;
   if(!confirm('Ajouter '+pts+' points au feu de camp ('+n+' rescapé(s)) et clôturer ?')) return;
   fbSetFire(Object.assign({}, fire, { points:(fire.points||0)+pts }));
+  const gps = Object.values(galerapagos.players||{}), saved = !!galerapagos.escaped;
+  lbRecord('galerapagos', { fire:pts, label:n ? n+' rescapé'+(n>1?'s':'') : 'Aucun rescapé', pseudos:gps.map(p=>p.pseudo),
+    scores:Object.fromEntries(gps.map(p=>[p.pseudo, (saved && p.alive)?1:0])), startedAt:galerapagos.startedAt });
   fbSetGalerapagos(null);
   toast('🔥 +'+pts+' points au feu ! Partie clôturée.');
 }

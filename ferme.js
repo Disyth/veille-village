@@ -477,6 +477,7 @@ function fermeForceStart(){
   if(!ferme || ferme.phase!=='lobby') return;
   if(fPlayers(ferme).length===0){ toast('Aucun villageois n\'a rejoint le lobby !'); return; }
   const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
+  st.startedAt = lbNow();   // temps de jeu (classement global)
   fStartPlanning(st);
   fbSetFerme(st);
 }
@@ -657,6 +658,9 @@ function fermeEndToFire(){
   const pts = parseInt(prompt('Combien de points ajouter au feu de camp ?', ferme.result==='victory'?'30':'0'));
   if(isNaN(pts)) return;
   if(pts>0) fbSetFire(Object.assign({}, fire, { points:(fire.points||0)+pts }));
+  const won = ferme.result==='victory', fps = Object.keys(ferme.players||{});
+  lbRecord('ferme', { fire:Math.max(0,pts), label:won?'Victoire':'Défaite', pseudos:fps,
+    scores:Object.fromEntries(fps.map(p=>[p, won?1:0])), startedAt:ferme.startedAt });
   fbSetFerme(null);
   toast(pts>0?('🔥 +'+pts+' pts au feu ! Partie clôturée.'):'Partie clôturée.');
 }
