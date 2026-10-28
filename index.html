@@ -69,7 +69,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getDatabase, ref, onValue, set, update, remove, get, child, serverTimestamp, runTransaction }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-  import { getAuth, signInAnonymously, signInWithEmailAndPassword, onAuthStateChanged }
+  import { getAuth, signInAnonymously, signInWithEmailAndPassword, signInWithCustomToken, signOut, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   // ╔══════════════════════════════════════════════════════════════════╗
@@ -104,21 +104,47 @@
       db, ref, onValue, set, update, remove, get, child, serverTimestamp, runTransaction,
       auth, onAuthStateChanged,
       currentUser: () => auth.currentUser,
-      signInMeneur: (email, pass) => signInWithEmailAndPassword(auth, email, pass)
+      signInMeneur: (email, pass) => signInWithEmailAndPassword(auth, email, pass),
+      // Déconnexion d'un compte Twitch : on retombe automatiquement sur un badge anonyme
+      signOutTwitch: () => signOut(auth),
+      twitch: null   // { login, name } quand le joueur est connecté via Twitch
     };
     // Chaque visiteur reçoit un badge ANONYME (invisible) — requis par les règles de la base.
+    // Exception : au retour de la page Twitch, la fonction Netlify a déposé un jeton personnalisé
+    // (sessionStorage « twToken ») : on se connecte avec, le joueur devient « twitch:<id> ».
     let dispatched = false;
+    const isTwitchUser = (u) => !!(u && String(u.uid).startsWith('twitch:'));
+    const ready = () => { if (!dispatched) { dispatched = true; window.dispatchEvent(new Event('fb-ready')); } };
+    const proceed = async (user) => {
+      let tw = null;
+      if (isTwitchUser(user)) {
+        try { const c = (await user.getIdTokenResult()).claims; tw = { login: c.tw, name: c.twn || c.tw }; } catch (e) {}
+      }
+      window.FB.twitch = tw;
+      window.FB.user = user;
+      window.dispatchEvent(new Event('fb-auth'));
+      ready();
+    };
     onAuthStateChanged(auth, (user) => {
+      let pending = null;
+      try { pending = sessionStorage.getItem('twToken'); if (pending) sessionStorage.removeItem('twToken'); } catch (e) {}
+      if (pending && !isTwitchUser(user)) {
+        signInWithCustomToken(auth, pending).catch((e) => {
+          console.error('Connexion Twitch refusee par Firebase.', e);
+          try { sessionStorage.setItem('twErr', 'Connexion Twitch refusée, réessaie.'); } catch (e2) {}
+          if (user) proceed(user);
+          else signInAnonymously(auth).catch(() => ready());
+        });
+        return;   // le succès relance onAuthStateChanged avec le compte Twitch
+      }
       if (!user) {
         signInAnonymously(auth).catch((e) => {
           console.error('Auth anonyme echouee — active-la dans Firebase Console (Authentication).', e);
-          if (!dispatched) { dispatched = true; window.dispatchEvent(new Event('fb-ready')); }
+          ready();
         });
         return;
       }
-      window.FB.user = user;
-      window.dispatchEvent(new Event('fb-auth'));
-      if (!dispatched) { dispatched = true; window.dispatchEvent(new Event('fb-ready')); }
+      proceed(user);
     });
   } else {
     window.FB = { ready: false };
@@ -154,6 +180,8 @@
 
         <div class="card login-card" id="login-card">
           <div class="card-title">Rejoindre la veillée</div>
+          <a class="btn-twitch" href="/.netlify/functions/twitch-auth">Connexion via Twitch</a>
+          <div class="login-or"><span>ou sans compte</span></div>
           <div class="input-group">
             <label>Ton pseudo Twitch</label>
             <input type="text" id="viewer-pseudo" placeholder="ex : DruideDuChat" maxlength="25" autocomplete="off" onkeydown="if(event.key==='Enter')viewerConnect()">

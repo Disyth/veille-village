@@ -8,8 +8,22 @@
 function viewerConnect(){
   const pseudo = document.getElementById('viewer-pseudo').value.trim();
   if(!pseudo){ toast('Entre ton pseudo !'); return; }
+  // Firebase interdit . # $ / [ ] dans les clés : les jeux rangent les joueurs par pseudo,
+  // un pseudo contenant l'un de ces caractères ferait échouer « Rejoindre la partie ».
+  // (L'apostrophe, elle, ne pose plus problème : escAttr la neutralise dans les boutons.)
+  if(/[.#$\/\[\]]/.test(pseudo)){ toast('Pseudo sans . # $ / [ ] s\'il te plaît'); return; }
+  // Un pseudo déjà pris par un joueur connecté via Twitch lui est réservé
+  const low = pseudo.toLowerCase();
+  if(Object.values(viewers||{}).some(v => v && v.tw && String(v.pseudo).toLowerCase()===low)){
+    toast('Ce pseudo est réservé : connecte-toi avec Twitch.'); return;
+  }
+  viewerStart(pseudo, false);
+}
+
+// Connexion effective (saisie libre ou compte Twitch). tw = true : pseudo imposé par Twitch.
+function viewerStart(pseudo, tw){
   currentViewerPseudo = pseudo;
-  fbSetViewer(pseudo);
+  fbSetViewer(pseudo, tw);
   document.getElementById('viewer-hero').style.display = 'none';
   document.getElementById('viewer-topframe').style.display = 'block';
   document.getElementById('topbar-pseudo').textContent = pseudo;
@@ -21,6 +35,8 @@ function viewerConnect(){
 }
 
 function viewerDisconnect(){
+  // Compte Twitch : on se déconnecte vraiment (sinon le rechargement reconnecterait le joueur)
+  if(window.FB && window.FB.twitch && window.FB.signOutTwitch){ window.FB.twitch = null; window.FB.signOutTwitch().catch(()=>{}); }
   currentViewerPseudo = null;
   document.getElementById('viewer-hero').style.display = '';
   document.getElementById('viewer-topframe').style.display = 'none';
@@ -28,6 +44,24 @@ function viewerDisconnect(){
   ['viewer-ferme','viewer-diamant','viewer-galerapagos','viewer-avel','viewer-idle'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
   renderViewerIdle();
 }
+
+// ── CONNEXION VIA TWITCH ────────────────────────────────────────────────────
+// Le compte Twitch est connu dès que Firebase a validé le jeton (évènement « fb-auth »).
+// Pseudo imposé = nom Twitch. Pas sur /admin ni /stream (ces vues ne jouent pas).
+function twitchAutoConnect(){
+  try{
+    const err = sessionStorage.getItem('twErr');
+    if(err){ sessionStorage.removeItem('twErr'); toast(err); }
+  }catch(e){}
+  const tw = window.FB && window.FB.twitch;
+  if(!tw || !tw.name) return;
+  if((typeof isAdminUrl==='function' && isAdminUrl()) || (typeof isStreamUrl==='function' && isStreamUrl())) return;
+  if(currentViewerPseudo === tw.name) return;
+  viewerStart(tw.name, true);
+}
+window.addEventListener('fb-auth', twitchAutoConnect);
+// Cas où fb-auth est déjà passé avant le chargement de ce script
+if(window.FB && window.FB.user) twitchAutoConnect();
 
 // Affiche « aucun jeu en cours » quand un joueur est connecté et qu'aucune partie n'est lancée
 function renderViewerIdle(){
@@ -44,7 +78,8 @@ async function adminLogin(){
   }
   // Déjà connecté (session persistante) : ouvre directement
   const u = window.FB.currentUser && window.FB.currentUser();
-  if(u && !u.isAnonymous){ showPage('admin'); renderViewerList(); updateStats(); return; }
+  // Un compte Twitch n'est PAS anonyme mais n'est pas le meneur : seul l'e-mail / mot de passe ouvre l'admin
+  if(u && !u.isAnonymous && !String(u.uid).startsWith('twitch:')){ showPage('admin'); renderViewerList(); updateStats(); return; }
   // Sinon : e-mail + mot de passe, vérifiés par Firebase (côté serveur — rien en clair dans le code)
   const emailEl = document.getElementById('admin-email-input');
   const passEl  = document.getElementById('admin-pass-input');

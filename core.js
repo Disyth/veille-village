@@ -75,12 +75,13 @@ function attachListeners(){
 }
 
 // Write helpers — écrit dans Firebase si en ligne, sinon miroir local + re-render
-function fbSetViewer(pseudo){
+// tw = true : joueur connecté via Twitch (son pseudo est alors réservé, cf. viewerConnect)
+function fbSetViewer(pseudo, tw){
   if (ONLINE){
     const { db, ref, set, serverTimestamp } = window.FB;
-    set(ref(db, 'viewers/' + fbKey(pseudo)), { pseudo, joined: serverTimestamp() });
+    set(ref(db, 'viewers/' + fbKey(pseudo)), tw ? { pseudo, tw:true, joined: serverTimestamp() } : { pseudo, joined: serverTimestamp() });
   } else {
-    if(!viewers[pseudo]) viewers[pseudo] = { pseudo, joined: Date.now() };
+    if(!viewers[pseudo]) viewers[pseudo] = tw ? { pseudo, tw:true, joined: Date.now() } : { pseudo, joined: Date.now() };
     renderViewerList(); updateStats();
   }
 }
