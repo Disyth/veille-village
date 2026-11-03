@@ -159,12 +159,13 @@ const F_ACTIONS = {
     { id:'relique', label:'🏺 Chercher une relique', locations:['Montagne'],
       desc:(st)=>{ const rest=fRelicsLeft(st).length; return rest+' relique'+(rest>1?'s':'')+' encore \u00e0 d\u00e9couvrir'; },
       check:(st)=>(fRelicsLeft(st).length>0?{ok:true}:{ok:false,why:'toutes les reliques sont au mus\u00e9e'}),
-      apply:(st)=>{
+      apply:(st, ctx)=>{
         const left = fRelicsLeft(st);
         if(!left.length) return 'fouille les galeries, mais le mus\u00e9e a d\u00e9j\u00e0 toutes les reliques';
         // Toutes les reliques restantes ont la m\u00eame chance d'\u00eatre trouv\u00e9es
         const relic = left[Math.floor(Math.random()*left.length)];
         const roll = 1 + Math.floor(Math.random()*6);
+        if(ctx) ctx.dice = { roll, bonus:0, need:relic.val, ok:roll>=relic.val, what:relic.nom };
         if(roll >= relic.val){
           if(!Array.isArray(st.museum)) st.museum=[];
           st.museum.push(relic.nom);
@@ -197,7 +198,8 @@ const F_ACTIONS = {
         const fish = fPickFish(loc, miracle ? 10 : 0);   // appât miracle : +10% d'apparition du légendaire ce tirage
         if(!fish){ return 'lance sa ligne, mais il n\'y a rien à pêcher ici'; }
         const rodBonus = (fish.legendaire && ctx && ctx.player && ctx.player.betterRod) ? 1 : 0;   // canne améliorée : +1 sur les légendaires uniquement
-        const roll = 1 + Math.floor(Math.random()*6) + rodBonus;
+        const raw = 1 + Math.floor(Math.random()*6), roll = raw + rodBonus;
+        if(ctx) ctx.dice = { roll:raw, bonus:rodBonus, need:fish.val, ok:roll>=fish.val, what:fish.nom };
         const bonusTxt = (miracle?' (appât miracle)':'') + (rodBonus?' (canne +1)':'');
         const nm = fish.legendaire ? ('✨ '+fish.nom+' (LÉGENDAIRE)') : fish.nom;
         if(roll >= fish.val){
@@ -291,7 +293,7 @@ function fObjectivesCards(st){
       '<div class="obj-bar"><div class="obj-bar-fill" style="width:'+pct+'%"></div></div>'+
       '<div class="obj-parts">'+partsHtml+'</div></div>';
   }).join('');
-  return '<div class="obj-list">'+cards+'</div>';
+  return '<div class="obj-list is-grid">'+cards+'</div>';
 }
 
 // Affichage du musée (reliques rapportées)
@@ -575,13 +577,18 @@ function fermeDoAction(pseudo, actionId){
   if(act.locations && act.locations.indexOf(p.location)<0){ toast('Action impossible à '+p.location); return; }
   const chk = act.check(st, { location:p.location, player:p });
   if(!chk.ok){ toast(chk.why||'Action impossible'); return; }
-  const msg = act.apply(st, { location: p.location, player:p, pseudo });
+  const ctx = { location: p.location, player:p, pseudo };
+  const msg = act.apply(st, ctx);
   p.actionsDone = (p.actionsDone||0)+1;
   st.lastEvent = pseudo+' '+msg+'.';
   // résultat persistant de la dernière action (ne se fait pas écraser par le passage au joueur suivant)
-  st.lastAction = { pseudo, msg, metier:p.metier, at:Date.now() };
+  const at = Date.now();
+  st.lastAction = { pseudo, msg, metier:p.metier, at, turn:st.turn };
+  if(ctx.dice) st.lastAction.dice = ctx.dice;   // lancer de dé → animation « Mon lancer » chez le lanceur
   st.history = Array.isArray(st.history) ? st.history : [];
-  st.history.push({ pseudo, msg, metier:p.metier, turn:st.turn, at:Date.now() });
+  const entry = { pseudo, msg, metier:p.metier, turn:st.turn, at };
+  if(ctx.dice) entry.dice = true;
+  st.history.push(entry);
   if(st.history.length>120) st.history = st.history.slice(-120);   // borne pour ne pas gonfler Firebase
   if(p.actionsDone>=2){ fAdvance(st); }
   fbSetFerme(st);
@@ -687,26 +694,82 @@ function fermeAdjustGold(delta){
 const F_RESOURCES = ['bois','bois dur','bûche','brindille','pierre','charbon','minerai de cuivre','cuivre','minerai de fer','fer','poisson','poisson grillé','appât miracle','panais','tomate','salade','plat de veillée','oeuf','lait'];
 
 // ── Rendering ──
-function fLastActionBanner(st, opts){
-  opts = opts||{};
-  if(!st.lastAction || !st.lastAction.msg) return '';
-  const skull = /crâne/.test(st.lastAction.msg);
-  const border = skull ? 'var(--danger)' : 'var(--success)';
-  const icon = skull ? '💀' : '✅';
-  const body = escHtml(st.lastAction.msg.replace(st.lastAction.pseudo+' ',''));
-  const dismiss = opts.dismiss
-    ? '<button onclick="fermeClearLastAction()" class="dismiss-btn">✕</button>'
-    : '';
-  return '<div class="ferme-lastaction" style="border-left:3px solid '+border+'">'+
-    '<span class="u-shrink0-lg">'+icon+'</span>'+
-    '<span class="u-minw0">Dernière action — <strong class="t-bright">'+escHtml(st.lastAction.pseudo)+'</strong> '+body+'</span>'+
-    dismiss+'</div>';
+
+// Dernières actions animées (« toaster » de la carte Joueurs, même composant que Chroniques d'Avel)
+const F_TOAST_MS = 2600, F_TOAST_EPIC_MS = 4200;
+let fToastSeen=null, fToastQueue=[], fToastBusy=false, fToastGame=null;
+function fToastEpic(msg){ return /LÉGENDAIRE !|ramenée au musée/.test(msg||''); }
+function fFeedToast(st, mePseudo){
+  const hist = Array.isArray(st.history) ? st.history : [];
+  const gameId = st.startedAt || 'ferme';
+  if(fToastGame!==gameId){ fToastGame=gameId; fToastSeen=null; fToastQueue=[]; }
+  const last = hist[hist.length-1];
+  if(fToastSeen===null){
+    // premier affichage : la dernière action sans animation
+    fToastSeen = last ? (last.at||0) : 0;
+    fShowToast(last ? { msg:last.pseudo+' '+last.msg, epic:fToastEpic(last.msg) } : { msg:'' }, false);
+    return;
+  }
+  hist.filter(e=>(e.at||0)>fToastSeen).forEach(e=>{
+    // mon propre lancer : on attend que le dé ait fini de rouler avant de dévoiler le résultat
+    fToastQueue.push({ msg:e.pseudo+' '+e.msg, epic:fToastEpic(e.msg), delay:(e.dice && e.pseudo===mePseudo) ? F_DIE_ROLL_MS+150 : 0 });
+  });
+  if(last) fToastSeen = Math.max(fToastSeen, last.at||0);
+  fPumpToast();
 }
-function fermeClearLastAction(){
-  if(!ferme) return;
-  const st = fNormalize(JSON.parse(JSON.stringify(ferme)));
-  st.lastAction = null;
-  fbSetFerme(st);
+function fShowToast(e, animate){
+  const el = document.getElementById('fv-toast'); if(!el) return;
+  el.className = 'av-toast'+(e.epic?' is-epic':'')+(animate?' is-enter':'')+(e.msg?'':' is-empty');
+  el.textContent = e.msg||'';
+}
+function fPumpToast(){
+  if(fToastBusy || !fToastQueue.length) return;
+  if(fToastQueue.length>4){   // actions enchaînées : on garde les 4 dernières (exploits toujours conservés)
+    const epic=fToastQueue.filter(e=>e.epic), rest=fToastQueue.filter(e=>!e.epic);
+    fToastQueue = epic.concat(rest.slice(-Math.max(1, 4-epic.length)));
+  }
+  const e = fToastQueue.shift();
+  fToastBusy = true;
+  setTimeout(()=>{
+    fShowToast(e, true);
+    setTimeout(()=>{ fToastBusy=false; fPumpToast(); }, e.epic?F_TOAST_EPIC_MS:F_TOAST_MS);
+  }, e.delay||0);
+}
+
+// Lancer de dé animé (« Mon lancer ») — visible uniquement chez le joueur qui a lancé
+const F_DIE_ROLL_MS = 750, F_DIE_STEP_MS = 80;
+let fDiceSeen = null, fDiceTimers = [];
+function fDiceHtml(st, mePseudo){
+  const la = st.lastAction;
+  if(st.phase!=='action' || !la || !la.dice || la.pseudo!==mePseudo || la.turn!==st.turn) return '';
+  const d = la.dice, total = d.roll + (d.bonus||0);
+  const res = escHtml(d.what||'')+' · difficulté '+d.need+(d.bonus?' · canne +'+d.bonus+' → '+total:'')+
+              ' · '+(d.ok?'<span class="t-success">✓ réussi</span>':'<span class="t-danger">✗ raté</span>');
+  return '<div class="av-roll f-roll" data-at="'+la.at+'">'+
+    '<div class="av-roll-title">Mon lancer</div>'+
+    '<div class="f-roll-body">'+
+      '<div class="av-dice"><span class="av-die die-bleu f-die" data-final="'+d.roll+'" aria-label="Dé : '+d.roll+'">'+d.roll+'</span></div>'+
+      '<div class="f-roll-res">'+res+'</div>'+
+    '</div></div>';
+}
+function fRenderDice(st, mePseudo){
+  const el = document.getElementById('fv-dice'); if(!el) return;
+  const html = fDiceHtml(st, mePseudo);
+  if(el._h===html) return;
+  dSet(el, html);
+  const box = el.querySelector('.f-roll'); if(!box) return;
+  const at = box.getAttribute('data-at');
+  if(fDiceSeen===at) return;          // déjà animé sur cet écran
+  fDiceSeen = at;
+  const reduce = typeof matchMedia!=='undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduce) return;
+  fDiceTimers.forEach(clearTimeout); fDiceTimers=[];
+  const die = box.querySelector('.f-die'), final = die.getAttribute('data-final');
+  box.classList.add('is-rolling');
+  for(let t=0; t<F_DIE_ROLL_MS; t+=F_DIE_STEP_MS){
+    fDiceTimers.push(setTimeout(()=>{ die.textContent = 1+Math.floor(Math.random()*6); }, t));
+  }
+  fDiceTimers.push(setTimeout(()=>{ die.textContent = final; box.classList.remove('is-rolling'); die.classList.add('is-landed'); }, F_DIE_ROLL_MS));
 }
 
 function fStatusPills(st, opts){
@@ -719,25 +782,53 @@ function fStatusPills(st, opts){
   return html;
 }
 
+// Initiales d'un pseudo (2 premiers caractères alphanumériques) pour les pastilles du plateau
+function fInitials(pseudo){
+  const chars = Array.from(String(pseudo||'').replace(/[^\p{L}\p{N}]/gu,''));
+  return (chars.length ? chars : Array.from(String(pseudo||'?'))).slice(0,2).join('').toUpperCase();
+}
+const F_HEX_PTS = '100,43.3 75,86.6 25,86.6 0,43.3 25,0 75,0';   // hexagone à pointes gauche/droite (comme la carte d'Avel)
+// Cadrage de l'image dans l'hexagone (en pixels de l'image d'origine, 206×127) : on évite le cadre et le
+// bandeau « nom du lieu » incrusté en bas à gauche des images actuelles. Mettre null si on fournit des images
+// sans bandeau : l'image entière remplit alors l'hexagone.
+const F_HEX_CROP = { x:56, y:6, w:95, h:82, imgW:206, imgH:127 };
+function fHexImage(src, cid){
+  const c = F_HEX_CROP;
+  if(!c) return '<image href="'+src+'" x="0" y="0" width="100" height="86.6" preserveAspectRatio="xMidYMid slice" clip-path="url(#'+cid+')"/>';
+  const k = Math.max(100/c.w, 86.6/c.h);   // échelle « cover » de la zone choisie
+  const r = n=>Math.round(n*100)/100;
+  return '<image href="'+src+'" x="'+r(50-(c.x+c.w/2)*k)+'" y="'+r(43.3-(c.y+c.h/2)*k)+'" width="'+r(c.imgW*k)+'" height="'+r(c.imgH*k)+'" preserveAspectRatio="none" clip-path="url(#'+cid+')"/>';
+}
 function fBoard(st, opts){
   opts = opts||{};
   const cur   = fCurrent(st);
-  const me    = opts.pseudo || null;                                  // joueur qui peut cliquer (vue joueur)
+  const me    = opts.pseudo || null;
   const myLoc = me && st.players[me] ? st.players[me].location : null;
-  return '<div class="ferme-board">'+ st.locations.map(loc=>{
+  return '<div class="ferme-board">'+ st.locations.map((loc,i)=>{
     const here = fPlayers(st).filter(p=>p.location===loc);
-    // Noms des joueurs présents, affichés SOUS la carte du lieu
-    const names = here.map(p=>'<span class="fpawn'+(p.pseudo===cur?' current':'')+(p.pseudo===me?' mine':'')+'">'+escHtml(p.pseudo)+'</span>').join('');
-    const active    = here.filter(p=>!p.done).length;   // seuls les joueurs encore actifs occupent une place (les « done » garés à la Ferme ne bloquent pas)
+    // Pastilles d'initiales sous le nom du lieu (pseudo complet au survol)
+    const pawns = here.map(p=>{
+      const isCur = st.phase==='action' && p.pseudo===cur;
+      return '<span class="fpawn'+(isCur?' current':'')+(p.pseudo===me?' mine':'')+(p.done&&!isCur?' is-out':'')+'" title="'+escAttr(p.pseudo)+'">'+escHtml(fInitials(p.pseudo))+'</span>';
+    }).join('');
+    const active    = here.filter(p=>!p.done).length;   // les joueurs « done » garés à la Ferme ne bloquent pas
     const full      = active>=F_LOC_CAP && myLoc!==loc;
     const clickable = !!opts.pick && !full;
     const sel  = (myLoc===loc)?' selected':'';
     const cls  = 'floc'+sel+(clickable?' floc-btn':'')+((opts.pick&&full)?' floc-full':'');
-    const click = clickable ? ' onclick="'+opts.pick+'(\''+escAttr(me)+'\',\''+escAttr(loc)+'\')"' : '';
+    const call  = opts.pick+'(\''+escAttr(me)+'\',\''+escAttr(loc)+'\')';
+    const click = clickable ? ' role="button" tabindex="0" onclick="'+call+'" onkeydown="if(event.key===\'Enter\')'+call+'"' : '';
     const badge = (opts.pick && full) ? '<span class="floc-badge">complet</span>' : '';
+    const cid = 'fhex-'+i;
     return '<div class="'+cls+'"'+click+'>'+
-      '<div class="floc-visual"><img class="floc-img" src="'+F_LOC_IMG[loc]+'" alt="'+escAttr(loc)+'" draggable="false">'+badge+'</div>'+
-      '<div class="floc-pawns">'+names+'</div></div>';
+      '<div class="floc-visual">'+
+        '<svg class="floc-hex" viewBox="0 0 100 86.6" role="img" aria-label="'+escAttr(loc)+'">'+
+          '<defs><clipPath id="'+cid+'"><polygon points="'+F_HEX_PTS+'"/></clipPath></defs>'+
+          fHexImage(F_LOC_IMG[loc], cid)+
+          '<polygon class="floc-hex-line" points="'+F_HEX_PTS+'"/>'+
+        '</svg>'+badge+'</div>'+
+      '<div class="floc-name">'+escHtml(loc)+'</div>'+
+      '<div class="floc-pawns">'+pawns+'</div></div>';
   }).join('') + '</div>';
 }
 
@@ -784,20 +875,17 @@ function fViewerPlayers(st, mePseudo){
     return '<div class="'+cls+'">'+
       '<span class="player-name">'+escHtml(p.pseudo)+'</span>'+
       '<span class="player-infos">'+metier+objet+'</span>'+
-      '<span class="player-status">'+status+'</span></div>';
+      (status?'<span class="player-status">'+status+'</span>':'')+'</div>';
   }).join('');
 }
 
 function fInventory(st){
   const CROPS = (typeof F_CROP_MAX!=='undefined') ? Object.keys(F_CROP_MAX) : ['panais','tomate','salade'];
   const keys = Object.keys(st.inventory);
-  const recolte    = keys.filter(k=>CROPS.indexOf(k)>=0);   // produits de récolte (panais/tomate/salade)
-  const ressources = keys.filter(k=>CROPS.indexOf(k)<0);    // tout le reste (bois, pierre, poisson, plats…)
-  const pill = k=>'<span class="inv-item">'+escHtml(k)+' <strong>×'+st.inventory[k]+'</strong></span>';
-  let h = '<div class="u-mb-sm"><div class="f-caption-sm">Or</div><div class="finv"><span class="inv-item">Or <strong>×'+(st.gold||0)+'</strong></span></div></div>';
-  if(ressources.length) h += '<div class="u-mb-sm"><div class="f-caption-sm">Ressources</div><div class="finv">'+ressources.map(pill).join('')+'</div></div>';
-  if(recolte.length)    h += '<div class="u-mb-sm"><div class="f-caption-sm">Récolte</div><div class="finv">'+recolte.map(pill).join('')+'</div></div>';
-  return h;
+  const ordered = keys.filter(k=>CROPS.indexOf(k)<0).concat(keys.filter(k=>CROPS.indexOf(k)>=0));   // ressources puis récolte
+  const pill = (lbl,n)=>'<span class="inv-item">'+escHtml(lbl)+' <strong>'+n+'</strong></span>';
+  const cap = s=>s.charAt(0).toUpperCase()+s.slice(1);
+  return '<div class="finv">'+pill('Or', st.gold||0)+ordered.map(k=>pill(cap(k), st.inventory[k])).join('')+'</div>';
 }
 
 // Retire les emojis d'une chaîne d'affichage — vue meneur : emotes réservées à la vue joueur.
@@ -893,7 +981,7 @@ function renderFermeAdmin(){
 function renderFermeViewer(pseudo){
   const wrap = document.getElementById('viewer-ferme');
   if(!wrap) return;
-  if(!ferme || !ferme.active){ wrap.style.display='none'; return; }
+  if(!ferme || !ferme.active){ wrap.style.display='none'; fToastSeen=null; return; }
   wrap.style.display='block';
 
   const ph = ferme.phase;
@@ -911,22 +999,23 @@ function renderFermeViewer(pseudo){
   } else if(ph==='action'){
     instr.innerHTML = (cur===pseudo)
       ? 'Phase Action : ▶ C\'est ton tour ! Réalise tes actions ou déplace toi'
-      : 'Phase Action : Au tour de ' + (cur||'—');
+      : 'Phase Action : ▶ C\'est au tour de ' + escHtml(cur||'—');
   } else {
     instr.innerHTML = '';
   }
 
-  // Colonne de droite : inventaire + objectifs (seulement en jeu)
-  const side  = document.getElementById('fv-side');
-  const invEl = document.getElementById('fv-inventory');
-  const objEl = document.getElementById('fv-objectives');
-  if(side) side.style.display = inGame ? '' : 'none';
-  const playersEl = document.getElementById('fv-players');
+  // Colonne de droite : joueurs + dernières actions ; sous la carte : inventaire + objectifs (seulement en jeu)
+  const side   = document.getElementById('fv-side');
+  const bottom = document.getElementById('fv-bottom');
+  if(side)   side.style.display   = inGame ? '' : 'none';
+  if(bottom) bottom.style.display = inGame ? '' : 'none';
   if(inGame){
-    if(invEl) invEl.innerHTML = fInventory(ferme) + fCrops(ferme);
-    if(objEl) objEl.innerHTML = fObjectivesCards(ferme);
-    if(playersEl) playersEl.innerHTML = fViewerPlayers(ferme, pseudo);
+    dSet(document.getElementById('fv-inventory'), fInventory(ferme) + fCrops(ferme) + fMuseum(ferme));
+    dSet(document.getElementById('fv-objectives'), fObjectivesCards(ferme));
+    dSet(document.getElementById('fv-players'), fViewerPlayers(ferme, pseudo));
+    fFeedToast(ferme, pseudo);
   }
+  fRenderDice(ferme, pseudo);
 
   const zone = document.getElementById('fv-myzone');
 
@@ -941,7 +1030,7 @@ function renderFermeViewer(pseudo){
     return;
   }
 
-  const board = fBoard(ferme, {});
+  const board = fBoard(ferme, { pseudo:pseudo });
 
   if(!me){
     zone.innerHTML = board + '<div class="diamant-voted">👀 Tu n\'es pas dans cette partie. Tu pourras jouer à la prochaine !</div>';
@@ -964,14 +1053,14 @@ function renderFermeViewer(pseudo){
 
   if(ph==='action'){
     const isMe = (cur===pseudo);
-    const lastAct = fLastActionBanner(ferme);
     if(isMe){
-      zone.innerHTML = board + fActionButtons(ferme, pseudo) + lastAct +
-        '<button class="btn-primary u-mt-md" onclick="fermeEndPlayerTurn()">Terminer mon tour</button>';
+      // Ordre de la maquette : actions → déplacement → « Terminer mon tour » → carte
+      zone.innerHTML = fActionButtons(ferme, pseudo) +
+        '<button class="btn-primary f-endturn" onclick="fermeEndPlayerTurn()">Terminer mon tour</button>' + board;
     } else if(fIsAbsent(me)){
-      zone.innerHTML = board + '<div class="diamant-voted">💤 Tu es absent ce tour : tu n\'as pas choisi de métier à temps. Tu pourras rejouer au tour suivant en choisissant un métier pendant la planification.</div>' + lastAct;
+      zone.innerHTML = board + '<div class="diamant-voted">💤 Tu es absent ce tour : tu n\'as pas choisi de métier à temps. Tu pourras rejouer au tour suivant en choisissant un métier pendant la planification.</div>';
     } else {
-      zone.innerHTML = board + '<div class="diamant-voted">Ton métier ce tour : <strong class="t-metier">'+(me.metier||'—')+'</strong>, ton lieu : <strong class="t-bright">'+(me.location||'—')+'</strong>.</div>' + lastAct;
+      zone.innerHTML = board + '<div class="diamant-voted">Ton métier ce tour : <strong class="t-metier">'+(me.metier||'—')+'</strong>, ton lieu : <strong class="t-bright">'+(me.location||'—')+'</strong>.</div>';
     }
     return;
   }

@@ -55,6 +55,7 @@
   --hero-4: #b48be8;   /* Mélusine — violet */
   --hero-5: #f2d24c;   /* Théobald — jaune */
   --hero-6: #e9e4d4;   /* Brunehilde — ivoire */
+  --pawn: var(--hero-1); /* pastilles d'initiales des joueurs sur le plateau de la Ferme */
   --tile-face:   #3b2208;               /* tuile révélée */
   --tile-castle: #4a2c0c;               /* tuile du château */
   --tile-hidden: rgba(197,148,99,.10);  /* tuile face cachée */
@@ -227,12 +228,9 @@
 
   /* ── FERME ── */
   
-  @media(max-width:520px){ .ferme-board{ grid-template-columns:repeat(2,1fr); } }
   
   
   
-  .fpawn { font-size: .9rem; background:var(--border-soft); border:1px solid var(--border); border-radius:10px; padding:1px 7px; color:var(--text-hover); }
-  .fpawn.current { background:var(--success-line); border-color:var(--success); color:var(--success); }
   
   
   
@@ -246,8 +244,6 @@
   .fphase-action{ background:var(--success-soft); color:var(--success); }
   .fphase-gameEnd{ background:var(--danger-soft); color:var(--danger); }
 
-  .ferme-lastaction { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; padding:.5rem .2rem; background:none; margin:.6rem 0 .8rem; font-size:.92rem; line-height:1.4; color:var(--text-body); }
-  @media(max-width:520px){ .ferme-lastaction { font-size: .9rem; padding:.5rem .7rem; } }
 
   @media(max-width:520px){
     .diamant-status { gap:.5rem; }
@@ -334,22 +330,49 @@
 
 
 
-/* ── CARTE DU JEU (visuels des lieux) ─────────────────────────────────────── */
-.ferme-board { display:flex; flex-wrap:wrap; gap:15px; justify-content:center; margin-bottom:1rem; }
-.floc { flex:0 0 205px; max-width:205px; border-radius:10px; transition:transform .15s ease, filter .15s ease; }
-.floc-visual { position:relative; line-height:0; }
-.floc-img { width:100%; height:auto; aspect-ratio:205/127; display:block; image-rendering:pixelated; border-radius:8px; }
+/* ── CARTE DU JEU (Ferme) : tuiles hexagonales, image dedans, nom dessous ──── */
+.ferme-board { display:flex; flex-wrap:wrap; gap:14px; justify-content:center; background:var(--surface-sunken-soft); border:1px solid var(--border); border-radius:8px; padding:1.8rem 1rem 1.2rem; margin:1rem 0 1.4rem; }
+.floc { flex:0 0 96px; display:flex; flex-direction:column; align-items:center; transition:transform .15s ease, filter .15s ease; }
+.floc-visual { position:relative; width:100%; line-height:0; }
+.floc-hex { width:100%; height:auto; display:block; overflow:visible; }
+.floc-hex image { image-rendering:pixelated; }
+.floc-hex-line { fill:none; stroke:transparent; stroke-width:3; transition:stroke .15s; }
+.floc-name { font-family:'Literata',serif; font-weight:700; font-size:.8rem; color:var(--text-title); margin-top:.35rem; text-align:center; }
 .floc-btn { cursor:pointer; }
-.floc-btn:hover { transform:translateY(-4px); filter:brightness(1.12); }
-.floc.selected { outline:3px solid var(--text-title); outline-offset:3px; }
-.floc-full { opacity:.4; cursor:not-allowed; }
-.floc-badge { position:absolute; top:8px; right:8px; background:var(--surface-sunken); border:1px solid var(--danger); color:var(--danger); font-family:'Marcellus',serif; font-size:.8rem; letter-spacing:.05em; padding:.1rem .5rem; border-radius:10px; line-height:1.4; }
-.floc-pawns { display:flex; flex-wrap:wrap; gap:.3rem; justify-content:center; margin-top:.45rem; min-height:1.7rem; }
-.fpawn.mine { outline:1px solid var(--text-title); }
+.floc-btn:hover, .floc-btn:focus-visible { transform:translateY(-4px); filter:brightness(1.12); outline:none; }
+.floc-btn:hover .floc-hex-line { stroke:var(--text-body); }
+.floc.selected .floc-hex-line { stroke:var(--text-title); stroke-width:4; }
+.floc-full { cursor:not-allowed; }
+.floc-full .floc-hex, .floc-full .floc-name, .floc-full .floc-pawns { opacity:.4; }
+.floc-badge { position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--surface-sunken); border:1px solid var(--danger); color:var(--danger); font-family:'Marcellus',serif; font-size:.75rem; letter-spacing:.05em; padding:.05rem .45rem; border-radius:10px; line-height:1.4; white-space:nowrap; }
+.floc-pawns { display:flex; flex-wrap:wrap; gap:.3rem; justify-content:center; margin-top:.3rem; min-height:22px; max-width:110px; }
+/* Pastille d'initiales d'un joueur */
+.fpawn { width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; background:var(--pawn); color:var(--bg-page); font-family:'Marcellus',serif; font-size:.68rem; line-height:1; cursor:default; }
+.fpawn.mine { outline:2px solid var(--text-title); outline-offset:1px; }
+.fpawn.current { outline:2px solid var(--success); outline-offset:1px; }
+.fpawn.is-out { opacity:.5; }
+@media(max-width:640px){ .ferme-board { gap:10px 6px; padding:1.4rem .5rem 1rem; } .floc { flex:0 0 calc(33.333% - 6px); max-width:100px; } }
 
-/* Adaptation aux écrans plus étroits (vue joueur / mobile) */
-@media(max-width:1000px){ .floc { flex:0 0 calc(33.333% - 10px); max-width:none; } }
-@media(max-width:640px){  .floc { flex:0 0 calc(50% - 8px); } .ferme-board { gap:10px; } }
+/* Lancer de dé animé (« Mon lancer ») — réutilise .av-roll / .av-die de Chroniques d'Avel */
+.f-roll { margin-bottom:1rem; }
+.f-roll-body { display:flex; align-items:center; gap:1rem; flex-wrap:wrap; }
+.f-die { font-family:'Marcellus',serif; font-size:1.4rem; color:var(--text-title); }
+.f-roll-res { font-size:.9rem; color:var(--text-body); transition:opacity .25s; }
+.f-roll.is-rolling .f-roll-res { opacity:0; }
+.f-roll.is-rolling .f-die { animation:avDieIn .75s cubic-bezier(.2,.8,.3,1.2); }
+@media (prefers-reduced-motion: reduce){ .f-roll.is-rolling .f-die { animation:none; } }
+.f-endturn { margin-top:1rem; }
+
+/* Objectifs en GRILLE (Ferme, sous la carte) */
+.obj-list.is-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.6rem; }
+.obj-list.is-grid .obj-item { border:1px solid var(--border); border-radius:6px; padding:.8rem 1rem; background:var(--surface-sunken-soft); }
+.obj-list.is-grid .obj-item.done { border-color:var(--success); }
+.obj-list.is-grid .obj-item.done .obj-title { color:var(--success); }
+.obj-list.is-grid .obj-title { text-transform:uppercase; letter-spacing:.06em; font-size:.85rem; }
+@media(max-width:640px){ .obj-list.is-grid { grid-template-columns:1fr; } }
+#fv-bottom .section-title { margin:1.2rem 0 .6rem; }
+#fv-bottom .finv { margin-bottom:.6rem; }
+
 /* Zone des CTA, toujours en bas du module */
 .fa-cta { margin-top:var(--admin-card-gap); padding-top:var(--admin-card-gap); border-top:1px solid var(--border); }
 /* Sur écran étroit (vue mobile / fenêtre réduite), on laisse la hauteur s'adapter */

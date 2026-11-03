@@ -246,26 +246,29 @@
             <div class="container-head">
               <span class="container-title">🌾 La Ferme du Village</span>
               <span class="head-actions">
-                <button class="btn-help" onclick="fermeShowHistory()" title="Historique des actions" aria-label="Historique des actions">📋</button>
                 <button class="btn-help" onclick="fermeShowRules()">❓ Comment jouer</button>
               </span>
             </div>
             <div class="container-pills" id="fv-status"></div>
             <div class="fv-instruction" id="fv-instruction"></div>
+            <div id="fv-dice"></div>
             <div id="fv-myzone"></div>
+            <!-- Inventaire + objectifs, sous la carte -->
+            <div id="fv-bottom">
+              <div class="section-title">Inventaire</div>
+              <div id="fv-inventory"></div>
+              <div class="section-title">Objectifs de grand-père</div>
+              <div id="fv-objectives"></div>
+            </div>
           </div>
-          <!-- Colonne droite : onglets (inventaire / objectifs) + liste des joueurs -->
+          <!-- Colonne droite : liste des joueurs + dernières actions (comme Chroniques d'Avel) -->
           <div class="fv-side" id="fv-side">
             <div class="card">
-              <div class="tabs">
-                <button class="tab-btn is-active" data-tab-group="fv" data-tab-target="inv" onclick="uiTab('fv','inv')">Inventaire</button>
-                <button class="tab-btn" data-tab-group="fv" data-tab-target="obj" onclick="uiTab('fv','obj')">Objectifs</button>
+              <div class="container-head">
+                <span class="container-title is-label">Joueurs</span>
+                <span class="head-actions"><button class="btn-help" onclick="fermeShowHistory()" title="Historique des actions" aria-label="Historique des actions">📋</button></span>
               </div>
-              <div class="tab-panel is-active" data-tab-group="fv" data-tab-panel="inv" id="fv-inventory"></div>
-              <div class="tab-panel" data-tab-group="fv" data-tab-panel="obj" id="fv-objectives"></div>
-            </div>
-            <div class="card">
-              <div class="container-head"><span class="container-title is-label">Joueurs</span></div>
+              <div class="av-toast is-empty" id="fv-toast" aria-live="polite"></div>
               <div class="player-list" id="fv-players"></div>
             </div>
           </div>
