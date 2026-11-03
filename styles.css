@@ -188,6 +188,10 @@
   .dcard-treasure .dico { font-size:1rem; }
   .dcard-hazard { background:var(--danger-soft); border-color:var(--danger); color:var(--danger); }
   .dcard-hazard .dico { font-size:1.7rem; }
+  .dcard-relic { background:linear-gradient(160deg,var(--fire-soft),var(--hover-wash-2)); border-color:var(--fire); color:var(--fire); }
+  .dcard-relic .dval { font-size:1.4rem; font-weight:700; }
+  .dcard-relic .dico { font-size:1rem; }
+  .dcard-relic.is-taken { opacity:.35; }   /* relique emportée : reste visible sur le chemin, estompée */
   .dcard-empty { color:var(--text-body); font-style:italic; font-family:'Literata',serif; font-size: .9rem; padding:0 1rem; }
   .diamant-status { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:.8rem; }
   /* Pastilles unifiées : .dpill (Diamant/Galerapagos) et .fturn-pill (Ferme) partagent la même base */
@@ -817,3 +821,10 @@
   .lb-card .player-info.lb-time { display:none; }       /* le temps de jeu se lit dans la pastille du haut */
   .lb-card .lb-record .player-infos { display:none; }   /* record : on garde le score + l'issue */
 }
+/* ── Diamant versus : sections d'équipe dans la liste des joueurs ── */
+#dv-side.is-versus .card > .container-head { display:none; }   /* les titres d'équipe remplacent « Explorateurs » */
+.dteam-head { margin-bottom:.4rem; }
+.dteam-head:not(:first-child) { margin-top:1.1rem; }
+.dteam-score { margin-left:auto; font-family:'Marcellus',serif; color:var(--text-title); white-space:nowrap; }
+.dteam-head.is-winner .container-title { color:var(--fire); }
+.dteam-empty { font-style:italic; color:var(--text-out); font-size:.9rem; padding:.2rem .1rem; }

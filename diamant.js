@@ -1,16 +1,24 @@
 // ── DIAMANT ENGINE + UI ──────────────────────────────────────────────────────
 const D_HAZARDS = ['serpent','araignee','eboulement','feu','momie'];   // 5 types × 3 exemplaires (deck officiel)
 const D_HAZ_COPIES = 3;
-// Reliques du vrai jeu (5, 7, 8, 10, 12) : volontairement NON intégrées pour l'instant (décision de Damien).
+// Reliques (5, 7, 8, 10, 12) : uniquement en mode VERSUS (décision de Damien). Règle officielle :
+// 1 relique ajoutée au paquet à chaque manche ; seul un explorateur qui rentre SEUL ramasse les reliques
+// du chemin ; une relique révélée mais non ramassée est perdue en fin de manche (une relique encore
+// cachée dans le paquet reste pour la manche suivante).
+const D_RELICS = [5,7,8,10,12];
+// Mode VERSUS : 2 équipes fixes, équilibrées automatiquement. Le trésor d'un joueur compte pour son équipe.
+const D_TEAMS = [ { id:'ours', nom:'Équipe des Ours' }, { id:'loups', nom:'Équipe des Loups' } ];
 const D_TREASURES = [1,2,3,4,5,5,7,7,9,11,11,13,14,15,17];
 const D_MAXROUNDS = 5;
 let __dseq = 0;
 function dCardId(){ return 'c'+Date.now()+'_'+(__dseq++); }
 function dShuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 // removed = { type: nb de cartes retirées } — la carte piège qui a tué une manche sort du jeu pour la suite
-function dNewDeck(removed){
+// relics = valeurs des reliques à glisser dans le paquet (mode versus uniquement)
+function dNewDeck(removed, relics){
   removed = removed || {};
   const cards=[];
+  (relics||[]).forEach(v=>cards.push({id:dCardId(),type:'relic',value:v}));
   D_TREASURES.forEach(v=>cards.push({id:dCardId(),type:'treasure',value:v}));
   D_HAZARDS.forEach(t=>{ const n=Math.max(0, D_HAZ_COPIES-(removed[t]||0)); for(let i=0;i<n;i++) cards.push({id:dCardId(),type:'hazard',hazard:t}); });
   return dShuffle(cards);
@@ -36,6 +44,38 @@ function dHazIcon(h){ const ic = D_HAZ_ICON[h]; if(!ic) return '⚠️'; return 
 function dHazLabel(h){ return D_HAZ_NAME[h] ? (dHazIcon(h)+' '+D_HAZ_NAME[h]) : h; }
 function dInPlayers(st){ return Object.values(st.players).filter(p=>p.status==='in'); }
 function dTotalBanked(st){ return Object.values(st.players).reduce((s,p)=>s+p.banked,0); }
+// ── Mode versus : équipes + reliques ──
+function dIsVersus(st){ return !!(st && st.mode==='versus'); }
+function dTeamName(id){ const t=D_TEAMS.find(x=>x.id===id); return t ? t.nom : ''; }
+function dTeamCounts(st){ const c={}; D_TEAMS.forEach(t=>c[t.id]=0); Object.values(st.players).forEach(p=>{ if(p.team in c) c[p.team]++; }); return c; }
+function dTeamTotal(st, id){ return Object.values(st.players).filter(p=>p.team===id).reduce((s,p)=>s+(p.banked||0),0); }
+// Équipe la moins remplie (au hasard en cas d'égalité, pour ne pas toujours remplir les Ours en premier)
+function dPickTeam(st){
+  const c=dTeamCounts(st); const min=Math.min(...Object.values(c));
+  const cands=D_TEAMS.filter(t=>c[t.id]===min);
+  return cands[Math.floor(Math.random()*cands.length)].id;
+}
+// Rééquilibre au lancement (des départs du lobby, ou deux arrivées simultanées, peuvent déséquilibrer) :
+// on déplace les derniers arrivés de l'équipe la plus grosse vers la plus petite jusqu'à ±1 joueur.
+function dBalanceTeams(st){
+  Object.values(st.players).forEach(p=>{ if(!dTeamName(p.team)) p.team=dPickTeam(st); });
+  for(let guard=0; guard<50; guard++){
+    const c=dTeamCounts(st); const ids=Object.keys(c).sort((a,b)=>c[a]-c[b]);
+    const small=ids[0], big=ids[ids.length-1];
+    if(c[big]-c[small]<=1) return;
+    const mover=Object.values(st.players).filter(p=>p.team===big).sort((a,b)=>(b.joined||0)-(a.joined||0))[0];
+    mover.team=small;
+  }
+}
+function dPathRelics(st){ return st.board.filter(c=>c.type==='relic' && !c.taken); }
+function dRelicsPts(p){ return (p.relics||[]).reduce((s,v)=>s+v,0); }
+// Résultat final versus : { winner: id | null (égalité), totals: { id: total } }
+function dVersusResult(st){
+  const totals={}; D_TEAMS.forEach(t=>totals[t.id]=dTeamTotal(st,t.id));
+  const best=Math.max(...Object.values(totals));
+  const top=D_TEAMS.filter(t=>totals[t.id]===best);
+  return { winner: top.length===1 ? top[0].id : null, totals };
+}
 function dNormalize(st){
   if(!st) return st;
   // Firebase drops empty arrays/objects/null — rebuild them so the engine never hits undefined
@@ -45,24 +85,35 @@ function dNormalize(st){
   st.removedHazards = (st.removedHazards && typeof st.removedHazards==='object') ? st.removedHazards : {};
   st.players     = (st.players && typeof st.players==='object') ? st.players : {};
   st.pathTreasure= (typeof st.pathTreasure==='number') ? st.pathTreasure : 0;
+  st.mode        = (st.mode==='versus') ? 'versus' : 'coop';
+  st.relicQueue  = Array.isArray(st.relicQueue) ? st.relicQueue : (st.relicQueue ? Object.values(st.relicQueue) : []);
+  Object.values(st.players).forEach(p=>{
+    p.relics = Array.isArray(p.relics) ? p.relics : (p.relics ? Object.values(p.relics) : []);
+  });
   return st;
 }
 
 // ── Control handlers (write to Firebase) ──
-function startDiamant(){
+// mode = 'coop' (défaut) ou 'versus' (équipes + reliques)
+function startDiamant(mode){
+  const versus = (mode==='versus');
   // Ouvre un lobby vide : les joueurs volontaires rejoignent, le meneur lance quand il veut
   fbSetDiamant({
-    active:true, round:1, maxRounds:D_MAXROUNDS, phase:'lobby',
-    deck:[], board:[], pathTreasure:0, hazardsSeen:{}, removedHazards:{}, players:{},
-    lastEvent:'Lobby ouvert — les explorateurs peuvent rejoindre la partie.'
+    active:true, mode: versus?'versus':'coop', round:1, maxRounds:D_MAXROUNDS, phase:'lobby',
+    deck:[], board:[], pathTreasure:0, hazardsSeen:{}, removedHazards:{}, players:{}, relicQueue:[],
+    lastEvent: versus ? 'Lobby versus ouvert — rejoins la partie, les équipes se forment automatiquement.'
+                      : 'Lobby ouvert — les explorateurs peuvent rejoindre la partie.'
   });
-  toast('💎 Lobby de Diamant ouvert !');
+  toast(versus ? '💎 Lobby de Diamant versus ouvert !' : '💎 Lobby de Diamant ouvert !');
 }
 
 function diamantJoin(pseudo){
   if(!diamant || diamant.phase!=='lobby') return;
   const st = dNormalize(JSON.parse(JSON.stringify(diamant)));
-  if(!st.players[pseudo]) st.players[pseudo] = { pseudo, status:'in', held:0, banked:0, vote:null };
+  if(!st.players[pseudo]){
+    st.players[pseudo] = { pseudo, status:'in', held:0, banked:0, vote:null, joined:Date.now() };
+    if(dIsVersus(st)) st.players[pseudo].team = dPickTeam(st);
+  }
   st.lastEvent = Object.keys(st.players).length+' explorateur(s) dans le lobby.';
   fbSetDiamant(st);
 }
@@ -81,13 +132,24 @@ function diamantLaunch(){
   if(n===0){ toast('Aucun explorateur n\'a rejoint le lobby !'); return; }
   const st = dNormalize(JSON.parse(JSON.stringify(diamant)));
   // (re)initialise l'état des joueurs présents et démarre la première manche
-  Object.values(st.players).forEach(p=>{ p.status='in'; p.held=0; p.banked=0; p.vote=null; });
+  Object.values(st.players).forEach(p=>{ p.status='in'; p.held=0; p.banked=0; p.vote=null; p.relics=[]; });
   st.startedAt = lbNow();   // temps de jeu (classement global)
   st.phase='exploring';
   st.round=1;
   st.removedHazards={};   // nouvelle partie : deck complet
-  st.deck=dNewDeck(st.removedHazards); st.board=[]; st.pathTreasure=0; st.hazardsSeen={};
-  st.lastEvent='La partie commence avec '+n+' explorateur(s) ! Révèle la première carte.';
+  let relics = [];
+  if(dIsVersus(st)){
+    dBalanceTeams(st);
+    st.relicQueue = dShuffle(D_RELICS);   // ordre d'arrivée des reliques, 1 par manche
+    relics = [st.relicQueue.shift()];
+  }
+  st.deck=dNewDeck(st.removedHazards, relics); st.board=[]; st.pathTreasure=0; st.hazardsSeen={};
+  if(dIsVersus(st)){
+    const c=dTeamCounts(st);
+    st.lastEvent='La partie versus commence : '+D_TEAMS.map(t=>dTeamName(t.id)+' ('+c[t.id]+')').join(' contre ')+' ! Révèle la première carte.';
+  } else {
+    st.lastEvent='La partie commence avec '+n+' explorateur(s) ! Révèle la première carte.';
+  }
   fbSetDiamant(st);
   toast('💎 Partie lancée avec '+n+' joueur(s) !');
 }
@@ -104,7 +166,12 @@ function diamantDraw(){
   if(!st.deck.length){ st.lastEvent='Deck vide, la manche se termine.'; dEndRound(st); fbSetDiamant(st); return; }
   const card = st.deck.shift();
   st.board.push(card);
-  if(card.type==='treasure'){
+  if(card.type==='relic'){
+    // Une relique ne se partage pas : elle reste sur le chemin jusqu'à ce qu'un explorateur rentre seul
+    Object.values(st.players).forEach(p=>{ if(p.status==='in') p.vote=null; });
+    st.phase='voting';
+    st.lastEvent='🏺 Relique de '+card.value+' ! Elle reste sur le chemin : seul un explorateur qui rentre SEUL pourra l\'emporter.';
+  } else if(card.type==='treasure'){
     const ins = dInPlayers(st); const N=ins.length;
     if(N>0){
       const share=Math.floor(card.value/N), rem=card.value%N;
@@ -159,6 +226,18 @@ function dResolveVotes(st){
     leavers.forEach(p=>{ p.banked+=p.held+share; p.held=0; p.status='out'; p.vote=null; });
     st.pathTreasure=rem;
     st.lastEvent=M+' explorateur'+(M>1?'s rentrent':' rentre')+' au camp avec leur butin.';
+    // Reliques : seul un explorateur qui rentre SEUL les ramasse toutes
+    const relics = dPathRelics(st);
+    if(relics.length){
+      if(M===1){
+        const p=leavers[0]; const pts=relics.reduce((s,c)=>s+c.value,0);
+        relics.forEach(c=>{ c.taken=true; p.relics.push(c.value); });
+        p.banked+=pts;
+        st.lastEvent+=' 🏺 '+p.pseudo+' rentre seul et emporte '+(relics.length>1?(relics.length+' reliques'):'la relique')+' (+'+pts+')'+(p.team?(' pour l\''+dTeamName(p.team)):'')+' !';
+      } else {
+        st.lastEvent+=' 🏺 Ils sont plusieurs : personne ne peut emporter la relique.';
+      }
+    }
   } else { st.lastEvent='Tout le monde continue l\'exploration !'; }
   dInPlayers(st).forEach(p=>p.vote=null);
   if(dInPlayers(st).length===0){ dEndRound(st); return; }
@@ -167,6 +246,10 @@ function dResolveVotes(st){
 
 function dEndRound(st){
   dInPlayers(st).forEach(p=>{ p.held=0; p.status='out'; p.vote=null; });
+  // Reliques révélées non ramassées : perdues. Celles encore cachées dans le paquet restent pour la manche suivante.
+  const lostRelics = dPathRelics(st);
+  if(lostRelics.length) st.lastEvent=(st.lastEvent?st.lastEvent+' ':'')+'🏺 '+(lostRelics.length>1?(lostRelics.length+' reliques sont perdues'):'La relique est perdue')+' dans la grotte.';
+  st.relicCarry = st.deck.filter(c=>c.type==='relic').map(c=>c.value);
   st.pathTreasure=0; st.phase='roundEnd';
 }
 
@@ -175,10 +258,22 @@ function diamantNextRound(){
   const st = dNormalize(JSON.parse(JSON.stringify(diamant)));
   if(st.round>=st.maxRounds){
     st.phase='gameEnd';
-    st.lastEvent='🏁 Partie terminée ! Trésor total sécurisé : '+dTotalBanked(st)+'.';
+    if(dIsVersus(st)){
+      const r=dVersusResult(st);
+      st.lastEvent='🏁 Partie terminée ! '+D_TEAMS.map(t=>dTeamName(t.id)+' : '+r.totals[t.id]).join(' — ')+'. '+
+        (r.winner ? ('🏆 Victoire de l\'' +dTeamName(r.winner)+' !') : '🤝 Égalité parfaite !');
+    } else {
+      st.lastEvent='🏁 Partie terminée ! Trésor total sécurisé : '+dTotalBanked(st)+'.';
+    }
     fbSetDiamant(st); return;
   }
-  st.round+=1; st.deck=dNewDeck(st.removedHazards); st.board=[]; st.pathTreasure=0; st.hazardsSeen={};
+  let relics = [];
+  if(dIsVersus(st)){
+    relics = (Array.isArray(st.relicCarry) ? st.relicCarry : (st.relicCarry ? Object.values(st.relicCarry) : []));
+    if(st.relicQueue.length) relics.push(st.relicQueue.shift());
+  }
+  st.relicCarry = null;
+  st.round+=1; st.deck=dNewDeck(st.removedHazards, relics); st.board=[]; st.pathTreasure=0; st.hazardsSeen={};
   Object.values(st.players).forEach(p=>{ p.status='in'; p.held=0; p.vote=null; });
   st.phase='exploring';
   st.lastEvent='Manche '+st.round+' ! Tous repartent dans la grotte.';
@@ -206,6 +301,7 @@ function dRenderPath(el, board){
     ? '<div class="dcard-empty">La grotte est encore inexplorée…</div>'
     : board.map(c=>{
         if(c.type==='treasure') return '<div class="dcard dcard-treasure"><span class="dico">💎</span><span class="dval">'+c.value+'</span></div>';
+        if(c.type==='relic') return '<div class="dcard dcard-relic'+(c.taken?' is-taken':'')+'" title="'+(c.taken?'Relique emportée':'Relique sur le chemin')+'"><span class="dico">🏺</span><span class="dval">'+c.value+'</span></div>';
         return '<div class="dcard dcard-hazard"><span class="dico">'+dHazIcon(c.hazard)+'</span></div>';
       }).join('');
   if(el._h !== html){ el.innerHTML = html; el._h = html; el.scrollLeft = el.scrollWidth; }
@@ -214,9 +310,11 @@ function dRenderPath(el, board){
 function dStatusPills(st){
   const ins = dInPlayers(st).length;
   const total = dTotalBanked(st);
-  return '<div class="dpill">Manche <strong>'+st.round+'/'+st.maxRounds+'</strong></div>'+
+  return (dIsVersus(st) ? '<div class="dpill">Mode <strong>versus</strong></div>' : '')+
+         '<div class="dpill">Manche <strong>'+st.round+'/'+st.maxRounds+'</strong></div>'+
          '<div class="dpill">Dans la grotte <strong>'+ins+'</strong></div>'+
          '<div class="dpill">Sur le chemin <strong>'+st.pathTreasure+'</strong></div>'+
+         dRelicPill(st)+
          '<div class="dpill">Trésor sécurisé <strong>'+total+'</strong></div>';
 }
 
@@ -224,14 +322,39 @@ function dStatusPills(st){
 function dManchePill(st){
   return '<div class="dpill">Manche <strong>'+(st.round||1)+'/'+(st.maxRounds||5)+'</strong></div>';
 }
+// Pastille « Reliques » : seulement en versus, et seulement s'il y en a sur le chemin
+function dRelicPill(st){
+  if(!dIsVersus(st)) return '';
+  const r=dPathRelics(st); if(!r.length) return '';
+  return '<div class="dpill">Reliques sur le chemin <strong>'+r.reduce((s,c)=>s+c.value,0)+'</strong></div>';
+}
 function dStatsPills(st){
   return '<div class="dpill">Explorateurs <strong>'+dInPlayers(st).length+'</strong></div>'+
          '<div class="dpill">Sur le chemin <strong>'+st.pathTreasure+'</strong></div>'+
+         dRelicPill(st)+
          '<div class="dpill">Trésor sécurisé <strong>'+dTotalBanked(st)+'</strong></div>';
 }
 
 function dPlayersList(st, highlightPseudo){
-  return Object.values(st.players).map(p=>{
+  if(dIsVersus(st)) return dTeamsList(st, highlightPseudo);
+  return dPlayerRows(Object.values(st.players), st, highlightPseudo);
+}
+// Versus : une section par équipe (titre + total de l'équipe), puis ses joueurs
+function dTeamsList(st, highlightPseudo){
+  const done = st.phase==='gameEnd';
+  const res = done ? dVersusResult(st) : null;
+  return D_TEAMS.map(t=>{
+    const ps = Object.values(st.players).filter(p=>p.team===t.id);
+    const win = res && res.winner===t.id;
+    return '<div class="container-head dteam-head'+(win?' is-winner':'')+'">'+
+        '<span class="container-title is-label">'+escHtml(t.nom)+(win?' · 🏆':'')+'</span>'+
+        (st.phase==='lobby' ? '' : '<span class="dteam-score">'+dTeamTotal(st,t.id)+' 💎</span>')+
+      '</div>'+
+      (ps.length ? dPlayerRows(ps, st, highlightPseudo) : '<div class="dteam-empty">Personne pour l\'instant</div>');
+  }).join('');
+}
+function dPlayerRows(list, st, highlightPseudo){
+  return list.map(p=>{
     const isIn = p.status==='in';
     const voteBadge = (st.phase==='voting' && isIn)
       ? (p.vote ? '<span class="player-info is-voted">✓ a voté</span>' : '<span class="player-info">…réfléchit</span>')
@@ -240,6 +363,7 @@ function dPlayersList(st, highlightPseudo){
     return '<div class="'+cls+'">'+
       '<span class="player-name">'+escHtml(p.pseudo)+'</span>'+
       '<span class="player-infos">'+
+        ((p.relics&&p.relics.length) ? '<span class="player-info" title="Reliques emportées">🏺 '+dRelicsPts(p)+'</span>' : '')+
         '<span class="player-info">'+(isIn?('+'+p.held):('🔒 '+p.banked))+'</span>'+voteBadge+
       '</span>'+
       '<span class="player-status">'+(isIn?'en jeu':'au camp')+'</span></div>';
@@ -259,7 +383,7 @@ function renderDiamantAdmin(){
   const nPlayers = Object.keys(diamant.players||{}).length;
 
   if(ph==='lobby'){
-    document.getElementById('da-status').innerHTML = fNoEmoji('<div class="dpill">Lobby ouvert</div><div class="dpill">Explorateurs <strong>'+nPlayers+'</strong></div>');
+    document.getElementById('da-status').innerHTML = fNoEmoji((dIsVersus(diamant)?'<div class="dpill">Mode <strong>versus</strong></div>':'')+'<div class="dpill">Lobby ouvert</div><div class="dpill">Explorateurs <strong>'+nPlayers+'</strong></div>');
   } else {
     document.getElementById('da-status').innerHTML = fNoEmoji(dStatusPills(diamant));
   }
@@ -268,7 +392,8 @@ function renderDiamantAdmin(){
 
   const ctrl = document.getElementById('da-controls');
   if(ph==='lobby'){
-    ctrl.innerHTML = '<div class="diamant-voted">🚪 '+nPlayers+' explorateur(s) ont rejoint. Lance quand tu veux — la partie démarrera avec les joueurs présents.</div>'+
+    ctrl.innerHTML = '<div class="diamant-voted">🚪 '+nPlayers+' explorateur(s) ont rejoint. Lance quand tu veux — la partie démarrera avec les joueurs présents.'+
+      (dIsVersus(diamant)?' Les équipes seront rééquilibrées au lancement si besoin.':'')+'</div>'+
       '<button class="btn-primary" onclick="diamantLaunch()">💎 Lancer la partie'+(nPlayers?(' ('+nPlayers+' joueur'+(nPlayers>1?'s':'')+')'):'')+'</button>'+
       '<button class="btn-primary-danger u-mt-sm" onclick="diamantCancel()">✕ Fermer le lobby</button>';
   } else if(ph==='exploring'){
@@ -286,7 +411,10 @@ function renderDiamantAdmin(){
   } else if(ph==='gameEnd'){
     const total = dTotalBanked(diamant);
     const fireGain = Math.round(total/10);
-    ctrl.innerHTML = '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+total+'</div><div class="dbank-lbl">Trésor total</div></div></div>'+
+    const bank = dIsVersus(diamant)
+      ? '<div class="dbank">'+D_TEAMS.map(t=>'<div class="dbank-item"><div class="dbank-val">'+dTeamTotal(diamant,t.id)+'</div><div class="dbank-lbl">'+escHtml(t.nom)+'</div></div>').join('')+'</div>'
+      : '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+total+'</div><div class="dbank-lbl">Trésor total</div></div></div>';
+    ctrl.innerHTML = bank+
       '<button class="btn-primary" onclick="diamantEndToFire()">🔥 Ajouter '+fireGain+' pts au feu + clôturer</button>'+
       '<button class="btn-primary-danger u-mt-sm" onclick="diamantCancel()">✕ Clôturer sans ajouter au feu</button>';
   }
@@ -305,6 +433,9 @@ function renderDiamantViewer(pseudo){
   if(!wrap) return;
   if(!diamant || !diamant.active){ wrap.style.display='none'; return; }
   wrap.style.display='block';
+  const versus = dIsVersus(diamant);
+  const side = document.getElementById('dv-side');
+  if(side) side.classList.toggle('is-versus', versus);   // versus : les titres d'équipe remplacent « Explorateurs »
 
   dSet(document.getElementById('dv-manche'), dManchePill(diamant));
   dSet(document.getElementById('dv-stats'), (diamant.phase==='lobby') ? '' : dStatsPills(diamant));
@@ -317,17 +448,27 @@ function renderDiamantViewer(pseudo){
 
   if(diamant.phase==='lobby'){
     if(me){
-      dSet(zone, '<div class="diamant-voted">✓ Tu as rejoint le lobby ! En attente du lancement par le meneur…</div>'+
+      const teamMsg = (versus && me.team) ? (' Tu es dans l\'<strong class="t-bright">'+escHtml(dTeamName(me.team))+'</strong> (les équipes peuvent être rééquilibrées au lancement).') : '';
+      dSet(zone, '<div class="diamant-voted">✓ Tu as rejoint le lobby !'+teamMsg+' En attente du lancement par le meneur…</div>'+
         '<button class="btn-secondary u-full" onclick="diamantLeave(\''+escAttr(pseudo)+'\')">↩ Quitter le lobby</button>');
     } else {
       dSet(zone, '<div class="diamant-voted">🚪 Une partie de Diamant se prépare ! Rejoins avant le lancement.</div>'+
-        '<button class="btn-primary-continue u-full" onclick="diamantJoin(\''+escAttr(pseudo)+'\')">💎 Rejoindre la partie</button>');
+        '<button class="btn-primary-continue u-full" onclick="diamantJoin(\''+escAttr(pseudo)+'\')">💎 Rejoindre la partie'+(versus?' (versus)':'')+'</button>');
     }
     return;
   }
 
   if(!me){
     dSet(zone, '<div class="diamant-voted">👀 Une partie est en cours. Tu pourras jouer à la prochaine !</div>');
+    return;
+  }
+  if(diamant.phase==='gameEnd' && versus){
+    const r = dVersusResult(diamant);
+    const verdict = !r.winner ? '🤝 Égalité parfaite entre les deux équipes !'
+      : (r.winner===me.team ? '🏆 Victoire de ton équipe, bravo !' : '🏁 L\''+escHtml(dTeamName(r.winner))+' l\'emporte cette fois…');
+    dSet(zone, '<div class="dbank"><div class="dbank-item"><div class="dbank-val">'+me.banked+'</div><div class="dbank-lbl">Ton trésor</div></div>'+
+      D_TEAMS.map(t=>'<div class="dbank-item"><div class="dbank-val">'+r.totals[t.id]+'</div><div class="dbank-lbl">'+escHtml(t.nom)+'</div></div>').join('')+'</div>'+
+      '<div class="diamant-voted">'+verdict+'</div>');
     return;
   }
   if(diamant.phase==='gameEnd'){
@@ -358,7 +499,7 @@ function renderDiamantViewer(pseudo){
 
 // ── RÈGLES DU JEU (popin) ──
 // Composition du deck, générée depuis les constantes (se met à jour toute seule si le deck change)
-function dDeckRulesHtml(){
+function dDeckRulesHtml(versus){
   const nT=D_TREASURES.length, nH=D_HAZARDS.length*D_HAZ_COPIES, tot=nT+nH;
   const sum=D_TREASURES.reduce((a,v)=>a+v,0);
   const vals={}; D_TREASURES.forEach(v=>{ vals[v]=(vals[v]||0)+1; });
@@ -367,22 +508,33 @@ function dDeckRulesHtml(){
   return '<div class="rules-section"><h3>🃏 Le deck ('+tot+' cartes au départ, remélangé à chaque manche)</h3><ul>'+
     '<li><strong>'+nT+' trésors</strong> 💎 — valeurs : '+valList+' (total '+sum+').</li>'+
     '<li><strong>'+nH+' dangers</strong> — '+D_HAZ_COPIES+' de chaque : '+D_HAZARDS.map(h=>dHazLabel(h)).join(', ')+'.</li>'+
+    (versus ? '<li><strong>Mode versus</strong> : + <strong>1 relique</strong> 🏺 glissée dans le paquet à chaque manche ('+D_RELICS.length+' en tout : '+D_RELICS.join(', ')+').</li>' : '')+
     '<li>Quand un double danger fait perdre une manche, <strong>la carte qui a tué est retirée du jeu</strong> pour les manches suivantes : la grotte devient un peu moins dangereuse.</li>'+
   '</ul><p class="rules-note">Au départ, chaque carte a environ '+pct+' % de chances d\'être un danger.</p></div>';
 }
 function dRulesHtml(){
+  const versus = dIsVersus(diamant);
   return ''+
   '<h2 class="rules-title">💎 Diamant — La Grotte aux Trésors — Comment jouer</h2>'+
-  '<div class="rules-section"><h3>🎯 Le but</h3><p>Explorer la grotte en groupe et ramener le plus de trésor possible au camp, sur 5 manches.</p></div>'+
+  (versus
+    ? '<div class="rules-section"><h3>🎯 Le but (mode versus)</h3><p>Deux équipes s\'affrontent : '+D_TEAMS.map(t=>t.nom).join(' et ')+'. En rejoignant le lobby, tu es placé automatiquement dans l\'équipe qui a le moins de joueurs. Tout le trésor que tu sécurises compte pour ton équipe. Après 5 manches, l\'équipe qui a le plus de trésor gagne.</p></div>'
+    : '<div class="rules-section"><h3>🎯 Le but</h3><p>Explorer la grotte en groupe et ramener le plus de trésor possible au camp, sur 5 manches.</p></div>')+
   '<div class="rules-section"><h3>🔄 Le déroulé d\'une manche</h3><p>À chaque carte révélée :</p><ul>'+
     '<li><strong>Carte trésor</strong> : sa valeur est partagée à parts égales entre les explorateurs encore dans la grotte. Le reste non divisible est déposé <em>sur le chemin</em>.</li>'+
     '<li><strong>Carte danger</strong> : la première d\'un type est un avertissement. Un <strong>deuxième danger du même type</strong> et la manche est perdue — tout le trésor non sécurisé s\'envole.</li>'+
   '</ul></div>'+
-  dDeckRulesHtml()+
+  dDeckRulesHtml(versus)+
+  (versus ? '<div class="rules-section"><h3>🏺 Les reliques</h3><ul>'+
+    '<li>Une relique révélée <strong>ne se partage pas</strong> : elle reste sur le chemin.</li>'+
+    '<li>Seul un explorateur qui <strong>rentre seul</strong> au camp (personne d\'autre ne rentre au même moment) emporte <strong>toutes</strong> les reliques du chemin.</li>'+
+    '<li>Une relique encore sur le chemin à la fin de la manche est <strong>perdue</strong>. Une relique pas encore révélée reste dans le paquet pour la manche suivante.</li>'+
+  '</ul></div>' : '')+
   '<div class="rules-section"><h3>🎒 Continuer ou rentrer ?</h3>'+
     '<p>Après un danger, chacun choisit : <strong>continuer</strong> pour révéler la carte suivante (plus de trésor, mais plus de risque), ou <strong>rentrer</strong> au camp.</p>'+
     '<p class="rules-note">Ceux qui rentrent ensemble se partagent le trésor <em>resté sur le chemin</em> en plus de leur butin, puis le sécurisent. Un trésor sécurisé ne peut plus être perdu.</p></div>'+
-  '<div class="rules-section"><h3>🏁 Fin de partie</h3><p>Après 5 manches, le groupe additionne tout le trésor sécurisé. Bonne exploration !</p></div>';
+  (versus
+    ? '<div class="rules-section"><h3>🏁 Fin de partie</h3><p>Après 5 manches, chaque équipe additionne le trésor (reliques comprises) de ses joueurs. Le total des deux équipes alimente quand même le feu commun. Bonne exploration !</p></div>'
+    : '<div class="rules-section"><h3>🏁 Fin de partie</h3><p>Après 5 manches, le groupe additionne tout le trésor sécurisé. Bonne exploration !</p></div>');
 }
 function diamantShowRules(){
   const box = document.getElementById('diamant-rules-content');

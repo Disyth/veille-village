@@ -229,6 +229,8 @@ function showPage(name){
 const F_GAMES = {
   diamant: { nom:'Diamant',
     desc:'Partie coopérative sur 5 manches. Les explorateurs révèlent les cartes de la grotte, votent pour continuer ou rentrer, et sécurisent leur trésor. Le total alimente le feu de camp.' },
+  'diamant-versus': { nom:'Diamant — Versus',
+    desc:'Deux équipes (Ours contre Loups) formées automatiquement. Même règles que Diamant + 5 reliques (5, 7, 8, 10, 12) qu\'on n\'emporte qu\'en rentrant seul. L\'équipe la plus riche gagne ; le total alimente le feu.' },
   ferme:   { nom:'La Ferme du Village',
     desc:'Partie coopérative en 20 tours. Chaque villageois choisit son métier et son lieu à chaque tour, puis joue ses actions. Objectif : remplir les objectifs de grand-père.' },
   galerapagos: { nom:'Galerapagos — L\'île du Village',
@@ -267,6 +269,7 @@ function lancerJeu(){
   if (!key){ toast('Choisis un jeu dans la liste'); return; }
   if (gameActive()){ toast('Un jeu est déjà en cours'); return; }
   if (key === 'diamant') startDiamant();
+  else if (key === 'diamant-versus') startDiamant('versus');
   else if (key === 'ferme') startFerme();
   else if (key === 'galerapagos') startGalerapagos();
   else if (key === 'avel') startAvel();
