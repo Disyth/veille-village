@@ -23,9 +23,11 @@ import crypto from 'node:crypto';
 
 // ── Réglages du jeu (équilibrage) ──────────────────────────────────────────
 // Paliers de la récompense Twitch. Pour en ajouter un : une ligne de plus, puis
-// « Connecter la chaîne » à nouveau dans la vue meneur (les récompenses sont créées / mises à jour).
+// « Rebrancher la chaîne » dans la vue meneur (les récompenses sont créées / mises à jour).
+// Renommer, changer le prix ou la description : modifier la ligne puis « Rebrancher » —
+// la récompense existante est retrouvée par sa clé (key), JAMAIS la changer.
 export const CL_TIERS = [
-  { key:'lucioles10', title:'10 Lucioles · Guerre des clans', cost:1000, lucioles:10,
+  { key:'lucioles10', title:'Obtenir des Lucioles', cost:1000, lucioles:10,
     prompt:'Reçois 10 Lucioles à dépenser dans la Guerre des clans. Connecte-toi avec Twitch sur le site de la Veillée (page Guerre des clans).' },
 ];
 export const CL_RECENT_MAX = 12;     // nombre de derniers crédits affichés au meneur
@@ -165,7 +167,10 @@ async function helix(method, path, token, body, useApp){
 }
 
 // Crée (ou met à jour) les récompenses des paliers. Renvoie { <rewardId>: { key, title, cost, lucioles } }
+// Une récompense déjà créée est retrouvée par son identifiant (noté dans clans/status, via la clé du palier),
+// sinon par son titre : la renommer la MODIFIE au lieu d'en créer une seconde.
 export async function ensureRewards(b){
+  const previous = ((await dbGet('clans/status').catch(() => null)) || {}).rewards || {};
   const list = await helix('GET', '/channel_points/custom_rewards?broadcaster_id=' + b.id + '&only_manageable_rewards=true', b.access);
   if(!list.ok) throw new Error('Lecture des récompenses Twitch : ' + list.status + ' ' + list.txt);
   const mine = (list.json && list.json.data) || [];
@@ -173,7 +178,8 @@ export async function ensureRewards(b){
   for(const t of CL_TIERS){
     const body = { title:t.title, cost:t.cost, prompt:t.prompt, is_enabled:true, is_user_input_required:false,
       should_redemptions_skip_request_queue:false, background_color:'#F5B832' };
-    const existing = mine.find(r => r.title === t.title);
+    const prevId = Object.keys(previous).find(id => previous[id] && previous[id].key === t.key);
+    const existing = mine.find(r => r.id === prevId) || mine.find(r => r.title === t.title);
     const res = existing
       ? await helix('PATCH', '/channel_points/custom_rewards?broadcaster_id=' + b.id + '&id=' + existing.id, b.access, body)
       : await helix('POST',  '/channel_points/custom_rewards?broadcaster_id=' + b.id, b.access, body);
