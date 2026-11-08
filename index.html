@@ -196,7 +196,10 @@
           <div class="topbar-title">La Grande Veillée du Village</div>
           <div class="topbar-user">
             <div class="topbar-welcome">Bienvenue <strong id="topbar-pseudo"></strong> <span class="topbar-emblem">🦊</span></div>
-            <button class="topbar-logout" onclick="viewerDisconnect()">Se déconnecter</button>
+            <div class="topbar-links">
+              <a class="topbar-logout" href="/clans">Guerre des clans</a>
+              <button class="topbar-logout" onclick="viewerDisconnect()">Se déconnecter</button>
+            </div>
           </div>
         </div>
 
@@ -409,6 +412,12 @@
             <button class="btn-secondary u-full" onclick="resetFirePoints()">↺ Réinitialiser le feu</button>
           </div>
 
+          <!-- Guerre des clans : branchement des points de chaîne Twitch (rempli par clans.js) -->
+          <div class="card">
+            <div class="section-title">Guerre des clans — points de chaîne</div>
+            <div id="clans-admin"></div>
+          </div>
+
           <!-- Bibliothèque de jeux -->
           <div class="card" id="game-library">
             <div class="section-title">Bibliothèque de jeux</div>
@@ -499,6 +508,20 @@
     </div>
   </div>
 
+  <!-- ══ GUERRE DES CLANS (/clans ou #clans) — rempli par clans.js ══ -->
+  <div id="page-clans" class="page">
+    <div class="viewer-container cl-page">
+      <div class="topbar">
+        <div>
+          <div class="topbar-title">La Guerre des clans</div>
+          <div class="cl-subtitle">Forêt de Nibel</div>
+        </div>
+        <div class="topbar-user"><a class="topbar-logout" href="/">Retour à la veillée</a></div>
+      </div>
+      <div id="clans-root"></div>
+    </div>
+  </div>
+
   <!-- ══ VUE STREAM (publique, lecture seule — /stream ou #stream) ══ -->
   <div id="page-stream" class="page">
     <div class="viewer-container" style="padding-top:1.5rem"><div id="gs-root"></div></div>
@@ -515,6 +538,7 @@
   <script src="galerapagos.js"></script>
   <script src="avel.js"></script>
   <script src="classement.js"></script>
+  <script src="clans.js"></script>
   <script src="boot.js"></script>
 </body>
 </html>

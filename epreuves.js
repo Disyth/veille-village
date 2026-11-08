@@ -47,7 +47,7 @@ function viewerDisconnect(){
 
 // ── CONNEXION VIA TWITCH ────────────────────────────────────────────────────
 // Le compte Twitch est connu dès que Firebase a validé le jeton (évènement « fb-auth »).
-// Pseudo imposé = nom Twitch. Pas sur /admin ni /stream (ces vues ne jouent pas).
+// Pseudo imposé = nom Twitch. Pas sur /admin, /stream ni /clans (ces vues ne jouent pas à la veillée).
 function twitchAutoConnect(){
   try{
     const err = sessionStorage.getItem('twErr');
@@ -56,6 +56,7 @@ function twitchAutoConnect(){
   const tw = window.FB && window.FB.twitch;
   if(!tw || !tw.name) return;
   if((typeof isAdminUrl==='function' && isAdminUrl()) || (typeof isStreamUrl==='function' && isStreamUrl())) return;
+  if(typeof isClansUrl==='function' && isClansUrl()) return;   // la Guerre des clans n'inscrit pas le joueur à la veillée
   if(currentViewerPseudo === tw.name) return;
   viewerStart(tw.name, true);
 }

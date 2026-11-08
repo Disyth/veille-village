@@ -9,9 +9,10 @@ function updateStats(){
   }
 }
 
-// Routing initial : /stream -> vue publique, /admin -> écran meneur, sinon vue joueur
+// Routing initial : /stream -> vue publique, /admin -> écran meneur, /clans -> Guerre des clans, sinon vue joueur
 function routePage(){
   if (isStreamUrl()) showPage('stream');
+  else if (isClansUrl()){ showPage('clans'); renderClans(); }
   else showPage(isAdminUrl() ? 'admin-gate' : 'viewer');
 }
 routePage();
@@ -27,6 +28,7 @@ renderFermeAdmin();
 renderGalerapagosAdmin();
 renderGalerapagosStream();
 renderAvelAdmin();
+renderClansAdmin();
 renderGameLibrary();
 // Cas où fb-ready s'est déclenché avant le chargement de ce script
 if (window.FB) initSync();

@@ -219,6 +219,14 @@ function isStreamUrl(){
   return /(?:^|[?&])stream(?:=|&|$)/.test(location.search.toLowerCase());
 }
 
+// La Guerre des clans (bourse de Lucioles) : /clans (Netlify), ou #clans / ?clans
+function isClansUrl(){
+  const p = location.pathname.toLowerCase().replace(/\/+$/,'');
+  if (p.endsWith('/clans')) return true;
+  if (location.hash.toLowerCase() === '#clans') return true;
+  return /(?:^|[?&])clans(?:=|&|$)/.test(location.search.toLowerCase());
+}
+
 function showPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   const el = document.getElementById('page-'+name);

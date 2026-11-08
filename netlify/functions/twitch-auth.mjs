@@ -7,6 +7,7 @@
 //                            puis fabrique un jeton Firebase personnalisé à son nom
 //                            (uid « twitch:<id> », pseudo = nom Twitch).
 //   Le jeton est remis au navigateur, qui se connecte à Firebase avec.
+//   Retour : sur la page notée dans sessionStorage « twBack » (ex : /clans), sinon l'accueil.
 //
 //  Aucune dépendance à installer : la signature du jeton utilise le module crypto de Node.
 //
@@ -41,7 +42,8 @@ export function mintFirebaseToken(uid, claims, email, privateKey, now = Math.flo
 function handoff(key, value){
   const html = '<!doctype html><meta charset="utf-8"><title>Connexion…</title>' +
     '<script>try{sessionStorage.setItem(' + JSON.stringify(key) + ',' + JSON.stringify(value) + ')}catch(e){}' +
-    'location.replace("/")</script><noscript>Active JavaScript puis <a href="/">reviens à la veillée</a>.</noscript>';
+    'var b="/";try{b=sessionStorage.getItem("twBack")||"/";sessionStorage.removeItem("twBack")}catch(e){}' +
+    'if(!/^\\/(?!\\/)/.test(b))b="/";location.replace(b)</script><noscript>Active JavaScript puis <a href="/">reviens à la veillée</a>.</noscript>';
   return new Response(html, { status:200, headers:{
     'Content-Type':'text/html; charset=utf-8',
     'Cache-Control':'no-store',
