@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La Grande Veillée du Village</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Marcellus&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<!-- Firebase SDK (module) -->
+<!-- Config Firebase externe : à déposer UNE SEULE FOIS sur Netlify (voir le guide).
+       Ce fichier n'est jamais écrasé par les mises à jour de l'app. -->
+  
+  <!-- ══ POPIN : RÈGLES DE LA FERME DU VILLAGE ══ -->
+  <div id="ferme-rules-modal" class="modal-overlay" style="display:none" onclick="fermeHideRules(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="fermeHideRules()" aria-label="Fermer">✕</button>
+      <div id="ferme-rules-content"></div>
+    </div>
+  </div>
+
+  <div id="ferme-history-modal" class="modal-overlay" style="display:none" onclick="fermeHideHistory(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="fermeHideHistory()" aria-label="Fermer">✕</button>
+      <div id="ferme-history-content"></div>
+    </div>
+  </div>
+
+  <div id="diamant-rules-modal" class="modal-overlay" style="display:none" onclick="diamantHideRules(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="diamantHideRules()" aria-label="Fermer">✕</button>
+      <div id="diamant-rules-content"></div>
+    </div>
+  </div>
+
+  <div id="diamant-records-modal" class="modal-overlay" style="display:none" onclick="diamantHideRecords(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="diamantHideRecords()" aria-label="Fermer">✕</button>
+      <div id="diamant-records-content"></div>
+    </div>
+  </div>
+
+  <div id="galerapagos-rules-modal" class="modal-overlay" style="display:none" onclick="galerapagosHideRules(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="galerapagosHideRules()" aria-label="Fermer">✕</button>
+      <div id="galerapagos-rules-content"></div>
+    </div>
+  </div>
+
+  <div id="galerapagos-history-modal" class="modal-overlay" style="display:none" onclick="galerapagosHideHistory(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="galerapagosHideHistory()" aria-label="Fermer">✕</button>
+      <div id="galerapagos-history-content"></div>
+    </div>
+  </div>
+
+  <!-- Popin unique des Chroniques d'Avel (règles, historique, carte complète, détail d'un héros) -->
+  <div id="avel-modal" class="modal-overlay" style="display:none" onclick="avelHideModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="avelHideModal()" aria-label="Fermer">✕</button>
+      <div id="avel-modal-content"></div>
+    </div>
+  </div>
+
+<script src="firebase-config.js"></script>
+
+  <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getDatabase, ref, onValue, set, update, remove, get, child, serverTimestamp, runTransaction }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+  import { getAuth, signInAnonymously, signInWithEmailAndPassword, signInWithCustomToken, signOut, onAuthStateChanged }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  // ╔══════════════════════════════════════════════════════════════════╗
+  // ║  La config Firebase vit dans le fichier SÉPARÉ « firebase-config.js »  ║
+  // ║  (déposé une seule fois sur Netlify). L'app la lit ici automatiquement.  ║
+  // ║  Ce fichier index.html ne contient AUCUN identifiant.                    ║
+  // ╚══════════════════════════════════════════════════════════════════╝
+  const PLACEHOLDER = {
+    apiKey: "TON_API_KEY",
+    authDomain: "TON_PROJET.firebaseapp.com",
+    databaseURL: "https://TON_PROJET-default-rtdb.firebaseio.com",
+    projectId: "TON_PROJET",
+    storageBucket: "TON_PROJET.appspot.com",
+    messagingSenderId: "XXXXXXXX",
+    appId: "1:XXXX:web:XXXX"
+  };
+  // Récupère la config externe si présente, sinon retombe sur le placeholder (mode local hors-ligne)
+  const firebaseConfig = (window.FIREBASE_CONFIG && typeof window.FIREBASE_CONFIG === "object")
+    ? window.FIREBASE_CONFIG
+    : PLACEHOLDER;
+
+  // Détection : config non remplie / fichier absent -> mode local (démo hors-ligne)
+  const isConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey !== "TON_API_KEY";
+
+  if (isConfigured) {
+    const app  = initializeApp(firebaseConfig);
+    const db   = getDatabase(app);
+    const auth = getAuth(app);
+    // Expose une API minimale au reste du script (non-module)
+    window.FB = {
+      ready: true,
+      db, ref, onValue, set, update, remove, get, child, serverTimestamp, runTransaction,
+      auth, onAuthStateChanged,
+      currentUser: () => auth.currentUser,
+      signInMeneur: (email, pass) => signInWithEmailAndPassword(auth, email, pass),
+      // Déconnexion d'un compte Twitch : on retombe automatiquement sur un badge anonyme
+      signOutTwitch: () => signOut(auth),
+      twitch: null   // { login, name } quand le joueur est connecté via Twitch
+    };
+    // Chaque visiteur reçoit un badge ANONYME (invisible) — requis par les règles de la base.
+    // Exception : au retour de la page Twitch, la fonction Netlify a déposé un jeton personnalisé
+    // (sessionStorage « twToken ») : on se connecte avec, le joueur devient « twitch:<id> ».
+    let dispatched = false;
+    const isTwitchUser = (u) => !!(u && String(u.uid).startsWith('twitch:'));
+    const ready = () => { if (!dispatched) { dispatched = true; window.dispatchEvent(new Event('fb-ready')); } };
+    const proceed = async (user) => {
+      let tw = null;
+      if (isTwitchUser(user)) {
+        try { const c = (await user.getIdTokenResult()).claims; tw = { login: c.tw, name: c.twn || c.tw }; } catch (e) {}
+      }
+      window.FB.twitch = tw;
+      window.FB.user = user;
+      window.dispatchEvent(new Event('fb-auth'));
+      ready();
+    };
+    onAuthStateChanged(auth, (user) => {
+      let pending = null;
+      try { pending = sessionStorage.getItem('twToken'); if (pending) sessionStorage.removeItem('twToken'); } catch (e) {}
+      if (pending && !isTwitchUser(user)) {
+        signInWithCustomToken(auth, pending).catch((e) => {
+          console.error('Connexion Twitch refusee par Firebase.', e);
+          try { sessionStorage.setItem('twErr', 'Connexion Twitch refusée, réessaie.'); } catch (e2) {}
+          if (user) proceed(user);
+          else signInAnonymously(auth).catch(() => ready());
+        });
+        return;   // le succès relance onAuthStateChanged avec le compte Twitch
+      }
+      if (!user) {
+        signInAnonymously(auth).catch((e) => {
+          console.error('Auth anonyme echouee — active-la dans Firebase Console (Authentication).', e);
+          ready();
+        });
+        return;
+      }
+      proceed(user);
+    });
+  } else {
+    window.FB = { ready: false };
+    window.dispatchEvent(new Event('fb-ready'));
+  }
+</script>
+</head>
+<body>
+<div id="app">
+
+  <!-- Bandeau de configuration (visible tant que Firebase n'est pas configuré) -->
+  <div id="setup-banner" style="display:none;max-width:760px;margin:1rem auto 0;padding:1rem 1.4rem;background:var(--danger-soft);border:1px solid var(--danger-line);border-radius:8px;font-size:.9rem;line-height:1.6;color:var(--text-hover)">
+    <strong style="color:var(--text-title);font-family:'Marcellus',serif;letter-spacing:.05em">⚙️ Mode local (hors-ligne)</strong><br>
+    La synchronisation temps réel entre appareils n'est pas encore active. Pour l'activer, ouvre ce fichier dans un éditeur, colle ta config Firebase dans le bloc <code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:3px">firebaseConfig</code> en haut, puis héberge le fichier (voir le guide fourni).
+  </div>
+
+  <!-- Indicateur de connexion (visible quand Firebase est actif) -->
+  <div id="conn-indicator" style="display:none;position:fixed;top:10px;right:12px;z-index:50;font-family:'Marcellus',serif;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;padding:.25rem .7rem;border-radius:12px;background:var(--success-soft);border:1px solid var(--success-line);color:var(--success)">
+    <span style="width:6px;height:6px;border-radius:50%;background:var(--success);display:inline-block;margin-right:4px;animation:pulse-dot 1.8s ease-in-out infinite"></span>En ligne
+  </div>
+
+  <!-- ══ VIEWER PAGE ══ -->
+  <div id="page-viewer" class="page active">
+    <div class="viewer-container">
+
+      <!-- ─── ACCUEIL (avant connexion) ─── -->
+      <div id="viewer-hero" class="viewer-hero">
+        <span class="hero-flame">🔥</span>
+        <h1 class="hero-title">La Grande Veillée du Village</h1>
+        <p class="hero-tagline">Êtes-vous prêt à relever les épreuves du feu de camp ?</p>
+        <div class="hero-rule"><span></span></div>
+        <p class="hero-intro">Collaborez avec les autres villageois pour construire la plus belle des veillées près du feu de camp.</p>
+
+        <div class="card login-card" id="login-card">
+          <div class="card-title">Rejoindre la veillée</div>
+          <a class="btn-twitch" href="/.netlify/functions/twitch-auth">Connexion via Twitch</a>
+          <div class="login-or"><span>ou sans compte</span></div>
+          <div class="input-group">
+            <label>Ton pseudo Twitch</label>
+            <input type="text" id="viewer-pseudo" placeholder="ex : DruideDuChat" maxlength="25" autocomplete="off" onkeydown="if(event.key==='Enter')viewerConnect()">
+          </div>
+          <button class="btn-primary" onclick="viewerConnect()">Rejoindre la veillée</button>
+        </div>
+      </div>
+
+      <!-- ─── BARRE DU HAUT + JAUGE DU FEU (après connexion) ─── -->
+      <div id="viewer-topframe" style="display:none">
+        <div class="topbar">
+          <div class="topbar-title">La Grande Veillée du Village</div>
+          <div class="topbar-user">
+            <div class="topbar-welcome">Bienvenue <strong id="topbar-pseudo"></strong> <span class="topbar-emblem">🦊</span></div>
+            <div class="topbar-links">
+              <a class="topbar-logout" href="/clans">Guerre des clans</a>
+              <button class="topbar-logout" onclick="viewerDisconnect()">Se déconnecter</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="fire-gauge" id="viewer-fire-meter">
+          <div class="fire-gauge-head">
+            <span class="fire-gauge-flame" id="fire-visual">🔥</span>
+            <div class="fire-gauge-labels">
+              <span class="fire-tier-label" id="fire-tier-label">Petit feu</span>
+              <span class="fire-gauge-pts" id="fire-count">0 pts</span>
+            </div>
+          </div>
+          <div class="fire-gauge-track-wrap">
+            <div class="fire-gauge-track"><div class="fire-gauge-bar" id="fire-progress-bar" style="width:0%"></div></div>
+            <div class="fire-gauge-marks" id="fire-thresholds"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── CONTENU DE JEU (après connexion) ─── -->
+      <!-- Diamant board (shown when a Diamant game is active) -->
+      <div id="viewer-diamant" style="display:none">
+        <div class="fv-layout">
+          <div class="card fv-game">
+            <div class="container-head">
+              <span class="container-title">💎 Diamant — La Grotte aux Trésors</span>
+              <span class="head-actions"><button class="btn-help" onclick="diamantShowRecords()">🏆 Records</button><button class="btn-help" onclick="diamantShowRules()">❓ Comment jouer</button></span>
+            </div>
+            <div class="container-pills"><span id="dv-manche" style="display:contents"></span><span id="dv-stats" style="display:contents"></span></div>
+            <div class="diamant-board"><div class="diamant-path" id="dv-path"></div></div>
+            <div class="diamant-event" id="dv-event"></div>
+            <div id="dv-myzone"></div>
+          </div>
+          <div class="fv-side" id="dv-side">
+            <div class="card">
+              <div class="container-head"><span class="container-title is-label">Explorateurs</span></div>
+              <div class="diamant-players" id="dv-players"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ferme board (shown when a Ferme game is active) -->
+      <div id="viewer-ferme" style="display:none">
+        <div class="fv-layout">
+          <!-- Colonne gauche : le jeu -->
+          <div class="card fv-game">
+            <div class="container-head">
+              <span class="container-title">🌾 La Ferme du Village</span>
+              <span class="head-actions">
+                <button class="btn-help" onclick="fermeShowRules()">❓ Comment jouer</button>
+              </span>
+            </div>
+            <div class="container-pills" id="fv-status"></div>
+            <div class="fv-instruction" id="fv-instruction"></div>
+            <div id="fv-dice"></div>
+            <div id="fv-myzone"></div>
+            <!-- Inventaire + objectifs, sous la carte -->
+            <div id="fv-bottom">
+              <div class="section-title">Inventaire</div>
+              <div id="fv-inventory"></div>
+              <div class="section-title">Objectifs de grand-père</div>
+              <div id="fv-objectives"></div>
+            </div>
+          </div>
+          <!-- Colonne droite : liste des joueurs + dernières actions (comme Chroniques d'Avel) -->
+          <div class="fv-side" id="fv-side">
+            <div class="card">
+              <div class="container-head">
+                <span class="container-title is-label">Joueurs</span>
+                <span class="head-actions"><button class="btn-help" onclick="fermeShowHistory()" title="Historique des actions" aria-label="Historique des actions">📋</button></span>
+              </div>
+              <div class="av-toast is-empty" id="fv-toast" aria-live="polite"></div>
+              <div class="player-list" id="fv-players"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Galerapagos board (shown when a Galerapagos game is active) -->
+      <div id="viewer-galerapagos" style="display:none">
+        <div class="fv-layout">
+          <div class="card fv-game">
+            <div class="container-head">
+              <span class="container-title">🏝️ Galerapagos — L'île du Village</span>
+              <span class="head-actions">
+                <button class="btn-help" onclick="galerapagosShowHistory()" title="Historique des actions" aria-label="Historique des actions">📋</button>
+                <button class="btn-help" onclick="galerapagosShowRules()">❓ Comment jouer</button>
+              </span>
+            </div>
+            <div class="container-pills" id="gv-status"></div>
+            <div class="diamant-event" id="gv-event"></div>
+            <div id="gv-myzone"></div>
+          </div>
+          <div class="fv-side" id="gv-side">
+            <div class="card">
+              <div class="container-head"><span class="container-title is-label">Naufragés</span></div>
+              <div class="diamant-players" id="gv-players"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chroniques d'Avel (shown when an Avel game is active) -->
+      <div id="viewer-avel" style="display:none">
+        <div class="fv-layout">
+          <div class="card fv-game">
+            <div class="container-head">
+              <span class="container-title">Chroniques d'Avel</span>
+              <span class="head-actions"><button class="btn-help" onclick="avelShowRules()">❓ Comment jouer</button></span>
+            </div>
+            <div class="container-pills" id="av-status"></div>
+            <div id="av-boss"></div>
+            <div class="fv-instruction" id="av-instruction"></div>
+            <div id="av-lobby"></div>
+            <div id="av-board" style="display:none">
+              <div id="av-fight"></div>
+              <div id="av-alert"></div>
+              <div class="av-map" id="av-map"></div>
+              <div class="av-cta-row" id="av-cta"></div>
+              <div id="av-actions"></div>
+              <div id="av-inventory"></div>
+            </div>
+          </div>
+          <div class="fv-side">
+            <div class="card">
+              <div class="container-head">
+                <span class="container-title is-label">Joueurs</span>
+                <span class="head-actions"><button class="btn-help" onclick="avelShowHistory()" title="Historique des actions" aria-label="Historique des actions">📋</button></span>
+              </div>
+              <div class="av-toast" id="av-toast" aria-live="polite"></div>
+              <div class="player-list" id="av-players"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Aucun jeu en cours (état d'attente après connexion) -->
+      <div id="viewer-idle" class="game-card" style="display:none">
+        <div class="game-card-header">
+          <span class="game-card-icon">🏕️</span>
+          <div>
+            <div class="game-card-title">Aucun jeu n'a démarré pour l'instant…</div>
+            <div class="game-card-subtitle">Consignes du meneur</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Classement global (rempli par classement.js, visible quand aucun jeu n'est lancé) -->
+      <div id="viewer-leaderboard" class="card lb-card" style="display:none"></div>
+
+    </div>
+  </div>
+
+  <!-- ══ ÉCRAN MENEUR : CONNEXION (/admin) ══ -->
+  <div id="page-admin-gate" class="page">
+    <div class="gate-hero">
+      <span class="hero-flame">🔥</span>
+      <h1 class="hero-title">La Grande Veillée du Village</h1>
+      <p class="hero-tagline">Espace du meneur de jeu</p>
+      <div class="card gate-card">
+        <div class="card-title">Accès meneur</div>
+        <div class="input-group">
+          <label>E-mail</label>
+          <input type="email" id="admin-email-input" placeholder="ton@email.com" autocomplete="username" onkeydown="if(event.key==='Enter')adminLogin()">
+        </div>
+        <div class="input-group">
+          <label>Mot de passe</label>
+          <input type="password" id="admin-pass-input" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')adminLogin()">
+        </div>
+        <button class="btn-primary" onclick="adminLogin()">Se connecter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ÉCRAN MENEUR : TABLEAU DE BORD ══ -->
+  <div id="page-admin" class="page">
+    <div class="admin-shell">
+
+      <div class="admin-topbar">
+        <div class="admin-topbar-title">La Grande Veillée du Village</div>
+        <button class="admin-lock" onclick="showPage('admin-gate')">Verrouiller</button>
+      </div>
+
+      <div class="admin-layout">
+
+        <!-- ─── Colonne gauche ─── -->
+        <div class="admin-side">
+
+          <!-- Gestion feu de camp -->
+          <div class="card">
+            <div class="section-title">Gestion feu de camp</div>
+            <div class="admin-fire-head">
+              <span class="admin-fire-flame" id="admin-fire-visual">🔥</span>
+              <div class="admin-fire-info">
+                <div class="admin-fire-tier" id="admin-fire-tier">Petit feu</div>
+                <div class="admin-fire-pts">Points : <strong id="admin-fire-points">0</strong></div>
+              </div>
+              <div class="admin-fire-btns">
+                <button class="btn-icon" onclick="adjustFirePoints(-5)" title="-5">−5</button>
+                <button class="btn-icon" onclick="adjustFirePoints(-1)" title="-1">−</button>
+                <button class="btn-icon" onclick="adjustFirePoints(1)" title="+1">+</button>
+                <button class="btn-icon" onclick="adjustFirePoints(5)" title="+5">+5</button>
+              </div>
+            </div>
+            <div class="fire-progress"><div class="fire-progress-bar" id="admin-fire-bar" style="width:0%"></div></div>
+            <div class="fire-cfg">
+              <label class="fire-cfg-line"><span>Grand feu à partir de</span><input type="number" min="1" id="fire-threshold-grand" class="fire-mini-input" value="50" onchange="saveFireConfig()"></label>
+              <label class="fire-cfg-line"><span>Feu légendaire à partir de</span><input type="number" min="1" id="fire-threshold-legendaire" class="fire-mini-input" value="120" onchange="saveFireConfig()"></label>
+            </div>
+            <button class="btn-secondary u-full" onclick="resetFirePoints()">↺ Réinitialiser le feu</button>
+          </div>
+
+          <!-- Guerre des clans : branchement des points de chaîne Twitch (rempli par clans.js) -->
+          <div class="card">
+            <div class="section-title">Guerre des clans — points de chaîne</div>
+            <div id="clans-admin"></div>
+          </div>
+
+          <!-- Bibliothèque de jeux -->
+          <div class="card" id="game-library">
+            <div class="section-title">Bibliothèque de jeux</div>
+            <div class="input-group">
+              <label>Choisir un jeu</label>
+              <select id="game-select" onchange="renderGameLibrary()">
+                <option value="">— Sélectionne un jeu —</option>
+                <option value="diamant">Diamant — La Grotte aux Trésors</option>
+                <option value="diamant-versus">Diamant — Versus (équipes)</option>
+                <option value="ferme">La Ferme du Village</option>
+                <option value="galerapagos">Galerapagos — L'île du Village</option>
+                <option value="avel">Chroniques d'Avel</option>
+              </select>
+            </div>
+            <button class="btn-primary" id="game-launch-btn" onclick="lancerJeu()">Lancer le jeu</button>
+          </div>
+
+          <!-- Villageois (base de joueurs) -->
+          <div class="card">
+            <div class="section-title">Villageois</div>
+            <input class="search-input" type="text" id="search-viewers" placeholder="Rechercher un pseudo…" oninput="renderViewerList()">
+            <div class="viewer-list" id="viewer-list-el">
+              <div class="empty-state">Aucun villageois connecté</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ─── Colonne droite : jeu actif ─── -->
+        <div class="admin-main">
+          <div class="section-title">Jeu actif</div>
+
+          <div class="card" id="no-game-card">
+            <div class="no-game">Aucun jeu actif. Choisis un jeu dans la bibliothèque pour le lancer.</div>
+          </div>
+
+          <!-- Diamant -->
+          <div class="card" id="diamant-panel" style="display:none">
+            <div class="section-title">Diamant — La Grotte aux Trésors</div>
+            <div id="diamant-admin-active" style="display:none">
+              <div class="diamant-status" id="da-status"></div>
+              <div class="diamant-event" id="da-event"></div>
+              <div class="diamant-players" id="da-players" style="margin-bottom:1rem"></div>
+              <div id="da-controls"></div>
+            </div>
+          </div>
+
+          <!-- Ferme -->
+          <div class="card" id="ferme-panel" style="display:none">
+            <div class="section-title">La Ferme du Village</div>
+            <div id="ferme-admin-active" style="display:none">
+              <div class="diamant-status" id="fa-status"></div>
+
+              <div class="fa-main">
+                <div class="ferme-players" id="fa-players"></div>
+                <div class="fa-side" id="fa-progress"></div>
+              </div>
+
+              <div class="diamant-event" id="fa-event"></div>
+              <div id="fa-controls" class="fa-cta"></div>
+              <div class="fa-give" id="fa-give"></div>
+            </div>
+          </div>
+
+          <!-- Chroniques d'Avel -->
+          <div class="card" id="avel-panel" style="display:none">
+            <div class="section-title">Chroniques d'Avel</div>
+            <div class="diamant-status" id="aa-status"></div>
+            <div class="diamant-event" id="aa-event"></div>
+            <div class="player-list" id="aa-players" style="margin-bottom:1rem"></div>
+            <div id="aa-controls"></div>
+          </div>
+
+          <!-- Galerapagos -->
+          <div class="card" id="galerapagos-panel" style="display:none">
+            <div class="section-title">Galerapagos — L'île du Village</div>
+            <div id="galerapagos-admin-active" style="display:none">
+              <div class="diamant-status" id="ga-status"></div>
+              <div class="diamant-event" id="ga-event"></div>
+              <div class="diamant-players" id="ga-players" style="margin-bottom:1rem"></div>
+              <div id="ga-controls"></div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ GUERRE DES CLANS (/clans ou #clans) — rempli par clans.js ══ -->
+  <div id="page-clans" class="page">
+    <div class="viewer-container cl-page">
+      <div class="topbar">
+        <div>
+          <div class="topbar-title">La Guerre des clans</div>
+          <div class="cl-subtitle">Forêt de Nibel</div>
+        </div>
+        <div class="topbar-user"><a class="topbar-logout" href="/">Retour à la veillée</a></div>
+      </div>
+      <div id="clans-root"></div>
+    </div>
+  </div>
+
+  <!-- ══ VUE STREAM (publique, lecture seule — /stream ou #stream) ══ -->
+  <div id="page-stream" class="page">
+    <div class="viewer-container" style="padding-top:1.5rem"><div id="gs-root"></div></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Application découpée en modules (chargés dans l'ordre : core d'abord, boot en dernier) -->
+  <script src="core.js"></script>
+  <script src="epreuves.js"></script>
+  <script src="diamant.js"></script>
+  <script src="ferme.js"></script>
+  <script src="galerapagos.js"></script>
+  <script src="avel.js"></script>
+  <script src="classement.js"></script>
+  <script src="clans.js"></script>
+  <script src="boot.js"></script>
+</body>
+</html>
