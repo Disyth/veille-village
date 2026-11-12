@@ -28,6 +28,7 @@ renderFermeAdmin();
 renderGalerapagosAdmin();
 renderGalerapagosStream();
 renderAvelAdmin();
+renderAthletesAdmin();
 renderClansAdmin();
 renderGameLibrary();
 // Cas où fb-ready s'est déclenché avant le chargement de ce script

@@ -67,6 +67,16 @@
   --die-violet: #c62fe0;
   --die-noir:   #000000;
   --die-ink:    #2a1500;   /* sort ✨ dessiné sur les dés clairs */
+  /* ─── Les Athlètes du Village : couleur de chaque joueur (siège 1 à 9), toujours doublée de l'emoji de l'athlète ─── */
+  --runner-1: var(--hero-1);
+  --runner-2: var(--hero-2);
+  --runner-3: var(--hero-3);
+  --runner-4: var(--hero-4);
+  --runner-5: var(--hero-5);
+  --runner-6: var(--hero-6);
+  --runner-7: #e85aa9;   /* rose */
+  --runner-8: #c98a4b;   /* cuivre */
+  --runner-9: #8c9bb0;   /* ardoise */
   /* ─── Connexion via Twitch (couleur de marque Twitch) ─── */
   --twitch:       #9146ff;   /* fond du bouton « Connexion via Twitch » */
   --twitch-hover: #772ce8;   /* survol */
@@ -910,3 +920,34 @@
 @keyframes clJarJump { 0%{ transform:none; } 35%{ transform:scale(1.08,.92); } 65%{ transform:translateY(-6px) scale(.96,1.05); } 100%{ transform:none; } }
 @media (max-width:480px){ .cl-purse { gap:1rem; } .cl-jar { width:92px; } .cl-plus { left:100px; } }
 @media (prefers-reduced-motion: reduce){ .cl-fly, .cl-jar-halo, .cl-jar.is-filling, .cl-amount.is-bump { animation:none; } }
+
+/* ═══ LES ATHLÈTES DU VILLAGE ═══ */
+/* Piste TEMPORAIRE en serpentin (31 cases, 8 par rangée) — sera remplacée par la maquette de Damien */
+.at-track { display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:4px; margin:.8rem 0; }
+.at-cell { position:relative; min-height:58px; background:var(--tile-face); border:1px solid var(--border); border-radius:6px; padding:3px 4px 4px; display:flex; flex-direction:column; gap:2px; min-width:0; }
+.at-cell.is-start, .at-cell.is-finish { background:var(--tile-castle); border-color:var(--border-strong); }
+.at-cell.is-finish { border-color:var(--fire); }
+.at-cell.is-star { border-color:var(--fire); }
+.at-cell.is-oups { border-color:var(--danger-line); background:var(--danger-soft); }
+.at-cell.is-arrow { border-color:var(--metier-line); background:var(--metier-soft); }
+.at-num { font-family:'Marcellus',serif; font-size:.65rem; letter-spacing:.04em; color:var(--text-body); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.at-fx { position:absolute; top:2px; right:4px; font-family:'Marcellus',serif; font-size:.7rem; color:var(--text-title); }
+.at-chips { display:flex; flex-wrap:wrap; gap:2px; }
+.at-chip { width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:13px; line-height:1; background:var(--surface-sunken); border:2px solid var(--chip, var(--border)); transition:transform .3s; }
+.at-chip.is-me { box-shadow:0 0 0 2px var(--text-title); }
+.at-chip.is-turn { animation:atPulse 1.2s ease-in-out infinite; }
+.at-chip.is-trip { transform:rotate(90deg); opacity:.55; }
+.at-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+.at-cta { display:flex; gap:.6rem; flex-wrap:wrap; }
+.at-cta > button { flex:1 1 12rem; width:auto; }
+.at-team { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.5rem; }
+.at-team-item { display:flex; flex-direction:column; align-items:center; gap:.15rem; text-align:center; padding:.6rem .4rem; background:var(--surface-sunken); border:1px solid var(--border); border-radius:8px; }
+.at-team-item.is-used { opacity:.45; }
+.at-team-ico { font-size:1.5rem; line-height:1; }
+.at-team-name { font-family:'Marcellus',serif; font-size:.85rem; color:var(--text-title); }
+.at-team-sub { font-size:.75rem; color:var(--text-body); font-style:italic; }
+.at-podium { background:var(--surface-sunken-2); border:1px solid var(--border); border-radius:8px; padding:1rem 1.2rem; margin:.6rem 0; }
+.at-podium .rules-title { font-size:1.2rem; margin-bottom:.8rem; }
+@keyframes atPulse { 0%,100%{ box-shadow:0 0 0 0 var(--fire-glow); } 50%{ box-shadow:0 0 0 5px var(--fire-glow); } }
+@media (max-width:520px){ .at-cell { min-height:48px; } .at-fx { position:static; font-size:.65rem; } .at-lab { display:none; } .at-chip { width:18px; height:18px; font-size:11px; } .at-team { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (prefers-reduced-motion: reduce){ .at-chip.is-turn { animation:none; } }

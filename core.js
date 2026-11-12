@@ -7,6 +7,7 @@ let diamant   = null;  // partie de Diamant en cours (null si aucune)
 let ferme     = null;  // partie de Ferme en cours (null si aucune)
 let galerapagos = null;  // partie de Galerapagos en cours (null si aucune)
 let avel      = null;  // partie des Chroniques d'Avel en cours (null si aucune)
+let athletes  = null;  // compétition des Athlètes du Village en cours (null si aucune)
 let currentViewerPseudo = null;
 
 // ── FIREBASE SYNC LAYER ─────────────────────────────────────────────────────
@@ -75,6 +76,13 @@ function attachListeners(){
     avel = snap.val() ? avNormalize(snap.val()) : null;
     renderAvelAdmin();
     if (currentViewerPseudo) renderAvelViewer(currentViewerPseudo);
+    renderViewerIdle();
+  });
+
+  onValue(ref(db, 'athletes'), (snap) => {
+    athletes = snap.val() ? atNormalize(snap.val()) : null;
+    renderAthletesAdmin();
+    if (currentViewerPseudo) renderAthletesViewer(currentViewerPseudo);
     renderViewerIdle();
   });
 }
@@ -184,6 +192,42 @@ function fbTxAvel(update){
   return Promise.resolve({ committed: r !== undefined });
 }
 
+function fbSetAthletes(a){
+  if (ONLINE){
+    const { db, ref, set } = window.FB;
+    set(ref(db, 'athletes'), a).catch((e) => {
+      console.error('Écriture des Athlètes du Village refusée :', e);
+      toast('Firebase refuse l\'écriture : ajoute la règle « athletes » dans la base.');
+    });
+  } else {
+    athletes = a ? atNormalize(a) : null;
+    renderAthletesAdmin();
+    if(currentViewerPseudo) renderAthletesViewer(currentViewerPseudo);
+    renderViewerIdle();
+  }
+}
+
+// Transaction sur le nœud « athletes » (même principe que fbTxAvel) : indispensable car
+// les minuteurs et les clics de plusieurs joueurs peuvent tomber dans la même seconde.
+function fbTxAthletes(update){
+  if (ONLINE && window.FB.runTransaction){
+    const { db, ref, runTransaction } = window.FB;
+    return runTransaction(ref(db, 'athletes'), update).catch((e) => {
+      console.error('Écriture des Athlètes du Village refusée :', e);
+      toast('Firebase refuse l\'écriture : ajoute la règle « athletes » dans la base.');
+      return { committed:false };
+    });
+  }
+  const r = update(athletes ? JSON.parse(JSON.stringify(athletes)) : null);
+  if (r !== undefined){
+    athletes = r ? atNormalize(r) : null;
+    renderAthletesAdmin();
+    if(currentViewerPseudo) renderAthletesViewer(currentViewerPseudo);
+    renderViewerIdle();
+  }
+  return Promise.resolve({ committed: r !== undefined });
+}
+
 // Firebase keys can't contain . # $ [ ] / — sanitize pseudo
 function fbKey(s){ return String(s).replace(/[.#$\[\]/]/g,'_'); }
 
@@ -245,6 +289,8 @@ const F_GAMES = {
     desc:'Survie pour 3 à 12 naufragés : construire un radeau et quitter l\'île avant l\'ouragan. Météo, pêche, eau, bois (gare aux serpents !), et votes de pénurie quand les vivres manquent.' },
   avel: { nom:'Chroniques d\'Avel',
     desc:'Aventure coopérative pour 1 à 12 joueurs : explorer les terres du château, affronter les monstres et se préparer à la Lune Noire.' },
+  athletes: { nom:'Les Athlètes du Village',
+    desc:'Course chaotique pour 3 à 9 joueurs, en 4 courses : chacun recrute 4 athlètes aux pouvoirs farfelus et en envoie un par course. Or, argent et bronze ; la somme des points alimente le feu.' },
 };
 
 function gameActive(){
@@ -252,6 +298,7 @@ function gameActive(){
   if (typeof ferme   !== 'undefined' && ferme   && ferme.active)   return 'ferme';
   if (typeof galerapagos !== 'undefined' && galerapagos && galerapagos.active) return 'galerapagos';
   if (typeof avel !== 'undefined' && avel && avel.active) return 'avel';
+  if (typeof athletes !== 'undefined' && athletes && athletes.active) return 'athletes';
   return null;
 }
 
@@ -281,4 +328,5 @@ function lancerJeu(){
   else if (key === 'ferme') startFerme();
   else if (key === 'galerapagos') startGalerapagos();
   else if (key === 'avel') startAvel();
+  else if (key === 'athletes') startAthletes();
 }

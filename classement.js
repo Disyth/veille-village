@@ -18,6 +18,7 @@ const LB_GAMES = [
   { id:'ferme',       nom:'La Ferme',          who:'fermier',     label:'Victoires',        unit:(n)=>n+' victoire'+(n>1?'s':''),     scoreMode:'sum' },
   { id:'galerapagos', nom:'Galerapagos',       who:'naufragé',    label:'Évasions',         unit:(n)=>n+' évasion'+(n>1?'s':''),      scoreMode:'sum' },
   { id:'avel',        nom:'Chroniques d\'Avel', who:'héros',       label:'Monstres vaincus', unit:(n)=>n+' monstre'+(n>1?'s':''),      scoreMode:'sum' },
+  { id:'athletes',    nom:'Les Athlètes',      who:'athlète',     label:'Points cumulés',   unit:(n)=>n+' pt'+(n>1?'s':''),           scoreMode:'sum' },
 ];
 const LB_TOP = 5;
 
@@ -30,7 +31,7 @@ function lbTwitchUid(pseudo){
 }
 
 // ── ENREGISTREMENT D'UNE PARTIE (appelé par chaque jeu à sa clôture au feu) ──
-//  game     : 'diamant' | 'ferme' | 'galerapagos' | 'avel'
+//  game     : 'diamant' | 'ferme' | 'galerapagos' | 'avel' | 'athletes'
 //  fire     : points apportés au feu par cette partie
 //  label    : résumé du résultat (« 187 💎 », « Victoire », « 11 rescapés »…)
 //  pseudos  : participants
