@@ -77,6 +77,8 @@
   --runner-7: #e85aa9;   /* rose */
   --runner-8: #c98a4b;   /* cuivre */
   --runner-9: #8c9bb0;   /* ardoise */
+  --at-die-bg:  #9fd37f;   /* dé « Mon lancé » (maquette) */
+  --at-die-ink: #e8452c;
   /* ─── Connexion via Twitch (couleur de marque Twitch) ─── */
   --twitch:       #9146ff;   /* fond du bouton « Connexion via Twitch » */
   --twitch-hover: #772ce8;   /* survol */
@@ -922,18 +924,17 @@
 @media (prefers-reduced-motion: reduce){ .cl-fly, .cl-jar-halo, .cl-jar.is-filling, .cl-amount.is-bump { animation:none; } }
 
 /* ═══ LES ATHLÈTES DU VILLAGE ═══ */
-/* Piste TEMPORAIRE en serpentin (31 cases, 8 par rangée) — sera remplacée par la maquette de Damien */
-.at-track { display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:4px; margin:.8rem 0; }
-.at-cell { position:relative; min-height:58px; background:var(--tile-face); border:1px solid var(--border); border-radius:6px; padding:3px 4px 4px; display:flex; flex-direction:column; gap:2px; min-width:0; }
-.at-cell.is-start, .at-cell.is-finish { background:var(--tile-castle); border-color:var(--border-strong); }
-.at-cell.is-finish { border-color:var(--fire); }
-.at-cell.is-star { border-color:var(--fire); }
-.at-cell.is-oups { border-color:var(--danger-line); background:var(--danger-soft); }
-.at-cell.is-arrow { border-color:var(--metier-line); background:var(--metier-soft); }
-.at-num { font-family:'Marcellus',serif; font-size:.65rem; letter-spacing:.04em; color:var(--text-body); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.at-fx { position:absolute; top:2px; right:4px; font-family:'Marcellus',serif; font-size:.7rem; color:var(--text-title); }
-.at-chips { display:flex; flex-wrap:wrap; gap:2px; }
-.at-chip { width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:13px; line-height:1; background:var(--surface-sunken); border:2px solid var(--chip, var(--border)); transition:transform .3s; }
+/* Plateaux dessinés (Pépère / Galère) : image + pions positionnés en % de l'image */
+.at-box { border:1px solid var(--border); border-radius:8px; padding:1rem 1.1rem; margin:.8rem 0; }
+.at-box-title { font-family:'Marcellus',serif; color:var(--text-title); margin-bottom:.6rem; }
+.at-roll-row { display:flex; align-items:center; gap:1rem; flex-wrap:wrap; }
+.at-roll-row .at-cta { flex:1; }
+.at-die { width:48px; height:48px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; background:var(--at-die-bg); color:var(--at-die-ink); font-family:'Marcellus',serif; font-weight:700; font-size:1.6rem; flex-shrink:0; }
+.at-die.is-empty { background:var(--surface-sunken); color:var(--text-body); }
+.at-board { position:relative; width:100%; max-width:682px; margin:0 auto; container-type:inline-size; }
+.at-board-img { display:block; width:100%; height:auto; }
+.at-board-scroll { overflow-x:auto; }
+.at-chip { position:absolute; width:2.93%; aspect-ratio:1; box-sizing:border-box; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:1.6cqi; line-height:1; background:var(--surface-sunken); border:2px solid var(--chip, var(--border)); transition:left .4s, top .4s, transform .3s; }
 .at-chip.is-me { box-shadow:0 0 0 2px var(--text-title); }
 .at-chip.is-turn { animation:atPulse 1.2s ease-in-out infinite; }
 .at-chip.is-trip { transform:rotate(90deg); opacity:.55; }
@@ -949,5 +950,5 @@
 .at-podium { background:var(--surface-sunken-2); border:1px solid var(--border); border-radius:8px; padding:1rem 1.2rem; margin:.6rem 0; }
 .at-podium .rules-title { font-size:1.2rem; margin-bottom:.8rem; }
 @keyframes atPulse { 0%,100%{ box-shadow:0 0 0 0 var(--fire-glow); } 50%{ box-shadow:0 0 0 5px var(--fire-glow); } }
-@media (max-width:520px){ .at-cell { min-height:48px; } .at-fx { position:static; font-size:.65rem; } .at-lab { display:none; } .at-chip { width:18px; height:18px; font-size:11px; } .at-team { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:520px){ .at-board { min-width:600px; } /* téléphone : le plateau garde une taille lisible et défile à l'horizontale */ .at-box { padding:.7rem; } .at-team { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (prefers-reduced-motion: reduce){ .at-chip.is-turn { animation:none; } }

@@ -30,12 +30,11 @@ const AT_PODIUM_SECS = 12;     // pause sur le podium avant la course suivante
 // tous codés, plusieurs joueurs peuvent avoir le même athlète. À passer à false au dernier lot.
 const AT_ALLOW_DUP = true;
 
-// Piste Galère TEMPORAIRE (Damien dessinera la vraie) : case → effet
+// Piste Galère (plateau dessiné par Damien) : case → effet
 //  star = +1 point · oups = l'athlète trébuche · arrow = déplacement de n cases (n<0 : recule)
 const AT_WILD = {
-  3:{ t:'star' },  5:{ t:'arrow', n:2 },  8:{ t:'oups' },  10:{ t:'star' },
-  12:{ t:'arrow', n:-3 }, 14:{ t:'oups' }, 16:{ t:'star' }, 18:{ t:'arrow', n:3 },
-  21:{ t:'oups' }, 23:{ t:'star' }, 25:{ t:'arrow', n:-4 }, 27:{ t:'star' }, 28:{ t:'oups' }
+  1:{ t:'star' },  5:{ t:'oups' },  7:{ t:'arrow', n:3 },  11:{ t:'arrow', n:1 },  13:{ t:'star' },
+  16:{ t:'arrow', n:-4 }, 17:{ t:'oups' }, 23:{ t:'arrow', n:2 }, 24:{ t:'arrow', n:-2 }, 26:{ t:'oups' }
 };
 const AT_TRACK_NAME = { mild:'Pépère', wild:'Galère' };
 
@@ -100,7 +99,7 @@ function atNormalize(st){
     p.used = atArr(p.used);
     p.offer = atArr(p.offer);
     if(!p.chosen) p.chosen=null;
-    ['pts','gold','silver','bronze','stars'].forEach(k=>{ if(typeof p[k]!=='number') p[k]=0; });
+    ['pts','gold','silver','bronze','stars','roll'].forEach(k=>{ if(typeof p[k]!=='number') p[k]=0; });
   });
   st.racers.forEach(r=>{
     if(typeof r.pos!=='number') r.pos=0;
@@ -186,9 +185,12 @@ function atMove(st, ctx, ri, n){
   if(pos===start) return;
   r.pos=Math.min(pos, AT_LEN);
   const passed = dir>0 ? st.racers.map((o,i)=>i).filter(i=>i!==ri && !st.racers[i].place && st.racers[i].pos>start && st.racers[i].pos<r.pos) : [];
-  if(frog && skipped) atTrigger(st, ctx, ri, atLabel(r.a)+' saute par-dessus '+atPlural(skipped,'case')+' occupée'+(skipped>1?'s':'')+' !');
-  if(r.pos>=AT_LEN){ atFinish(st, ri); return; }
+  const hop=()=>{ if(frog && skipped) atTrigger(st, ctx, ri, atLabel(r.a)+' saute par-dessus '+atPlural(skipped,'case')+' occupée'+(skipped>1?'s':'')+' !'); };
+  // L'arrivée est enregistrée AVANT les réactions (sinon une Commère pourrait finir entre-temps)
+  if(r.pos>=AT_LEN){ atFinish(st, ri); hop(); return; }
   r.arr=++st.mseq;
+  hop();
+  if(st.racers.filter(o=>o.place).length>=2) return;
   atAfterStop(st, ctx, ri, passed);
 }
 
@@ -270,6 +272,7 @@ function atPlay(st, mode){
   }
   const d=atDie();
   atLog(st, '🎲 '+r.p+' lance le dé : '+d+'.');
+  if(st.players[r.p]) st.players[r.p].roll=d;
   // La Chenille : sur un 1, le lanceur ne bouge pas et la Chenille avance d'1
   if(d===1){
     const worms=atReactOrder(st).filter(i=>i!==ri && !st.racers[i].place && st.racers[i].a==='chenille');
@@ -428,7 +431,7 @@ function atChoose(st, pseudo, key, auto){
 
 function atStartRace(st){
   st.phase='race';
-  st.racers=st.order.map(ps=>{ const p=st.players[ps]; p.used.push(p.chosen); return { p:ps, a:p.chosen, pos:0, trip:false, place:0, arr:0 }; });
+  st.racers=st.order.map(ps=>{ const p=st.players[ps]; p.used.push(p.chosen); p.roll=0; return { p:ps, a:p.chosen, pos:0, trip:false, place:0, arr:0 }; });
   st.mseq=0; st.pend=null;
   atLog(st, '📣 Course '+st.race+' — piste '+AT_TRACK_NAME[AT_TRACKS[st.race-1]]+' ! Sur la ligne de départ : '+st.racers.map(r=>atDef(r.a).ico+' '+r.p).join(', ')+'.', true);
   // Qui commence : au hasard pour la 1re course, puis le dernier de la course précédente
@@ -598,9 +601,9 @@ if (typeof setInterval!=='undefined' && typeof document!=='undefined') setInterv
 // ═══════════════════════════════════════════════════════════════════════════
 function atTimerSpan(until){ return '<span class="av-timer" data-at-until="'+until+'">'+atFmt(until-atNow())+'</span>'; }
 function atSeat(st, pseudo){ return Math.max(0, st.order.indexOf(pseudo)); }
-function atChip(st, r, me){
+function atChip(st, r, me, pos){
   const d=atDef(r.a), act=st.phase==='race' && atActive(st)===r;
-  return '<span class="at-chip'+(r.trip?' is-trip':'')+(act?' is-turn':'')+(r.p===me?' is-me':'')+'" style="--chip:var(--runner-'+(atSeat(st,r.p)+1)+')" title="'+escHtml(r.p+' — '+d.nom+(r.trip?' (a trébuché)':''))+'">'+d.ico+'</span>';
+  return '<span class="at-chip'+(r.trip?' is-trip':'')+(act?' is-turn':'')+(r.p===me?' is-me':'')+'" style="--chip:var(--runner-'+(atSeat(st,r.p)+1)+');'+(pos||'')+'" title=""'+escHtml(r.p+' — '+d.nom+(r.trip?' (a trébuché)':''))+'">'+d.ico+'</span>';
 }
 
 function atStatusPills(st){
@@ -613,25 +616,50 @@ function atStatusPills(st){
   return z.join('');
 }
 
-// Piste en serpentin : 31 cases (0 = départ, 30 = arrivée), 8 par rangée
-const AT_COLS = 8;
+// Plateaux dessinés (images/athletes/plateau-*.png, 682 × 187 px).
+// Position de chaque case en pixels de l'image : [x, y, largeur, hauteur].
+// 0 = Départ, 1-12 rangée du haut, 13-15 colonne de droite, 16-29 rangée du bas (vers la gauche), 30 = Arrivée.
+const AT_BOARD_W = 682, AT_BOARD_H = 187, AT_CHIP = 20;
+const AT_CELLS = (()=>{
+  const c=[];
+  c[0]=[14,14,129,40];
+  for(let i=1;i<=12;i++) c[i]=[143+44*(i-1),14,44,40];
+  c[13]=[627,54,44,40]; c[14]=[627,94,44,40]; c[15]=[627,134,44,40];
+  for(let i=16;i<=29;i++) c[i]=[583-44*(i-16),134,44,40];
+  c[30]=[12,54,43,80];
+  return c;
+})();
+// Positions (en pixels de l'image) de n pions dans une case : grille centrée, serrée si besoin
+function atSlots(cell, n){
+  const [x,y,w,h]=cell, s=AT_CHIP;
+  const cols=Math.max(1, Math.min(n, Math.floor(w/s)));
+  const rows=Math.ceil(n/cols);
+  const stepX=cols>1 ? Math.min(s, (w-s-4)/(cols-1)) : 0;
+  const stepY=rows>1 ? Math.min(s, (h-s-4)/(rows-1)) : 0;
+  const x0=x+(w-(s+stepX*(cols-1)))/2, y0=y+(h-(s+stepY*(rows-1)))/2;
+  const out=[];
+  for(let k=0;k<n;k++) out.push([x0+(k%cols)*stepX, y0+Math.floor(k/cols)*stepY]);
+  return out;
+}
 function atTrackHtml(st, me){
-  const wild=atIsWild(st);
-  let h='<div class="at-track'+(wild?' is-wild':'')+'">';
+  const wild=atIsWild(st), track=wild?'galere':'pepere';
+  let chips='';
   for(let i=0;i<=AT_LEN;i++){
-    const row=Math.floor(i/AT_COLS), c=i%AT_COLS, col=(row%2===0) ? c : (AT_COLS-1-c);
-    const cell=wild ? AT_WILD[i] : null;
-    let fx='';
-    if(cell && cell.t==='star') fx='<span class="at-fx">⭐</span>';
-    else if(cell && cell.t==='oups') fx='<span class="at-fx">💥</span>';
-    else if(cell && cell.t==='arrow') fx='<span class="at-fx">'+(cell.n>0?'⏩+':'⏪')+cell.n+'</span>';
-    const lab=i===0?'🚩<span class="at-lab"> Départ</span>':(i===AT_LEN?'🏁<span class="at-lab"> Arrivée</span>':String(i));
-    const here=st.racers.filter(r=>!r.place && r.pos===i);
-    const done=i===AT_LEN ? st.racers.filter(r=>r.place).sort((a,b)=>a.place-b.place) : [];
-    h+='<div class="at-cell'+(i===0?' is-start':'')+(i===AT_LEN?' is-finish':'')+(cell?' is-'+cell.t:'')+'" style="grid-row:'+(row+1)+';grid-column:'+(col+1)+'">'+
-      '<span class="at-num">'+lab+'</span>'+fx+'<span class="at-chips">'+here.concat(done).map(r=>atChip(st,r,me)).join('')+'</span></div>';
+    const here=i===AT_LEN ? st.racers.filter(r=>r.place).sort((a,b)=>a.place-b.place) : st.racers.filter(r=>!r.place && r.pos===i);
+    if(!here.length) continue;
+    atSlots(AT_CELLS[i], here.length).forEach(([x,y],k)=>{
+      chips+=atChip(st, here[k], me, 'left:'+(x/AT_BOARD_W*100).toFixed(2)+'%;top:'+(y/AT_BOARD_H*100).toFixed(2)+'%');
+    });
   }
-  return h+'</div>';
+  return '<div class="at-box at-board-scroll"><div class="at-board"><img class="at-board-img" src="images/athletes/plateau-'+track+'.png" alt="Plateau '+AT_TRACK_NAME[wild?'wild':'mild']+'">'+chips+'</div></div>';
+}
+
+// Bloc « Mon lancé » : dernier résultat de dé du joueur + boutons d'action
+function atRollBox(st, pl, actions){
+  const d=pl && pl.roll ? pl.roll : 0;
+  return '<div class="at-box"><div class="at-box-title">Mon lancé</div><div class="at-roll-row">'+
+    '<span class="at-die'+(d?'':' is-empty')+'" aria-label="'+(d?'Dé : '+d:'Pas encore lancé')+'">'+(d||'–')+'</span>'+
+    (actions?'<div class="at-cta">'+actions+'</div>':'')+'</div></div>';
 }
 
 function atCard(k, onclick, sub){
@@ -667,14 +695,15 @@ function atPlayersHtml(st, me){
     else if(st.phase==='draft'){ status=p.offer.length?'recrute…':'prêt'; out=!p.offer.length; }
     else if(st.phase==='choose'){ status=p.chosen?'prêt':'choisit…'; out=!!p.chosen; }
     else if(st.phase==='race' && r){
-      info='<span class="player-info">'+atDef(r.a).ico+' case '+Math.min(r.pos,AT_LEN)+'</span>';
+      info='<span class="player-info">'+(r.place?'arrivé':'case '+r.pos)+'</span>';
       if(r.place){ status=atPlace(r.place); out=true; }
-      else if(atActive(st)===r) status='son tour';
+      else if(atActive(st)===r) status='à son tour';
       else if(r.trip) status='a trébuché';
     }
     else if(st.phase==='podium' || st.phase==='end') status=atPlural(p.pts,'pt');
-    const pts=st.phase==='lobby' ? '' : '<span class="player-info">'+atPlural(p.pts,'pt')+'</span>';
-    const med=atMedals(p);
+    // Pendant la course (maquette) : seulement la case et le statut
+    const pts=(st.phase==='lobby' || st.phase==='race') ? '' : '<span class="player-info">'+atPlural(p.pts,'pt')+'</span>';
+    const med=st.phase==='race' ? '' : atMedals(p);
     return '<div class="player-row'+(ps===me?' is-current':'')+(out?' is-out':'')+'">'+
       '<span class="at-dot" style="background:var(--runner-'+(atSeat(st,ps)+1)+')"></span>'+
       '<span class="player-name">'+escHtml(ps)+'</span>'+
@@ -783,22 +812,24 @@ function renderAthletesViewer(pseudo){
   else if(st.phase==='race'){
     const r=atActive(st), mine=atRacerOf(st, pseudo);
     track=atTrackHtml(st, pseudo);
+    let actions='';
     if(mine && mine.place) ins='🏅 Ton athlète a terminé '+atPlace(mine.place)+' ! Attends la fin de la course.';
     else if(r && r.p===pseudo){
       if(st.pend){
-        ins='🚀 <strong>Tu as fait '+st.pend.d+'.</strong> Doubler ton déplacement ? (tu trébucheras ensuite)';
-        cta='<div class="at-cta">'+
-          '<button class="btn-primary-continue" onclick="athletesInventor(\''+esc+'\',true)">Doubler : '+(st.pend.d*2)+' cases</button>'+
-          '<button class="btn-primary" onclick="athletesInventor(\''+esc+'\',false)">Avancer de '+st.pend.d+'</button></div>';
+        ins='🚀 Tu as fait '+st.pend.d+'. Doubler ton déplacement ? (tu trébucheras ensuite)';
+        actions='<button class="btn-primary-continue" onclick="athletesInventor(\''+esc+'\',true)">Doubler : '+(st.pend.d*2)+' cases</button>'+
+          '<button class="btn-primary" onclick="athletesInventor(\''+esc+'\',false)">Avancer de '+st.pend.d+'</button>';
       } else {
-        ins='🎲 <strong>À toi de jouer</strong> avec '+escHtml(atLabel(r.a))+' !';
-        cta='<div class="at-cta">'+
-          '<button class="btn-primary-continue" onclick="athletesRoll(\''+esc+'\',\'roll\')">🎲 Lancer le dé</button>'+
-          (r.a==='facteur' ? '<button class="btn-primary" onclick="athletesRoll(\''+esc+'\',\'five\')">📯 Avancer de 5</button>' : '')+'</div>';
+        ins='🎲 À toi de jouer avec '+escHtml(atLabel(r.a))+' !';
+        actions='<button class="btn-primary-continue" onclick="athletesRoll(\''+esc+'\',\'roll\')">🎲 Lancer le dé</button>'+
+          (r.a==='facteur' ? '<button class="btn-primary" onclick="athletesRoll(\''+esc+'\',\'five\')">📯 Avancer de 5</button>' : '');
       }
     }
-    else if(r) ins='⏳ Au tour de <strong>'+escHtml(r.p)+'</strong> ('+escHtml(atLabel(r.a))+').';
-    if(mine) cta+='<div class="action-row-sub u-mt-sm">Ton athlète : '+escHtml(atLabel(mine.a))+' — '+escHtml(atDef(mine.a).txt)+'</div>';
+    else if(r) ins='⏳ Au tour de '+escHtml(r.p)+' ('+escHtml(atLabel(r.a))+').';
+    if(mine){
+      main=atRollBox(st, me, actions);
+      cta='<div class="action-row-sub u-mt-sm">Ton athlète : '+escHtml(atLabel(mine.a))+' — '+escHtml(atDef(mine.a).txt)+'</div>';
+    }
   }
   else if(st.phase==='podium'){
     ins=st.race>=AT_TEAM ? 'Dernière course terminée ! Classement dans quelques secondes…' : 'Course suivante dans quelques secondes…';
